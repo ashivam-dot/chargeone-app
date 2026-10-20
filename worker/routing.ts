@@ -1,7 +1,7 @@
-import { MAX_REPLANS_PER_TRIP, REPLAN_WINDOW_HOURS, decideTrip } from '../src/shared/plans.ts';
+import { FREE_TRIP_KM, MAX_REPLANS_PER_TRIP, PLANS, REPLAN_WINDOW_HOURS, decideTrip } from '../src/shared/plans.ts';
 import type { Coord } from '../src/planner/geometry.ts';
 import type { User } from './auth.ts';
-import { currentPlan, usageCounts } from './entitlements.ts';
+import { currentPlan, quotaWindows, usageCounts } from './entitlements.ts';
 import { isDev, type Env } from './env.ts';
 import { HttpError, enforceRateLimit, latLngInIndia, readJson, str, type LatLng } from './http.ts';
 import { distanceMetres } from './stations.ts';
@@ -9,6 +9,9 @@ import { distanceMetres } from './stations.ts';
 const ORS_URL = 'https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson';
 const OSRM_DEMO_URL = 'https://router.project-osrm.org/route/v1/driving';
 const SAME_DESTINATION_M = 2000;
+/** Detours after a failed charger can add some distance to the remaining route. */
+const REPLAN_DISTANCE_SLACK = 0.15;
+const REPLAN_DISTANCE_EXTRA_KM = 10;
 
 export interface RouteResult {
   coords: Coord[];
@@ -95,45 +98,65 @@ export async function planRoute(req: Request, env: Env, user: User) {
   const now = new Date();
   const planId = await currentPlan(env, user.id, now);
 
-  let replanOf: { id: string; replans: number } | null = null;
+  let original: { id: string; counts: 'short' | 'long'; distance_km: number } | null = null;
   if (tripId) {
     const since = new Date(now.getTime() - REPLAN_WINDOW_HOURS * 3600_000).toISOString();
     const trip = await env.DB.prepare(
-      'SELECT id, to_lat, to_lng, replans FROM trips WHERE id = ?1 AND user_id = ?2 AND created_at >= ?3',
+      'SELECT id, counts, distance_km, to_lat, to_lng, replans FROM trips WHERE id = ?1 AND user_id = ?2 AND created_at >= ?3',
     )
       .bind(tripId, user.id, since)
-      .first<{ id: string; to_lat: number; to_lng: number; replans: number }>();
+      .first<{ id: string; counts: 'short' | 'long'; distance_km: number; to_lat: number; to_lng: number; replans: number }>();
     if (trip && trip.replans < MAX_REPLANS_PER_TRIP && distanceMetres(to, { lat: trip.to_lat, lng: trip.to_lng }) <= SAME_DESTINATION_M) {
-      replanOf = { id: trip.id, replans: trip.replans };
+      original = trip;
     }
   }
+  // A re-plan is free only for the same journey: a driver on the way is closer, not further,
+  // and a short trip can't become a long one.
+  const isReplan = (km: number) =>
+    original !== null &&
+    km <= original.distance_km * (1 + REPLAN_DISTANCE_SLACK) + REPLAN_DISTANCE_EXTRA_KM &&
+    !(original.counts === 'short' && km > FREE_TRIP_KM);
 
   const straightKm = distanceMetres(from, to) / 1000;
   if (straightKm < 0.5) throw new HttpError(400, 'too_short', 'Start and destination are the same place.');
   const usage = await usageCounts(env, user.id, planId, now);
   // A road is never shorter than the straight line, so this refuses obviously-too-long trips
   // without spending a routing call.
-  const early = decideTrip(planId, straightKm, usage, replanOf !== null);
+  const early = decideTrip(planId, straightKm, usage, isReplan(straightKm));
   if (!early.allowed) throw new HttpError(402, early.reason, early.message, { plan: planId, usage });
 
   const route = await computeRoute(env, from, to);
-  const decision = decideTrip(planId, route.distanceKm, usage, replanOf !== null);
+  const decision = decideTrip(planId, route.distanceKm, usage, isReplan(route.distanceKm));
   if (!decision.allowed) {
     throw new HttpError(402, decision.reason, decision.message, { plan: planId, usage, distanceKm: Math.round(route.distanceKm) });
   }
 
   let id: string;
-  if (replanOf) {
-    id = replanOf.id;
-    await env.DB.prepare('UPDATE trips SET replans = replans + 1 WHERE id = ?1').bind(id).run();
+  if (decision.counts === 'replan') {
+    id = original!.id;
+    const res = await env.DB.prepare('UPDATE trips SET replans = replans + 1 WHERE id = ?1 AND replans < ?2')
+      .bind(id, MAX_REPLANS_PER_TRIP)
+      .run();
+    if ((res.meta.changes ?? 0) === 0) throw new HttpError(429, 'too_many_replans', 'This trip has been re-planned too many times. Start a new trip.');
   } else {
     id = crypto.randomUUID();
-    await env.DB.prepare(
-      'INSERT INTO trips (id, user_id, counts, distance_km, to_lat, to_lng, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)',
+    const plan = PLANS[planId];
+    const windows = await quotaWindows(env, user.id, planId, now);
+    const [since, limit] = decision.counts === 'short' ? [windows.dayStart, plan.shortTripsPerDay] : [windows.longStart, plan.longTripQuota];
+    // The quota check and the insert are one statement, so parallel requests can't overshoot it.
+    const res = await env.DB.prepare(
+      `INSERT INTO trips (id, user_id, counts, distance_km, to_lat, to_lng, created_at)
+       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
+       WHERE (SELECT COUNT(*) FROM trips WHERE user_id = ?2 AND counts = ?3 AND created_at >= ?8) < ?9`,
     )
       // Only the destination area (~1 km) is kept, which is enough to recognise a re-plan.
-      .bind(id, user.id, decision.counts, route.distanceKm, Math.round(to.lat * 100) / 100, Math.round(to.lng * 100) / 100, now.toISOString())
+      .bind(id, user.id, decision.counts, route.distanceKm, Math.round(to.lat * 100) / 100, Math.round(to.lng * 100) / 100, now.toISOString(), since, limit)
       .run();
+    if ((res.meta.changes ?? 0) === 0) {
+      const latest = await usageCounts(env, user.id, planId, now);
+      const again = decideTrip(planId, route.distanceKm, latest, false);
+      throw new HttpError(402, again.allowed ? 'long_quota_used' : again.reason, again.allowed ? 'Trip limit reached.' : again.message, { plan: planId, usage: latest });
+    }
   }
 
   const after = await usageCounts(env, user.id, planId, now);

@@ -17,7 +17,8 @@
 <table>
 <tr><th>Data</th><th>Why</th><th>Kept for</th></tr>
 <tr><td>Name and email from Google sign-in</td><td>To create your account and tell you about your plan</td><td>Until you delete your account</td></tr>
-<tr><td>Location when you report a charger</td><td>To confirm you are at the charger. We store the report and charger, not your coordinates.</td><td>Reports are kept as charger history</td></tr>
+<tr><td>Location when you report a charger</td><td>To confirm you are at the charger. We store the report and charger, not your coordinates.</td><td>Not stored</td></tr>
+<tr><td>Charger reports (status, charging speed, your car model and note if you add them)</td><td>Shown <strong>publicly</strong> to all drivers as the charger's recent history, without your name or email</td><td>Kept as charger history; your car model and note are erased when you delete your account</td></tr>
 <tr><td>Start and destination of planned trips</td><td>To calculate the route and count trips in your plan. We keep only the trip distance and destination area.</td><td>Deleted with your account</td></tr>
 <tr><td>Payment records (plan, amount, Razorpay payment ID)</td><td>To activate your plan and meet tax and accounting law</td><td>8 years, as the law requires</td></tr>
 <tr><td>Basic server logs (IP address, time, request)</td><td>Security, abuse prevention and legal compliance (CERT-In)</td><td>Up to 180 days</td></tr>
@@ -31,10 +32,11 @@
 <li>Cloudflare, for hosting.</li>
 <li>openrouteservice (HeiGIT), which receives route start and end points to calculate routes.</li>
 <li>Photon (komoot), which receives what you type in place search.</li>
+<li>OpenFreeMap, which serves the map images and sees your IP address and the map area you view.</li>
 </ul>
 
 <h2>Your rights</h2>
-<p>You can see your data in the app, correct it, and delete your account at any time from <em>Account → Delete my account</em>. Deleting cancels any subscription and erases your trips and profile. You can also withdraw consent or raise a grievance by emailing our grievance officer, {{OWNER_NAME}}, at <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a>. We reply within 7 days. If you're not satisfied, you can complain to the Data Protection Board of India.</p>
+<p>You can see your data in the app, correct it, and delete your account at any time from <em>Account → Delete my account</em>. Deleting cancels any subscription immediately, erases your trips, plan and profile (name, email and Google ID), and removes the car model and notes from your charger reports. Payment records are kept for the period tax law requires. You can also withdraw consent or raise a grievance by emailing our grievance officer, {{OWNER_NAME}}, at <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a>. We reply within 7 days. If you're not satisfied, you can complain to the Data Protection Board of India.</p>
 
 <h2>Children</h2>
 <p>ChargeOne is for drivers aged 18 and over.</p>

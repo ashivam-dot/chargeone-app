@@ -95,7 +95,7 @@ export const api = {
     request<{ id: number }>('POST', '/api/checkins', body),
   route: (from: LatLng, to: LatLng, tripId?: string) => request<RouteResponse>('POST', '/api/route', { from, to, tripId }),
   checkout: (plan: PlanId) => request<Checkout>('POST', '/api/billing/checkout', { plan }),
-  confirm: (payload: Record<string, string>) => request<{ plan: PlanId }>('POST', '/api/billing/confirm', payload),
+  confirm: (payload: Record<string, string>) => request<{ plan: PlanId; refundDue?: boolean }>('POST', '/api/billing/confirm', payload),
   cancel: () => request<{ activeUntil: string | null }>('POST', '/api/billing/cancel', {}),
   devGrant: (plan: PlanId) => request<Me>('POST', '/api/dev/grant', { plan }),
 };

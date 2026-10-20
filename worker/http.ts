@@ -1,3 +1,5 @@
+import { toHex } from './crypto.ts';
+
 export class HttpError extends Error {
   constructor(
     readonly status: number,
@@ -104,6 +106,12 @@ export function latLngInIndia(body: Record<string, unknown>, key: string): LatLn
 
 export function clientIp(req: Request): string {
   return req.headers.get('CF-Connecting-IP') ?? 'unknown';
+}
+
+/** A short hash of the client IP, so rate-limit rows never store addresses. */
+export async function clientKey(req: Request): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`chargeone:${clientIp(req)}`));
+  return toHex(new Uint8Array(digest)).slice(0, 24);
 }
 
 /** Fixed-window counter stored in D1. Returns false when the limit is exceeded. */

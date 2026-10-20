@@ -58,7 +58,7 @@ export const PLANS: Record<PlanId, Plan> = {
     longTripQuota: 30,
     longTripWindow: 'month',
     shortTripsPerDay: 30,
-    features: ['30 long trips a month', 'Live re-planning when a charger fails', 'Saved trips', 'Backup chargers at every stop'],
+    features: ['30 long trips a month', 'Live re-planning when a charger fails', 'Alerts if a stop on your route is reported broken', 'Backup chargers at every stop'],
   },
   plus_yearly: {
     id: 'plus_yearly',

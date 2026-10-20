@@ -9,10 +9,10 @@ import {
   verifyGoogleIdToken,
   currentUser,
 } from './auth.ts';
-import { cancelSubscription, cancelSubscriptionNow, confirmCheckout, createCheckout, handleWebhook } from './billing.ts';
+import { cancelAllSubscriptions, cancelSubscription, confirmCheckout, createCheckout, handleWebhook } from './billing.ts';
 import { getEntitlement, grantPlan, usageCounts } from './entitlements.ts';
 import { isDev, type Env } from './env.ts';
-import { HttpError, clientIp, enforceRateLimit, errorResponse, json, readJson, requireSameOrigin, str } from './http.ts';
+import { HttpError, clientKey, enforceRateLimit, errorResponse, json, readJson, requireSameOrigin, str } from './http.ts';
 import { STATION_ID, createCheckin, recentStatuses, stationReports } from './reports.ts';
 import { planRoute } from './routing.ts';
 
@@ -35,7 +35,12 @@ function route(method: string, path: string, handler: Handler, external = false)
   routes.push({ method, pattern, keys, handler, external });
 }
 
-const secureCookies = (req: Request) => new URL(req.url).protocol === 'https:';
+/** Local dev runs over plain http, where browsers drop Secure cookies. */
+const secureCookies = (req: Request, env: Env) => !isDev(env) || new URL(req.url).protocol === 'https:';
+
+const STATUS_CACHE_KEY = 'https://chargeone.internal/api/status';
+/** The edge cache exists only on Cloudflare; tests and Node run without it. */
+const edgeCache = (): Cache | null => (typeof caches === 'undefined' ? null : caches.default);
 
 async function meResponse(env: Env, userId: string, email: string, name: string | null) {
   const now = new Date();
@@ -65,14 +70,14 @@ route('GET', '/api/config', async (_req, env) =>
 );
 
 route('POST', '/api/auth/google', async (req, env) => {
-  await enforceRateLimit(env.DB, `auth:${clientIp(req)}`, 20, 600);
+  await enforceRateLimit(env.DB, `auth:${await clientKey(req)}`, 20, 600);
   const body = await readJson(req, 4096);
   const credential = str(body, 'credential', { max: 4000 })!;
   const identity = await verifyGoogleIdToken(credential, env.GOOGLE_CLIENT_ID);
   const user = await upsertUser(env, identity.sub, identity.email, identity.name);
   const token = await issueSession(env, user);
   return json(await meResponse(env, user.id, user.email, user.name), {
-    headers: { 'Set-Cookie': sessionCookie(token, secureCookies(req)) },
+    headers: { 'Set-Cookie': sessionCookie(token, secureCookies(req, env)) },
   });
 });
 
@@ -83,18 +88,18 @@ route('POST', '/api/auth/dev', async (req, env) => {
   const user = await upsertUser(env, `dev:${email}`, email, 'Test driver');
   const token = await issueSession(env, user);
   return json(await meResponse(env, user.id, user.email, user.name), {
-    headers: { 'Set-Cookie': sessionCookie(token, secureCookies(req)) },
+    headers: { 'Set-Cookie': sessionCookie(token, secureCookies(req, env)) },
   });
 });
 
-route('POST', '/api/auth/logout', async (req) =>
-  json({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie(secureCookies(req)) } }),
+route('POST', '/api/auth/logout', async (req, env) =>
+  json({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie(secureCookies(req, env)) } }),
 );
 
 route('POST', '/api/auth/logout-all', async (req, env) => {
   const user = await requireUser(req, env);
   await revokeSessions(env, user.id);
-  return json({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie(secureCookies(req)) } });
+  return json({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie(secureCookies(req, env)) } });
 });
 
 route('GET', '/api/me', async (req, env) => {
@@ -105,7 +110,7 @@ route('GET', '/api/me', async (req, env) => {
 
 route('POST', '/api/me/delete', async (req, env) => {
   const user = await requireUser(req, env);
-  await cancelSubscriptionNow(env, user.id);
+  await cancelAllSubscriptions(env, user.id);
   await env.DB.batch([
     env.DB.prepare('DELETE FROM trips WHERE user_id = ?1').bind(user.id),
     env.DB.prepare('DELETE FROM entitlements WHERE user_id = ?1').bind(user.id),
@@ -114,14 +119,19 @@ route('POST', '/api/me/delete', async (req, env) => {
       "UPDATE users SET email = 'deleted', name = NULL, google_sub = NULL, session_version = session_version + 1 WHERE id = ?1",
     ).bind(user.id),
   ]);
-  return json({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie(secureCookies(req)) } });
+  return json({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie(secureCookies(req, env)) } });
 });
 
-route('GET', '/api/status', async (_req, env) =>
-  json({ generatedAt: new Date().toISOString(), statuses: await recentStatuses(env) }, {
+route('GET', '/api/status', async (_req, env) => {
+  const cache = edgeCache();
+  const cached = await cache?.match(STATUS_CACHE_KEY);
+  if (cached) return cached;
+  const res = json({ generatedAt: new Date().toISOString(), statuses: await recentStatuses(env) }, {
     headers: { 'Cache-Control': 'public, max-age=30' },
-  }),
-);
+  });
+  await cache?.put(STATUS_CACHE_KEY, res.clone());
+  return res;
+});
 
 route('GET', '/api/stations/:id/reports', async (_req, env, params) => {
   if (!STATION_ID.test(params.id)) throw new HttpError(400, 'invalid', 'Invalid station.');
@@ -130,7 +140,9 @@ route('GET', '/api/stations/:id/reports', async (_req, env, params) => {
 
 route('POST', '/api/checkins', async (req, env) => {
   const user = await requireUser(req, env);
-  return json(await createCheckin(req, env, user), { status: 201 });
+  const created = await createCheckin(req, env, user);
+  await edgeCache()?.delete(STATUS_CACHE_KEY);
+  return json(created, { status: 201 });
 });
 
 route('POST', '/api/route', async (req, env) => {
@@ -150,7 +162,15 @@ route('POST', '/api/dev/grant', async (req, env) => {
   const plan = str(body, 'plan', { max: 20 }) as PlanId;
   if (!PAID_PLANS.includes(plan)) throw new HttpError(400, 'invalid', 'Unknown plan.');
   const now = new Date();
-  await grantPlan(env, user.id, plan, new Date(now.getTime() + PLANS[plan].periodDays * 86400_000), 'dev', null, 'active', now);
+  await grantPlan(env, {
+    userId: user.id,
+    plan,
+    activeUntil: new Date(now.getTime() + PLANS[plan].periodDays * 86400_000),
+    source: 'dev',
+    externalId: null,
+    status: 'active',
+    periodStart: now,
+  });
   return json(await meResponse(env, user.id, user.email, user.name));
 });
 

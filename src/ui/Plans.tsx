@@ -59,7 +59,7 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
       const checkout = await api.checkout(plan);
       await loadScript('https://checkout.razorpay.com/v1/checkout.js');
       if (!window.Razorpay) throw new Error('Payment window could not load.');
-      await new Promise<void>((resolve, reject) => {
+      const result = await new Promise<{ refundDue?: boolean }>((resolve, reject) => {
         const rzp = new window.Razorpay!({
           key: checkout.keyId,
           ...(checkout.kind === 'order' ? { order_id: checkout.orderId, amount: checkout.amount, currency: 'INR' } : { subscription_id: checkout.subscriptionId }),
@@ -70,8 +70,7 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
           modal: { ondismiss: () => reject(new Error('dismissed')) },
           handler: async (resp: RazorpayResponse) => {
             try {
-              await api.confirm({ ...resp });
-              resolve();
+              resolve(await api.confirm({ ...resp }));
             } catch (e) {
               reject(e);
             }
@@ -80,11 +79,19 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
         rzp.on('payment.failed', (r) => reject(new Error(r.error?.description ?? 'Payment failed.')));
         rzp.open();
       });
-      setMessage({ kind: 'ok', text: `${PLANS[plan].name} is active. Happy driving!` });
+      setMessage(
+        result.refundDue
+          ? { kind: 'error', text: 'You already have Plus, so this payment will be refunded within 5–7 days.' }
+          : { kind: 'ok', text: `${PLANS[plan].name} is active. Happy driving!` },
+      );
       onActivated();
     } catch (e) {
       if (e instanceof Error && e.message === 'dismissed') setMessage(null);
       else if (e instanceof ApiError && e.status === 401) onRequireSignIn();
+      else if (e instanceof ApiError && e.code === 'payment_pending') {
+        setMessage({ kind: 'error', text: e.message });
+        onActivated();
+      }
       else setMessage({ kind: 'error', text: e instanceof Error ? e.message : 'Payment did not complete.' });
     } finally {
       setBusy(null);

@@ -1,7 +1,7 @@
 import { REPORT_KINDS, STATUS_LOOKBACK_DAYS, type ReportKind, type StationStatus } from '../src/shared/status.ts';
 import type { User } from './auth.ts';
 import type { Env } from './env.ts';
-import { HttpError, enforceRateLimit, latLngInIndia, num, readJson, str } from './http.ts';
+import { HttpError, clientKey, enforceRateLimit, latLngInIndia, num, readJson, str } from './http.ts';
 import { distanceMetres, stationIndex } from './stations.ts';
 
 /** GPS on phones is often off by 100-300 m near tall buildings, so allow some slack. */
@@ -9,6 +9,10 @@ export const CHECKIN_RADIUS_M = 500;
 export const MAX_GPS_ACCURACY_M = 1000;
 const DUPLICATE_WINDOW_MIN = 10;
 const MAX_CHECKINS_PER_DAY = 30;
+const MAX_PROBLEM_REPORTS_PER_DAY = 5;
+/** Generous because many drivers can share one mobile carrier IP. */
+const MAX_CHECKINS_PER_IP_PER_DAY = 200;
+const PROBLEM_KINDS: ReportKind[] = ['broken', 'slow', 'blocked'];
 
 export interface CheckinRow {
   station_id: string;
@@ -122,6 +126,11 @@ export async function createCheckin(req: Request, env: Env, user: User): Promise
   }
 
   await enforceRateLimit(env.DB, `checkin:${user.id}`, MAX_CHECKINS_PER_DAY, 86400);
+  await enforceRateLimit(env.DB, `checkin-ip:${await clientKey(req)}`, MAX_CHECKINS_PER_IP_PER_DAY, 86400);
+  if (PROBLEM_KINDS.includes(kind)) {
+    // Problem reports turn a charger red for everyone, so one account can't flag many.
+    await enforceRateLimit(env.DB, `problem:${user.id}`, MAX_PROBLEM_REPORTS_PER_DAY, 86400);
+  }
   const since = new Date(Date.now() - DUPLICATE_WINDOW_MIN * 60_000).toISOString();
   const dup = await env.DB.prepare(
     'SELECT id FROM checkins WHERE user_id = ?1 AND station_id = ?2 AND kind = ?3 AND created_at >= ?4 LIMIT 1',

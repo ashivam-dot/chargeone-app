@@ -69,7 +69,7 @@ function readToken(req: Request): string | null {
 
 export async function currentUser(req: Request, env: Env): Promise<User | null> {
   const token = readToken(req);
-  if (!token || !env.SESSION_SECRET) return null;
+  if (!token || !env.SESSION_SECRET || env.SESSION_SECRET.length < 32) return null;
   const payload = await verifySessionToken(token, env.SESSION_SECRET);
   if (!payload) return null;
   const row = await env.DB.prepare('SELECT id, email, name, session_version FROM users WHERE id = ?1')

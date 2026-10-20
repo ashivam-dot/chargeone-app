@@ -30,18 +30,20 @@ export function startOfIndianDay(now: Date): string {
   return new Date(ist.getTime() - IST_OFFSET_MS).toISOString();
 }
 
-export async function usageCounts(env: Env, userId: string, planId: PlanId, now = new Date()): Promise<UsageCounts> {
+/** Start of the window each trip type is counted in: short trips per Indian day, long trips per plan window. */
+export async function quotaWindows(env: Env, userId: string, planId: PlanId, now = new Date()): Promise<{ dayStart: string; longStart: string }> {
   const plan = PLANS[planId];
-  let windowStart: string;
+  const dayStart = startOfIndianDay(now);
   if (plan.longTripWindow === 'period') {
     const e = await getEntitlement(env, userId);
-    windowStart = e?.periodStart ?? startOfIndianDay(now);
-  } else if (plan.longTripWindow === 'month') {
-    windowStart = new Date(now.getTime() - 30 * 86400_000).toISOString();
-  } else {
-    windowStart = startOfIndianDay(now);
+    return { dayStart, longStart: e?.periodStart ?? dayStart };
   }
-  const dayStart = startOfIndianDay(now);
+  if (plan.longTripWindow === 'month') return { dayStart, longStart: new Date(now.getTime() - 30 * 86400_000).toISOString() };
+  return { dayStart, longStart: dayStart };
+}
+
+export async function usageCounts(env: Env, userId: string, planId: PlanId, now = new Date()): Promise<UsageCounts> {
+  const { dayStart, longStart: windowStart } = await quotaWindows(env, userId, planId, now);
   const row = await env.DB.prepare(
     `SELECT
        SUM(CASE WHEN counts = 'short' AND created_at >= ?2 THEN 1 ELSE 0 END) AS short_today,
@@ -53,24 +55,59 @@ export async function usageCounts(env: Env, userId: string, planId: PlanId, now 
   return { shortToday: row?.short_today ?? 0, longInWindow: row?.long_window ?? 0 };
 }
 
-export async function grantPlan(
-  env: Env,
-  userId: string,
-  plan: PlanId,
-  activeUntil: Date,
-  source: string,
-  externalId: string | null,
-  status: string,
-  periodStart: Date | null,
-): Promise<void> {
-  const now = new Date().toISOString();
-  await env.DB.prepare(
+export interface Grant {
+  userId: string;
+  plan: PlanId;
+  activeUntil: Date;
+  source: string;
+  externalId: string | null;
+  status: string;
+  periodStart: Date | null;
+}
+
+/**
+ * Upserts the user's plan. For the same purchase (external id) it never shortens access, never
+ * reopens a cancelled or completed subscription and never revives a refunded one, so late or
+ * repeated webhooks and replayed confirms are harmless. Options, checked in the same statement:
+ * `unlessPaymentId` skips the grant if that payment was already processed (run it in the same
+ * batch as the payment insert); `notOverPlus` skips it while the user has active Plus.
+ */
+export function grantStatement(env: Env, g: Grant, opts: { unlessPaymentId?: string; notOverPlus?: boolean } = {}): D1PreparedStatement {
+  const guards = ['1'];
+  if (opts.unlessPaymentId) guards.push('NOT EXISTS (SELECT 1 FROM payments WHERE id = ?9)');
+  if (opts.notOverPlus) {
+    guards.push("NOT EXISTS (SELECT 1 FROM entitlements WHERE user_id = ?1 AND plan IN ('plus_monthly', 'plus_yearly') AND active_until > ?8)");
+  }
+  const same = 'entitlements.external_id IS excluded.external_id';
+  const stmt = env.DB.prepare(
     `INSERT INTO entitlements (user_id, plan, active_until, period_start, source, external_id, status, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-     ON CONFLICT(user_id) DO UPDATE SET plan = excluded.plan, active_until = excluded.active_until,
-       period_start = COALESCE(excluded.period_start, entitlements.period_start), source = excluded.source,
-       external_id = excluded.external_id, status = excluded.status, updated_at = excluded.updated_at`,
-  )
-    .bind(userId, plan, activeUntil.toISOString(), periodStart?.toISOString() ?? null, source, externalId, status, now)
-    .run();
+     SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8 WHERE ${guards.join(' AND ')}
+     ON CONFLICT(user_id) DO UPDATE SET
+       plan = excluded.plan,
+       active_until = CASE
+         WHEN ${same} AND (entitlements.status = 'refunded' OR entitlements.active_until > excluded.active_until)
+         THEN entitlements.active_until ELSE excluded.active_until END,
+       period_start = COALESCE(excluded.period_start, entitlements.period_start),
+       source = excluded.source,
+       external_id = excluded.external_id,
+       status = CASE
+         WHEN ${same} AND entitlements.status IN ('cancelled', 'completed', 'refunded')
+         THEN entitlements.status ELSE excluded.status END,
+       updated_at = excluded.updated_at`,
+  );
+  const args: Array<string | null> = [
+    g.userId,
+    g.plan,
+    g.activeUntil.toISOString(),
+    g.periodStart?.toISOString() ?? null,
+    g.source,
+    g.externalId,
+    g.status,
+    new Date().toISOString(),
+  ];
+  return opts.unlessPaymentId ? stmt.bind(...args, opts.unlessPaymentId) : stmt.bind(...args);
+}
+
+export async function grantPlan(env: Env, g: Grant): Promise<void> {
+  await grantStatement(env, g).run();
 }
