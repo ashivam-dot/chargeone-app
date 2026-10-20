@@ -48,6 +48,26 @@ try {
   await page.waitForTimeout(2000);
   await page.screenshot({ path: `${shots}02-station.png` });
 
+  check('charger sheet lists food nearby', await visible(page, 'section[aria-label="Food and stays nearby"] .poi'));
+  await page.getByRole('tab', { name: /Stays/ }).click();
+  check('stays tab lists hotels', await visible(page, '.poi__icon--stay'));
+  const bookingHref = await page.locator('a.chip-link--accent').first().getAttribute('href');
+  check('stay links to Booking.com search', bookingHref?.startsWith('https://www.booking.com/searchresults.html?ss=') ?? false);
+  const stayName = (await page.locator('button.poi__name').first().textContent())?.trim() ?? '';
+  await page.locator('button.poi__name').first().click();
+  check('place sheet opens with nearby chargers', await visible(page, 'section[aria-label="Chargers nearby"]'));
+  check('place deep link is in the URL', /[?&]p=/.test(page.url()));
+  await page.screenshot({ path: `${shots}02b-place.png` });
+  const placeUrl = page.url();
+  await page.goto(placeUrl, { waitUntil: 'domcontentloaded' });
+  check('place deep link reopens the place', await visible(page, `section[aria-label="${stayName.replace(/"/g, '\\"')}"]`));
+  await page.getByRole('button', { name: 'Close' }).first().click();
+  await page.getByRole('button', { name: 'Food', exact: true }).click();
+  check('food chip toggles on', (await page.getByRole('button', { name: 'Food', exact: true }).getAttribute('aria-pressed')) === 'true');
+  await page.getByRole('button', { name: 'Food', exact: true }).click();
+  await page.goto(`${BASE}/?s=${station.id}`, { waitUntil: 'domcontentloaded' });
+  await visible(page, `section[aria-label="${station.name.replace(/"/g, '\\"')}"]`);
+
   await page.getByRole('button', { name: 'Charged fine' }).click();
   check('reporting while signed out asks to sign in', await visible(page, 'section[aria-label="Sign in"]'));
   await page.getByRole('button', { name: /Test sign-in/ }).click();
@@ -107,6 +127,22 @@ try {
   await page.locator('.sheet__body').first().evaluate((el) => el.scrollTo(0, el.scrollHeight));
   await page.screenshot({ path: `${shots}06-trip-timeline.png` });
 
+  await page.getByRole('button', { name: 'Plan another trip' }).click();
+  await dest.fill('Kochi');
+  const kochi = page.locator('.place__list [role="option"]').filter({ hasText: /Kochi/ }).first();
+  if (await kochi.waitFor({ timeout: 15000 }).then(() => true, () => false)) await kochi.click();
+  await page.locator('.inline-select select').selectOption('6');
+  await page.locator('.slider input[type="range"]').fill('90');
+  await page.getByRole('button', { name: 'Plan my trip' }).click();
+  check('long trip is split into days', await visible(page, '.day__head', 30000));
+  console.log(`      verdict: "${(await page.locator('.verdict strong').textContent())?.trim()}", days: ${await page.locator('.day').count()}`);
+  check('overnight card suggests stays', await visible(page, '.overnight .poi', 3000));
+  console.log(`      overnight at "${(await page.locator('.overnight .timeline__name').first().textContent())?.trim()}", stays listed: ${await page.locator('.overnight .poi').count()}`);
+  check('stays near the destination are suggested', await visible(page, '.dest-stays .poi', 3000));
+  check('each day has its own navigation link', (await page.locator('.day__head a').first().getAttribute('href'))?.startsWith('https://www.google.com/maps/dir/') ?? false);
+  await page.locator('.overnight').first().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${shots}06b-multi-day.png` });
+
   await page.getByRole('button', { name: 'Close' }).first().click();
   await page.getByRole('button', { name: 'Account' }).click();
   check('account shows Plus', await visible(page, 'section[aria-label="Account"] >> text=Plus'));
@@ -118,6 +154,17 @@ try {
 
   await page.goto(`${BASE}/privacy.html`);
   check('privacy page is served', await visible(page, 'h1:has-text("Privacy policy")'));
+
+  await page.goto(`${BASE}/ev-charging/`);
+  check('city index page is served', await visible(page, 'h1:has-text("EV charging stations across India")'));
+  await page.locator('.cities a').first().click();
+  check('city page lists chargers', await visible(page, 'h1:has-text("EV charging stations in")'));
+  await page.locator('.links a').first().click();
+  check('charger page has structured data', (await page.locator('script[type="application/ld+json"]').count()) >= 2);
+  check('charger page links into the app', (await page.locator('a.btn').first().getAttribute('href'))?.startsWith('/?s=') ?? false);
+  await page.screenshot({ path: `${shots}08-seo-charger.png` });
+  const robots = await page.request.get(`${BASE}/robots.txt`);
+  check('robots.txt points to the sitemap', (await robots.text()).includes('Sitemap:'));
 } catch (e) {
   failures++;
   console.log('FAIL  unexpected error:', e instanceof Error ? e.message.split('\n')[0] : e);

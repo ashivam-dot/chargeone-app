@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
+import { Route } from 'lucide-preact';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { EMPTY_FILTERS, filterStations, operatorsByCount } from './data/filters.ts';
 import type { Dataset, Station } from './data/model.ts';
+import type { Place, PlacesData } from './data/places.ts';
 import { api, type Config, type Me } from './lib/api.ts';
+import { loadPlaces } from './lib/places.ts';
 import { isObject, loadJson, saveJson } from './lib/storage.ts';
-import { MapView, type FlyTarget, type StopMarker } from './map/MapView.tsx';
+import { MapView, type FlyTarget, type PlaceMarker } from './map/MapView.tsx';
 import { liveState, type StationStatus } from './shared/status.ts';
 import type { MyVehicle } from './shared/vehicles.ts';
 import { About } from './ui/About.tsx';
@@ -11,6 +14,7 @@ import { Account } from './ui/Account.tsx';
 import { FilterBar, type MapFilters } from './ui/FilterBar.tsx';
 import { Garage } from './ui/Garage.tsx';
 import { PlaceInput, type PickedPlace } from './ui/PlaceInput.tsx';
+import { PlaceSheet } from './ui/PlaceSheet.tsx';
 import { Plans } from './ui/Plans.tsx';
 import { SignIn } from './ui/SignIn.tsx';
 import { StationSheet } from './ui/StationSheet.tsx';
@@ -32,8 +36,12 @@ export function App() {
   const [statuses, setStatuses] = useState<Map<string, StationStatus>>(new Map());
   const [config, setConfig] = useState<Config | null>(null);
   const [me, setMe] = useState<Me | null>(null);
-  const [filters, setFilters] = useState<MapFilters>({ ...EMPTY_FILTERS, workingOnly: false });
+  const [filters, setFilters] = useState<MapFilters>({ ...EMPTY_FILTERS, workingOnly: false, showFood: false, showStays: false });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [places, setPlaces] = useState<PlacesData | null>(null);
+  const [placesLoading, setPlacesLoading] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<number | null>(null);
+  const placesRequested = useRef(false);
   const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [tripOpen, setTripOpen] = useState(false);
@@ -73,9 +81,30 @@ export function App() {
         }
       })
       .catch(() => setLoadError("Couldn't load the charger map. Check your connection and reload."));
+    const placeId = new URLSearchParams(location.search).get('p');
+    if (placeId) {
+      ensurePlaces().then((d) => {
+        const i = d ? d.places.findIndex((x) => x.id === placeId) : -1;
+        if (!d || i < 0) return;
+        setSelectedPlace(i);
+        setFlyTarget({ kind: 'point', lat: d.places[i].lat, lng: d.places[i].lng, zoom: 15 });
+      });
+    }
     api.config().then(setConfig).catch(() => undefined);
     api.me().then(setMe).catch(() => undefined);
   }, []);
+
+  function ensurePlaces(): Promise<PlacesData | null> {
+    if (!placesRequested.current) {
+      placesRequested.current = true;
+      setPlacesLoading(true);
+    }
+    return loadPlaces().then((d) => {
+      setPlaces(d);
+      setPlacesLoading(false);
+      return d;
+    });
+  }
 
   const refreshStatuses = useCallback(() => {
     api
@@ -118,11 +147,19 @@ export function App() {
     });
   }, [stations, filters, statuses]);
   const selected = selectedId ? byId.get(selectedId) ?? null : null;
+  const placeIndexById = useMemo(() => new Map(places?.places.map((p, i) => [p.id, i]) ?? []), [places]);
+
+  // Places are a separate, larger file: fetch it only once something needs it.
+  useEffect(() => {
+    if (selectedId || filters.showFood || filters.showStays || tripOpen) void ensurePlaces();
+  }, [selectedId, filters.showFood, filters.showStays, tripOpen]);
 
   const select = useCallback(
     (id: string | null) => {
       setSelectedId(id);
+      setSelectedPlace(null);
       const url = new URL(location.href);
+      url.searchParams.delete('p');
       if (id) url.searchParams.set('s', id);
       else url.searchParams.delete('s');
       history.replaceState(null, '', url);
@@ -131,6 +168,25 @@ export function App() {
     },
     [byId],
   );
+
+  const selectPlace = useCallback(
+    (index: number | null, fly = false) => {
+      const place = index !== null ? places?.places[index] : undefined;
+      setSelectedPlace(place ? index : null);
+      setSelectedId(null);
+      const url = new URL(location.href);
+      url.searchParams.delete('s');
+      if (place) url.searchParams.set('p', place.id);
+      else url.searchParams.delete('p');
+      history.replaceState(null, '', url);
+      if (place && fly) setFlyTarget({ kind: 'point', lat: place.lat, lng: place.lng, zoom: 15 });
+    },
+    [places],
+  );
+  const openPlace = (p: Place) => {
+    const i = placeIndexById.get(p.id);
+    if (i !== undefined) selectPlace(i, true);
+  };
 
   const openTrip = (to: PickedPlace | null) => {
     setTripTo(to);
@@ -145,13 +201,31 @@ export function App() {
     if (view) setFlyTarget({ kind: 'bbox', bbox: view.bbox });
   };
 
-  const stopMarkers: StopMarker[] = useMemo(
-    () => (tripView ? tripView.stops.map((s, i) => ({ id: s.station.id, lng: s.lng, lat: s.lat, label: String(i + 1) })) : []),
-    [tripView],
-  );
+  const stopMarkers = tripView?.markers ?? [];
+
+  // Food and stays on the map: the chosen categories, plus what is near the open charger or trip.
+  const placeMarkers: PlaceMarker[] = useMemo(() => {
+    if (!places) return [];
+    const want = new Set<number>();
+    places.places.forEach((p, i) => {
+      if ((p.cat === 'food' && filters.showFood) || (p.cat === 'stay' && filters.showStays)) want.add(i);
+    });
+    const near = selectedId ? places.near[selectedId] : undefined;
+    for (const [i] of [...(near?.f ?? []), ...(near?.s ?? [])]) want.add(i);
+    for (const id of tripView?.placeIds ?? []) {
+      const i = placeIndexById.get(id);
+      if (i !== undefined) want.add(i);
+    }
+    if (selectedPlace !== null) want.add(selectedPlace);
+    return [...want].map((i) => {
+      const p = places.places[i];
+      return { index: i, lng: p.lng, lat: p.lat, cat: p.cat, name: p.name, onsite: Boolean(p.chargerOnSite) };
+    });
+  }, [places, filters.showFood, filters.showStays, selectedId, selectedPlace, tripView, placeIndexById]);
 
   const attribution = useMemo(() => (dataset ? dataset.sources.map((s) => s.attribution) : []), [dataset]);
-  const sheetOpen = selected !== null || tripOpen;
+  const placeOpen = selectedPlace !== null && places !== null;
+  const sheetOpen = selected !== null || placeOpen || tripOpen;
   const toggleDark = () => {
     setDark(!dark);
     saveJson('dark', !dark);
@@ -169,7 +243,10 @@ export function App() {
         insets={sheetOpen ? (viewport.desktop ? { bottom: 0, left: DESKTOP_PANEL_PX } : { bottom: Math.round(viewport.height * 0.52), left: 0 }) : NO_INSETS}
         route={tripView?.route ?? null}
         stops={stopMarkers}
+        places={placeMarkers}
+        selectedPlace={selectedPlace}
         onSelect={select}
+        onSelectPlace={(i) => selectPlace(i)}
       />
 
       <header class="topbar">
@@ -214,17 +291,13 @@ export function App() {
 
       {!sheetOpen && (
         <button class="fab" onClick={() => openTrip(null)}>
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-            <path d="M5 19c3-1 4-4 7-7s6-4 7-7M5 19l3-1M19 5l-1 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
-            <circle cx="5" cy="19" r="2" fill="currentColor" />
-            <circle cx="19" cy="5" r="2" fill="currentColor" />
-          </svg>
+          <Route size={22} aria-hidden="true" />
           Plan a trip
         </button>
       )}
 
       {tripOpen && (
-        <div hidden={selected !== null}>
+        <div hidden={selected !== null || placeOpen}>
           <TripPlanner
             key={tripKey}
             stations={stations}
@@ -244,6 +317,7 @@ export function App() {
             }}
             onShow={showTrip}
             onSelectStation={select}
+            onOpenPlace={openPlace}
             onUsageChanged={refreshMe}
           />
         </div>
@@ -259,6 +333,20 @@ export function App() {
           onRequireSignIn={() => setOverlay('signin')}
           onReported={refreshStatuses}
           onPlanTo={(s: Station) => openTrip({ name: s.name, lat: s.lat, lng: s.lng, bbox: null, stationId: s.id })}
+          places={places}
+          placesLoading={placesLoading}
+          onOpenPlace={openPlace}
+        />
+      )}
+
+      {places && selectedPlace !== null && !selected && (
+        <PlaceSheet
+          data={places}
+          placeIndex={selectedPlace}
+          byId={byId}
+          statuses={statuses}
+          onClose={() => selectPlace(null)}
+          onSelectStation={select}
         />
       )}
 

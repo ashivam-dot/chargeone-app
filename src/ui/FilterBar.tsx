@@ -1,8 +1,11 @@
+import { BedDouble, Utensils, Zap } from 'lucide-preact';
 import type { ConnectorType } from '../data/model.ts';
 import type { Filters } from '../data/filters.ts';
 
 export interface MapFilters extends Filters {
   workingOnly: boolean;
+  showFood: boolean;
+  showStays: boolean;
 }
 
 interface Props {
@@ -23,12 +26,19 @@ export function FilterBar({ filters, operators, shown, total, onChange }: Props)
     });
 
   return (
-    <div class="filters" role="toolbar" aria-label="Filter chargers">
+    <div class="filters" role="toolbar" aria-label="Filter the map">
+      <button class="chip chip--food" aria-pressed={filters.showFood} onClick={() => onChange({ ...filters, showFood: !filters.showFood })}>
+        <Utensils size={14} aria-hidden="true" /> Food
+      </button>
+      <button class="chip chip--stay" aria-pressed={filters.showStays} onClick={() => onChange({ ...filters, showStays: !filters.showStays })}>
+        <BedDouble size={14} aria-hidden="true" /> Stays
+      </button>
+      <span class="filters__sep" aria-hidden="true" />
       <button class="chip" aria-pressed={filters.workingOnly} onClick={() => onChange({ ...filters, workingOnly: !filters.workingOnly })}>
         <span class="dot dot--working" aria-hidden="true" /> Working recently
       </button>
       <button class="chip" aria-pressed={filters.dcOnly} onClick={() => onChange({ ...filters, dcOnly: !filters.dcOnly })}>
-        ⚡ DC fast
+        <Zap size={14} aria-hidden="true" /> DC fast
       </button>
       {QUICK_CONNECTORS.map((c) => (
         <button key={c} class="chip" aria-pressed={filters.connectors.includes(c)} onClick={() => toggleConnector(c)}>

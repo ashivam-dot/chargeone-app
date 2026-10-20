@@ -25,14 +25,16 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallbackDenylist: [/^\/api\//],
+        // Charger and city pages are real documents for search engines, not app routes.
+        navigateFallbackDenylist: [/^\/api\//, /^\/charger\//, /^\/ev-charging\//],
         globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
+        globIgnores: ['charger/**', 'ev-charging/**', 'seo.css'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/data/'),
             handler: 'StaleWhileRevalidate',
-            options: { cacheName: 'station-data', expiration: { maxEntries: 4 } },
+            options: { cacheName: 'station-data', expiration: { maxEntries: 6 } },
           },
           {
             // OpenFreeMap's terms cap stored offline tiles at 3,000 per download.

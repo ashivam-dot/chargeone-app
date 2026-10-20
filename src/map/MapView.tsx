@@ -24,6 +24,16 @@ export interface StopMarker {
   lng: number;
   lat: number;
   label: string;
+  overnight?: boolean;
+}
+
+export interface PlaceMarker {
+  index: number;
+  lng: number;
+  lat: number;
+  cat: 'food' | 'stay';
+  name: string;
+  onsite: boolean;
 }
 
 interface Props {
@@ -37,7 +47,10 @@ interface Props {
   insets: { bottom: number; left: number };
   route: Coord[] | null;
   stops: StopMarker[];
+  places: PlaceMarker[];
+  selectedPlace: number | null;
   onSelect: (id: string | null) => void;
+  onSelectPlace: (index: number) => void;
 }
 
 // MapLibre looks for its worker next to its own module file, which bundling moves.
@@ -46,6 +59,12 @@ setWorkerUrl(workerUrl);
 const SOURCE = 'stations';
 const ROUTE = 'route';
 const STOPS = 'stops';
+const PLACES = 'places';
+const FOOD_COLOUR = '#f97316';
+const STAY_COLOUR = '#8b5cf6';
+/** Top-most first: the first hit under a tap wins. */
+const CLICKABLE = ['stop-labels', 'stops', 'stations', 'clusters', 'places'];
+const TAP_SLOP_PX = 8;
 const LIGHT_STYLE = 'https://tiles.openfreemap.org/styles/positron';
 const DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark';
 
@@ -71,7 +90,22 @@ function routeGeoJson(route: Coord[] | null): FeatureCollection<LineString> {
 function stopsGeoJson(stops: StopMarker[]): FeatureCollection<Point> {
   return {
     type: 'FeatureCollection',
-    features: stops.map((s) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] }, properties: { id: s.id, label: s.label } })),
+    features: stops.map((s) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
+      properties: { id: s.id, label: s.label, overnight: Boolean(s.overnight) },
+    })),
+  };
+}
+
+function placesGeoJson(places: PlaceMarker[]): FeatureCollection<Point> {
+  return {
+    type: 'FeatureCollection',
+    features: places.map((p) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+      properties: { i: p.index, cat: p.cat, name: p.name, onsite: p.onsite },
+    })),
   };
 }
 
@@ -79,14 +113,16 @@ interface LayerData {
   stations: FeatureCollection;
   route: FeatureCollection;
   stops: FeatureCollection;
+  places: FeatureCollection;
 }
 
-function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null, dark: boolean): void {
+function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null, selectedPlace: number | null, dark: boolean): void {
   if (map.getSource(SOURCE)) return;
   const halo = dark ? '#0b1220' : '#ffffff';
   map.addSource(SOURCE, { type: 'geojson', data: data.stations, cluster: true, clusterRadius: 46, clusterMaxZoom: 11 });
   map.addSource(ROUTE, { type: 'geojson', data: data.route });
   map.addSource(STOPS, { type: 'geojson', data: data.stops });
+  map.addSource(PLACES, { type: 'geojson', data: data.places });
 
   map.addLayer({
     id: 'route-casing',
@@ -101,6 +137,49 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     source: ROUTE,
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: { 'line-color': '#14b8a6', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 3.5, 14, 7] },
+  });
+  map.addLayer({
+    id: 'place-selected',
+    type: 'circle',
+    source: PLACES,
+    filter: ['==', ['get', 'i'], selectedPlace ?? -1],
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 10, 15, 15],
+      'circle-color': 'rgba(0,0,0,0)',
+      'circle-stroke-color': dark ? '#f8fafc' : '#0f172a',
+      'circle-stroke-width': 3,
+    },
+  });
+  map.addLayer({
+    id: 'places',
+    type: 'circle',
+    source: PLACES,
+    paint: {
+      'circle-color': ['match', ['get', 'cat'], 'food', FOOD_COLOUR, STAY_COLOUR],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 3.5, 12, 5.5, 16, 8],
+      'circle-stroke-color': ['case', ['get', 'onsite'], '#14b8a6', halo],
+      'circle-stroke-width': ['case', ['get', 'onsite'], 2.5, 1.5],
+    },
+  });
+  map.addLayer({
+    id: 'place-labels',
+    type: 'symbol',
+    source: PLACES,
+    minzoom: 14,
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-font': ['Noto Sans Regular'],
+      'text-size': 11,
+      'text-offset': [0, 1.1],
+      'text-anchor': 'top',
+      'text-max-width': 9,
+      'text-optional': true,
+    },
+    paint: {
+      'text-color': ['match', ['get', 'cat'], 'food', dark ? '#fdba74' : '#9a3412', dark ? '#c4b5fd' : '#5b21b6'],
+      'text-halo-color': halo,
+      'text-halo-width': 1.5,
+    },
   });
   map.addLayer({
     id: 'clusters',
@@ -151,23 +230,29 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     id: 'stops',
     type: 'circle',
     source: STOPS,
-    paint: { 'circle-radius': 13, 'circle-color': '#14b8a6', 'circle-stroke-color': halo, 'circle-stroke-width': 3 },
+    paint: {
+      'circle-radius': 13,
+      'circle-color': ['case', ['get', 'overnight'], STAY_COLOUR, '#14b8a6'],
+      'circle-stroke-color': halo,
+      'circle-stroke-width': 3,
+    },
   });
   map.addLayer({
     id: 'stop-labels',
     type: 'symbol',
     source: STOPS,
     layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-allow-overlap': true, 'icon-allow-overlap': true },
-    paint: { 'text-color': '#04201d' },
+    paint: { 'text-color': ['case', ['get', 'overnight'], '#ffffff', '#04201d'] },
   });
 }
 
-export function MapView({ stations, statuses, selectedId, flyTarget, dark, attribution, insets, route, stops, onSelect }: Props) {
+export function MapView(props: Props) {
+  const { stations, statuses, selectedId, flyTarget, dark, attribution, insets, route, stops, places, selectedPlace } = props;
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const styleUrl = useRef(dark ? DARK_STYLE : LIGHT_STYLE);
-  const latest = useRef({ stations, statuses, selectedId, dark, route, stops, onSelect });
-  latest.current = { stations, statuses, selectedId, dark, route, stops, onSelect };
+  const latest = useRef(props);
+  latest.current = props;
 
   useEffect(() => {
     if (!container.current) return;
@@ -192,27 +277,45 @@ export function MapView({ stations, statuses, selectedId, flyTarget, dark, attri
 
     map.on('style.load', () => {
       const l = latest.current;
-      addLayers(map, { stations: stationsGeoJson(l.stations, l.statuses), route: routeGeoJson(l.route), stops: stopsGeoJson(l.stops) }, l.selectedId, l.dark);
+      addLayers(
+        map,
+        { stations: stationsGeoJson(l.stations, l.statuses), route: routeGeoJson(l.route), stops: stopsGeoJson(l.stops), places: placesGeoJson(l.places) },
+        l.selectedId,
+        l.selectedPlace,
+        l.dark,
+      );
     });
 
-    map.on('click', 'clusters', async (e) => {
-      const feature = e.features?.[0] as MapGeoJSONFeature | undefined;
-      if (!feature || feature.geometry.type !== 'Point') return;
-      const source = map.getSource(SOURCE) as GeoJSONSource;
-      const zoom = await source.getClusterExpansionZoom(feature.properties.cluster_id as number);
-      map.easeTo({ center: feature.geometry.coordinates as [number, number], zoom: zoom + 0.5 });
-    });
-    for (const layer of ['stations', 'stops']) {
-      map.on('click', layer, (e) => {
-        const id = e.features?.[0]?.properties?.id;
+    map.on('click', async (e) => {
+      const layers = CLICKABLE.filter((id) => map.getLayer(id));
+      if (layers.length === 0) return;
+      const { x, y } = e.point;
+      const hits = map.queryRenderedFeatures(
+        [
+          [x - TAP_SLOP_PX, y - TAP_SLOP_PX],
+          [x + TAP_SLOP_PX, y + TAP_SLOP_PX],
+        ],
+        { layers },
+      );
+      const top = layers.map((id) => hits.find((h) => h.layer.id === id)).find(Boolean) as MapGeoJSONFeature | undefined;
+      if (!top) {
+        latest.current.onSelect(null);
+        return;
+      }
+      if (top.layer.id === 'clusters') {
+        if (top.geometry.type !== 'Point') return;
+        const source = map.getSource(SOURCE) as GeoJSONSource;
+        const zoom = await source.getClusterExpansionZoom(top.properties.cluster_id as number);
+        map.easeTo({ center: top.geometry.coordinates as [number, number], zoom: zoom + 0.5 });
+      } else if (top.layer.id === 'places') {
+        const i = top.properties.i;
+        if (typeof i === 'number') latest.current.onSelectPlace(i);
+      } else {
+        const id = top.properties.id;
         if (typeof id === 'string') latest.current.onSelect(id);
-      });
-    }
-    map.on('click', (e) => {
-      const hits = map.queryRenderedFeatures(e.point, { layers: ['stations', 'clusters', 'stops'] });
-      if (hits.length === 0) latest.current.onSelect(null);
+      }
     });
-    for (const layer of ['clusters', 'stations', 'stops']) {
+    for (const layer of ['clusters', 'stations', 'stops', 'places']) {
       map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
     }
@@ -240,9 +343,19 @@ export function MapView({ stations, statuses, selectedId, flyTarget, dark, attri
   }, [stops]);
 
   useEffect(() => {
+    const source = mapRef.current?.getSource(PLACES) as GeoJSONSource | undefined;
+    void source?.setData(placesGeoJson(places));
+  }, [places]);
+
+  useEffect(() => {
     const map = mapRef.current;
     if (map?.getLayer('station-selected')) map.setFilter('station-selected', ['==', ['get', 'id'], selectedId ?? '']);
   }, [selectedId]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map?.getLayer('place-selected')) map.setFilter('place-selected', ['==', ['get', 'i'], selectedPlace ?? -1]);
+  }, [selectedPlace]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -276,5 +389,5 @@ export function MapView({ stations, statuses, selectedId, flyTarget, dark, attri
     }
   }, [flyTarget]);
 
-  return <div ref={container} class="map" role="region" aria-label="Map of EV chargers" />;
+  return <div ref={container} class="map" role="region" aria-label="Map of EV chargers, food and stays" />;
 }

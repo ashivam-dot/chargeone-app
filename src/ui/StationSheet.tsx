@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Station } from '../data/model.ts';
 import { safeUrl } from '../data/normalize.ts';
+import type { Place, PlacesData } from '../data/places.ts';
+import { nearbyPlaces, sortStays } from '../planner/journey.ts';
+import { NearbyPlaces } from './NearbyPlaces.tsx';
 import { ApiError, api, currentPosition, type Report } from '../lib/api.ts';
 import { SPEED_LABEL, VEHICLE_LABEL, directionsUrl, formatDate, formatKw, latestUpdate, stationLink } from '../lib/format.ts';
 import { LIVE_COLOUR, LIVE_LABEL, REPORT_LABEL, liveState, timeAgo, type ReportKind, type StationStatus } from '../shared/status.ts';
@@ -15,6 +18,9 @@ interface Props {
   onRequireSignIn: () => void;
   onReported: () => void;
   onPlanTo: (s: Station) => void;
+  places: PlacesData | null;
+  placesLoading: boolean;
+  onOpenPlace: (p: Place) => void;
 }
 
 const GOOD: ReportKind[] = ['worked', 'charging_now'];
@@ -55,7 +61,11 @@ function LiveBlock({ status }: { status: StationStatus | undefined }) {
   );
 }
 
-export function StationSheet({ station, status, signedIn, vehicleName, onClose, onRequireSignIn, onReported, onPlanTo }: Props) {
+export function StationSheet(props: Props) {
+  const { station, status, signedIn, vehicleName, onClose, onRequireSignIn, onReported, onPlanTo, places } = props;
+  const food = useMemo(() => nearbyPlaces(places, station.id, 'f'), [places, station.id]);
+  const stays = useMemo(() => sortStays(nearbyPlaces(places, station.id, 's')), [places, station.id]);
+  const area = places?.area[station.id] ?? null;
   const [reports, setReports] = useState<Report[] | null>(null);
   const [sending, setSending] = useState<ReportKind | null>(null);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
@@ -136,7 +146,7 @@ export function StationSheet({ station, status, signedIn, vehicleName, onClose, 
   return (
     <Sheet title={station.name} onClose={onClose}>
       <p class="station__sub">
-        {[station.operator, station.address].filter(Boolean).join(' · ') || 'Operator not mapped yet'}
+        {[station.operator, station.address ?? area].filter(Boolean).join(' · ') || 'Operator not mapped yet'}
       </p>
 
       <div class="actions">
@@ -178,6 +188,8 @@ export function StationSheet({ station, status, signedIn, vehicleName, onClose, 
           </p>
         )}
       </section>
+
+      <NearbyPlaces key={`${station.id}:${places ? 1 : 0}`} food={food} stays={stays} area={area} loading={props.placesLoading} onOpen={props.onOpenPlace} />
 
       {station.connectors.length > 0 ? (
         <section aria-label="Connectors">

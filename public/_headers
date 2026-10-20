@@ -12,3 +12,9 @@
 
 /data/*
   Cache-Control: public, max-age=3600
+
+/charger/*
+  Cache-Control: public, max-age=3600
+
+/ev-charging/*
+  Cache-Control: public, max-age=3600
