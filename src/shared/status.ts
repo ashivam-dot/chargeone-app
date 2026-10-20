@@ -59,10 +59,10 @@ export const LIVE_COLOUR: Record<LiveState, string> = {
 };
 
 export const LIVE_LABEL: Record<LiveState, string> = {
-  working: 'Working',
-  in_use: 'In use',
-  problem: 'Problem reported',
-  unknown: 'No recent reports',
+  working: 'Available',
+  in_use: 'Occupied',
+  problem: 'Not working',
+  unknown: 'Status unknown',
 };
 
 export function timeAgo(iso: string | null, now: Date): string | null {

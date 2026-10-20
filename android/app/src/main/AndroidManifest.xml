@@ -74,5 +74,66 @@
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
+        <!-- Charging operator apps, so the station sheet can tell whether one is installed. -->
+        <package android:name="com.tatamotors.evoneapp" />
+        <package android:name="com.tatapower.evapp" />
+        <package android:name="com.statiq.tsredco" />
+        <package android:name="com.statiq" />
+        <package android:name="com.chargezone" />
+        <package android:name="com.jiobp.pulse_charge" />
+        <package android:name="com.namp.zeon" />
+        <package android:name="com.fortum.ChargeAndDriveIndia" />
+        <package android:name="com.atherenergy.aegridapp" />
+        <package android:name="com.kazam.ev" />
+        <package android:name="com.revos.bolt.android" />
+        <package android:name="com.electreefi.techperspect" />
+        <package android:name="com.namp.relux" />
+        <package android:name="com.shell.sitibv.rechargeindia" />
+        <package android:name="com.hpcl.ev" />
+        <package android:name="com.edrive.bpcl" />
+        <package android:name="com.iocl.ev" />
+        <package android:name="com.ionage.app" />
+        <package android:name="in.evre.charge" />
+        <package android:name="com.ovunque.parkwheels" />
+        <package android:name="com.mgmotor.ehub" />
+        <package android:name="com.mahendra.chargin" />
+        <package android:name="com.hmil.myhyundai" />
+        <package android:name="com.bpm.ksebapp" />
+        <package android:name="com.honda_mpp.in.heid.eswap" />
+        <package android:name="com.yuma.oem" />
+        <package android:name="com.electriva" />
+        <package android:name="com.hero.communitycharging" />
+        <package android:name="com.bescom.evmithra" />
+        <package android:name="com.namp.azadpower" />
+        <package android:name="com.sunmobility.app" />
+        <package android:name="com.evigo.evigo" />
+        <package android:name="com.teslamotors.tesla" />
+        <package android:name="com.namp.adani" />
+        <package android:name="ai.lime.lectrix" />
+        <package android:name="com.vinfast.in" />
+        <package android:name="com.xatori.Plugshare" />
+        <package android:name="com.olaelectric.companion" />
+        <package android:name="com.mobile.batterysmart" />
+        <package android:name="com.bpm.chargemod" />
+        <package android:name="app.yulu.bike" />
+        <package android:name="com.exicom.android.spinev" />
+        <package android:name="com.bpm.evok" />
+        <package android:name="com.uplugappnew.techperspect" />
+        <package android:name="app.evdock.evdock" />
+        <package android:name="com.cesl.echarge" />
+        <package android:name="com.nxccontrols.msedcl" />
+        <package android:name="com.voltran.app" />
+        <package android:name="com.goegonetwork.app" />
+        <package android:name="com.charjkaro" />
+        <package android:name="com.esygo.esyandroid" />
+        <package android:name="com.nikolev" />
+        <package android:name="com.daimler.ris.mercedesme.ece.android" />
+        <package android:name="de.bmw.connected.mobile20.row" />
+        <package android:name="com.pulseenergy.pulse" />
+        <package android:name="com.wattapp.electricpe" />
+        <package android:name="com.indofast.rider" />
+        <package android:name="com.bses.elv" />
+        <package android:name="com.minooki.android.apps.minooki.bc" />
+        <package android:name="com.delhitransport.onedelhi" />
     </queries>
 </manifest>

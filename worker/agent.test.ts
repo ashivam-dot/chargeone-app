@@ -142,7 +142,7 @@ describe('agent chat answers', () => {
     const tool = second.at(-1);
     expect(tool).toMatchObject({ role: 'tool', tool_call_id: 'call_0' });
     const result = JSON.parse(tool.content);
-    expect(result.chargers[0]).toMatchObject({ id: station.id, distance_km: 0, dc_fast: true, live_status: 'No recent reports' });
+    expect(result.chargers[0]).toMatchObject({ id: station.id, distance_km: 0, dc_fast: true, live_status: 'Status unknown' });
     expect(result.chargers.length).toBeLessThanOrEqual(8);
   });
 

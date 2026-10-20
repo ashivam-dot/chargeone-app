@@ -2,7 +2,12 @@ import { Check, EyeOff, Lock, Minus, RotateCcw, Route, ShieldCheck, Smartphone, 
 import { useState } from 'preact/hooks';
 import { ApiError, api, loadScript, type Config, type Me, type UpiPayment } from '../lib/api.ts';
 import { PLATFORM } from '../native/bridge.ts';
-import { UpiPay } from './UpiPay.tsx';
+import { lazy } from './shell/lazy.tsx';
+
+const UpiPay = lazy(
+  () => import('./UpiPay.tsx').then((m) => m.UpiPay),
+  () => <p class="muted">Loading UPI…</p>,
+);
 import { BASIC, COMPARE, FREE_TRIP_KM, PLANS, PLAN_ROWS, TRIAL_DAYS, YEARLY_SAVING_PCT, cheapestWith, formatRupees, isPlus, type Perk, type Plan, type PlanId } from '../shared/plans.ts';
 import { Sheet } from './Sheet.tsx';
 
@@ -167,6 +172,7 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
         return;
       }
       if (method === 'upi') {
+        UpiPay.preload();
         setUpi(await api.upiStart(plan));
         return;
       }

@@ -7,6 +7,9 @@ import { NearbyPlaces } from './NearbyPlaces.tsx';
 import { ApiError, api, currentPosition, type Report } from '../lib/api.ts';
 import { SPEED_LABEL, VEHICLE_LABEL, directionsUrl, formatDate, formatKw, latestUpdate, stationLink } from '../lib/format.ts';
 import { LIVE_COLOUR, LIVE_LABEL, REPORT_LABEL, liveState, timeAgo, type ReportKind, type StationStatus } from '../shared/status.ts';
+import { IS_NATIVE } from '../native/bridge.ts';
+import { isOperatorAppInstalled, openOperatorApp } from '../native/operatorApp.ts';
+import { deviceFromUa, operatorAppFor, webLink, type OperatorApp } from '../shared/operatorApps.ts';
 import { Sheet } from './Sheet.tsx';
 
 interface Props {
@@ -27,7 +30,34 @@ interface Props {
 const GOOD: ReportKind[] = ['worked', 'charging_now'];
 const BAD: ReportKind[] = ['broken', 'slow', 'blocked', 'queue'];
 
-function LiveBlock({ status }: { status: StationStatus | undefined }) {
+/** The charging network's own app: open it if installed, else its store page, else its website. */
+function OperatorAppLink({ app }: { app: OperatorApp }) {
+  const [installed, setInstalled] = useState(false);
+  useEffect(() => {
+    let live = true;
+    if (IS_NATIVE) void isOperatorAppInstalled(app).then((v) => live && setInstalled(v));
+    return () => {
+      live = false;
+    };
+  }, [app]);
+  if (IS_NATIVE) {
+    return (
+      <button class="btn btn--glass operator-app" onClick={() => void openOperatorApp(app)} data-testid="operator-app">
+        {installed ? `Open in ${app.name}` : `Get the ${app.name} app`}
+      </button>
+    );
+  }
+  const device = deviceFromUa(navigator.userAgent, navigator.maxTouchPoints);
+  const link = webLink(app, device);
+  if (!link) return null;
+  return (
+    <a class="btn btn--glass operator-app" href={link.href} target="_blank" rel="noopener noreferrer" data-testid="operator-app">
+      {link.kind === 'store' ? `Open the ${app.name} app` : `${app.name} website`}
+    </a>
+  );
+}
+
+function LiveBlock({ status, app }: { status: StationStatus | undefined; app: OperatorApp | null }) {
   const now = new Date();
   const state = liveState(status, now);
   const lines: string[] = [];
@@ -43,10 +73,12 @@ function LiveBlock({ status }: { status: StationStatus | undefined }) {
     lines.push(`${REPORT_LABEL[status.problemKind ?? 'broken']} reported ${timeAgo(status.problemAt, now)}${n}`);
   }
   return (
-    <div class={`live live--${state}`} role="status">
+    <div class={`live live--${state}`} role="status" data-testid="live-status">
       <div class="live__head">
-        <span class="live__dot" style={{ background: LIVE_COLOUR[state] }} aria-hidden="true" />
-        <strong>{LIVE_LABEL[state]}</strong>
+        <span class="live__badge" style={{ '--live': LIVE_COLOUR[state] }}>
+          <span class="live__dot" aria-hidden="true" />
+          {LIVE_LABEL[state]}
+        </span>
         {status && <span class="live__count">{status.reports7d} report{status.reports7d === 1 ? '' : 's'} this week</span>}
       </div>
       {lines.length > 0 ? (
@@ -58,6 +90,10 @@ function LiveBlock({ status }: { status: StationStatus | undefined }) {
       ) : (
         <p class="muted">No driver has reported this charger in the last 7 days. Be the first after you charge.</p>
       )}
+      <p class="live__source small muted">
+        From ChargeOne drivers' reports, not live from the operator.{app ? ` For live status and payment, use the ${app.name} app.` : ''}
+      </p>
+      {app && <OperatorAppLink app={app} />}
     </div>
   );
 }
@@ -67,6 +103,7 @@ export function StationSheet(props: Props) {
   const food = useMemo(() => nearbyPlaces(places, station.id, 'f'), [places, station.id]);
   const stays = useMemo(() => sortStays(nearbyPlaces(places, station.id, 's')), [places, station.id]);
   const area = places?.area[station.id] ?? null;
+  const operatorApp = useMemo(() => operatorAppFor(station), [station.id]);
   const [reports, setReports] = useState<Report[] | null>(null);
   const [sending, setSending] = useState<ReportKind | null>(null);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
@@ -162,7 +199,7 @@ export function StationSheet(props: Props) {
         </button>
       </div>
 
-      <LiveBlock status={status} />
+      <LiveBlock status={status} app={operatorApp} />
 
       <section class="report" aria-label="Report this charger">
         <h3>Are you here now?</h3>

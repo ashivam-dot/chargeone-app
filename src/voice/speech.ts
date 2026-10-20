@@ -1,6 +1,9 @@
 // Speech in and out: the Capacitor plugins in the apps, the Web Speech API in the browser.
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
+import { ApiError, api } from '../lib/api.ts';
 import type { AgentLang } from '../shared/contracts.ts';
+import { hdVoiceOn, setHdVoice } from './hd.ts';
+import { sentences, speakable } from './normalize.ts';
 import { VOICE_TEXT, type VoiceText } from './phrases.ts';
 
 export type SpeechLang = 'hi-IN' | 'en-IN';
@@ -244,17 +247,27 @@ export function listen(opts: ListenOptions): Promise<() => void> {
   return Capacitor.isNativePlatform() ? listenNative(opts) : Promise.resolve(listenWeb(opts));
 }
 
-/** The best installed voice for a language: an exact match, else any voice of that language, else none. */
+/** Neural voices (Edge "Online (Natural)", Apple "Enhanced"/"Premium", Chrome's Google voices) sound far less robotic. */
+const NATURAL_VOICE = /natural|neural|online|enhanced|premium/i;
+
+/**
+ * The best installed voice for a language. The Indian voice comes first, so an Indian accent beats a
+ * nicer-sounding British one; among those, a neural voice, then one that works offline.
+ */
 export function pickVoice(voices: readonly SpeechSynthesisVoice[], lang: SpeechLang): SpeechSynthesisVoice | null {
   const norm = (l: string) => l.replace('_', '-').toLowerCase();
   const want = lang.toLowerCase();
   const base = want.slice(0, 2);
-  return (
-    voices.find((v) => norm(v.lang) === want && v.localService) ??
-    voices.find((v) => norm(v.lang) === want) ??
-    voices.find((v) => norm(v.lang).startsWith(base)) ??
-    null
-  );
+  let best: SpeechSynthesisVoice | null = null;
+  let bestScore = 0;
+  for (const v of voices) {
+    const l = norm(v.lang);
+    const match = l === want ? 100 : l.startsWith(base) ? 50 : 0;
+    if (!match) continue;
+    const score = match + (NATURAL_VOICE.test(v.name) ? 30 : /google/i.test(v.name) ? 20 : 0) + (v.localService ? 5 : 0);
+    if (score > bestScore) [best, bestScore] = [v, score];
+  }
+  return best;
 }
 
 function loadVoices(synth: SpeechSynthesis): Promise<SpeechSynthesisVoice[]> {
@@ -271,36 +284,114 @@ function loadVoices(synth: SpeechSynthesis): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
-/** Reads text aloud, replacing anything already being read; resolves when it ends or fails. */
-export async function speak(text: string, lang: SpeechLang | AgentLang): Promise<void> {
-  const bcp = lang === 'hi' || lang === 'en' ? speechLang(lang) : lang;
-  if (!text.trim()) return;
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const { TextToSpeech, QueueStrategy } = await nativeTts();
-      await TextToSpeech.speak({ text, lang: bcp, rate: 1, pitch: 1, queueStrategy: QueueStrategy.Flush });
-    } catch {
-      // Missing voice data or an interrupted utterance: the text is on screen anyway.
-    }
-    return;
+/** Bumped by every speak() and stopSpeaking(); a reading whose number is stale stops at the next sentence. */
+let generation = 0;
+let playing: HTMLAudioElement | null = null;
+const HD_CACHE_MAX = 40;
+const hdCache = new Map<string, Promise<string | null>>();
+
+/** One sentence from the HD voice as a data: URL, or null when the server can't read it now. */
+function hdClip(sentence: string, lang: AgentLang): Promise<string | null> {
+  const key = `${lang}\n${sentence}`;
+  const cached = hdCache.get(key);
+  if (cached) return cached;
+  const clip = api.voiceTts(sentence, lang).then(
+    (r) => `data:${r.mime};base64,${r.audio}`,
+    (err: unknown) => {
+      hdCache.delete(key);
+      // Not set up, or today's allowance is used: the system voice reads for the rest of the session.
+      if (err instanceof ApiError && (err.status === 404 || err.status === 429)) setHdVoice(false);
+      return null;
+    },
+  );
+  hdCache.set(key, clip);
+  if (hdCache.size > HD_CACHE_MAX) hdCache.delete(hdCache.keys().next().value!);
+  return clip;
+}
+
+function playClip(url: string): Promise<boolean> {
+  const audio = new Audio(url);
+  playing = audio;
+  return new Promise((resolve) => {
+    const done = (ok: boolean) => {
+      audio.onended = audio.onerror = audio.onpause = null;
+      if (playing === audio) playing = null;
+      resolve(ok);
+    };
+    audio.onended = () => done(true);
+    audio.onerror = () => done(false);
+    audio.onpause = () => done(true);
+    audio.play().catch(() => done(false));
+  });
+}
+
+/** Reads sentences with the HD voice, fetching the next while one plays. Returns how many it read. */
+async function speakHd(parts: string[], lang: AgentLang, mine: number): Promise<number> {
+  let next = hdClip(parts[0], lang);
+  for (let i = 0; i < parts.length; i++) {
+    const url = await next;
+    if (mine !== generation) return parts.length;
+    if (!url) return i;
+    if (i + 1 < parts.length) next = hdClip(parts[i + 1], lang);
+    if (!(await playClip(url))) return i;
+    if (mine !== generation) return parts.length;
   }
+  return parts.length;
+}
+
+async function speakNative(text: string, bcp: SpeechLang): Promise<void> {
+  try {
+    const { TextToSpeech, QueueStrategy } = await nativeTts();
+    await TextToSpeech.speak({ text, lang: bcp, rate: 1, pitch: 1, queueStrategy: QueueStrategy.Flush });
+  } catch {
+    // Missing voice data or an interrupted utterance: the text is on screen anyway.
+  }
+}
+
+/** Sentence by sentence: Chrome cuts long utterances off, and a stop lands between sentences. */
+async function speakWeb(parts: string[], bcp: SpeechLang, mine: number): Promise<void> {
   const synth = webSynth();
   if (!synth) return;
   synth.cancel();
   const voice = pickVoice(await loadVoices(synth), bcp);
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = voice?.lang ?? bcp;
-  if (voice) u.voice = voice;
-  u.rate = 1;
-  u.pitch = 1;
-  await new Promise<void>((resolve) => {
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
-    synth.speak(u);
-  });
+  for (const part of parts) {
+    if (mine !== generation) return;
+    const u = new SpeechSynthesisUtterance(part);
+    u.lang = voice?.lang ?? bcp;
+    if (voice) u.voice = voice;
+    u.rate = 1;
+    u.pitch = 1;
+    const ok = await new Promise<boolean>((resolve) => {
+      u.onend = () => resolve(true);
+      u.onerror = () => resolve(false);
+      synth.speak(u);
+    });
+    if (!ok) return;
+  }
+}
+
+/** Reads text aloud, replacing anything already being read; resolves when it ends or fails. */
+export async function speak(text: string, lang: SpeechLang | AgentLang): Promise<void> {
+  const bcp = lang === 'hi' || lang === 'en' ? speechLang(lang) : lang;
+  const short: AgentLang = bcp === 'hi-IN' ? 'hi' : 'en';
+  const parts = sentences(speakable(text, short));
+  if (!parts.length) return;
+  const mine = ++generation;
+  playing?.pause();
+  let from = 0;
+  if (hdVoiceOn()) {
+    if (!Capacitor.isNativePlatform()) webSynth()?.cancel();
+    from = await speakHd(parts, short, mine);
+    if (from >= parts.length || mine !== generation) return;
+  }
+  const rest = parts.slice(from);
+  if (Capacitor.isNativePlatform()) await speakNative(rest.join(' '), bcp);
+  else await speakWeb(rest, bcp, mine);
 }
 
 export async function stopSpeaking(): Promise<void> {
+  generation++;
+  playing?.pause();
   if (Capacitor.isNativePlatform()) {
     if (!ttsModule) return;
     try {

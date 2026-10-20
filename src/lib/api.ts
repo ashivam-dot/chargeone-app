@@ -45,6 +45,8 @@ export interface Config {
   /** Which ways to pay the server is set up for. Older servers don't send it. */
   payments?: { razorpay: boolean; upi: boolean; play: boolean };
   devLogin: boolean;
+  /** The server can read replies in a neural voice (/api/voice/tts). Older servers don't send it. */
+  voiceHd?: boolean;
   plans: Plan[];
 }
 
@@ -116,6 +118,7 @@ export const api = {
   playVerify: (productId: string, purchaseToken: string) =>
     request<{ plan: PlanId; activeUntil: string | null; granted?: boolean }>('POST', '/api/billing/play/verify', { productId, purchaseToken }),
   playSync: () => request<{ synced: number }>('POST', '/api/billing/play/sync', {}),
+  voiceTts: (text: string, lang: 'en' | 'hi') => request<{ mime: string; audio: string; cached: boolean }>('POST', '/api/voice/tts', { text, lang }),
 };
 
 export interface UpiPayment {

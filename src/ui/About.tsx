@@ -1,6 +1,7 @@
 import type { Dataset } from '../data/model.ts';
 import { formatDate } from '../lib/format.ts';
 import { LIVE_COLOUR, LIVE_LABEL, type LiveState } from '../shared/status.ts';
+import { CAR_MODEL_CREDITS } from './car/models3d.ts';
 import { Sheet } from './Sheet.tsx';
 
 interface Props {
@@ -9,7 +10,7 @@ interface Props {
 }
 
 const LEGEND: Array<[LiveState, string]> = [
-  ['working', 'A driver charged here in the last 48 hours'],
+  ['working', 'A driver charged here in the last 48 hours and nobody reported charging in the last hour'],
   ['in_use', 'Someone is charging or queueing right now'],
   ['problem', 'Reported not working, slow or blocked in the last 24 hours'],
   ['unknown', 'No recent reports, so it may or may not work'],
@@ -38,7 +39,8 @@ export function About({ dataset, onClose }: Props) {
       <p>
         Status comes from drivers who check in at the charger. A report only counts when the phone is actually at the charger, and each
         driver can report a limited number of times a day. Charging companies don't share live data with independent apps yet, so please
-        report after you charge. It takes one tap and helps the next driver.
+        report after you charge. It takes one tap and helps the next driver. Where we know who runs a charger, its page links to that
+        operator's app for their own live status and to pay.
       </p>
 
       <h3>Charger locations</h3>
@@ -61,8 +63,10 @@ export function About({ dataset, onClose }: Props) {
           <li>
             Map © <a href="https://openfreemap.org" target="_blank" rel="noopener noreferrer">OpenFreeMap</a>, ©{' '}
             <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>. Place search by
-            Photon. Routes by openrouteservice.
+            Photon. Routes by openrouteservice. Terrain ©{' '}
+            <a href="https://mapterhorn.com/attribution" target="_blank" rel="noopener noreferrer">Mapterhorn</a>.
           </li>
+          <li>3D cars: {CAR_MODEL_CREDITS.join(', ')}. HD voice: Supertonic 3 by Supertone.</li>
         </ul>
       )}
 

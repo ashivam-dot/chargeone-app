@@ -4,6 +4,7 @@ import { EMPTY_FILTERS, filterStations, operatorsByCount } from './data/filters.
 import type { Dataset, Station } from './data/model.ts';
 import type { Place, PlacesData } from './data/places.ts';
 import { api, type Config, type Me } from './lib/api.ts';
+import { setHdVoice } from './voice/hd.ts';
 import { loadPlaces } from './lib/places.ts';
 import { clearSavedTrips } from './lib/savedTrips.ts';
 import { isObject, loadJson, removeJson, saveJson } from './lib/storage.ts';
@@ -172,7 +173,13 @@ export function App() {
         setFlyTarget({ kind: 'point', lat: d.places[i].lat, lng: d.places[i].lng, zoom: 15 });
       });
     }
-    api.config().then(setConfig).catch(() => undefined);
+    api
+      .config()
+      .then((c) => {
+        setConfig(c);
+        setHdVoice(c.voiceHd === true);
+      })
+      .catch(() => undefined);
     api
       .me()
       .then((m) => {

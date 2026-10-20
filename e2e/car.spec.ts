@@ -18,7 +18,7 @@ test.describe('My car', () => {
 
     await expect(screen.locator('.pill--live')).toBeVisible();
     await expect(screen).toContainText('Demo car · simulated');
-    await expect(page.locator('.car-hero.is-connected')).toBeVisible();
+    await expect(page.getByTestId('car-view')).toHaveAttribute('data-connected', 'true');
     const battery = page.getByRole('meter', { name: 'Battery' });
     await expect(battery).toHaveAttribute('aria-valuenow', /\d+/);
     await expect(screen).toContainText('Wh/km');

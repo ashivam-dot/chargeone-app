@@ -3,7 +3,7 @@ import { useMemo, useState } from 'preact/hooks';
 import { haptic } from '../../native/platform.ts';
 import { TRIAL_DAYS } from '../../shared/plans.ts';
 import { CUSTOM_VEHICLE_ID, VEHICLES, myVehicleFromModel, type MyVehicle } from '../../shared/vehicles.ts';
-import { CarHero } from '../car/CarHero.tsx';
+import { CarStage } from '../car/CarStage.tsx';
 import { PAINTS } from '../car/carArt.ts';
 import './onboarding.css';
 
@@ -102,7 +102,7 @@ export function Onboarding({ stationCount, dcCount, vehicle, paint, trialAvailab
           <p class="onboard__kicker">Step 1 of {trialAvailable ? 2 : 1}</p>
           <h1 class="onboard__title">What do you drive?</h1>
           <div class="onboard__hero">
-            <CarHero key={modelId} modelId={modelId} paint={paint} connected driving={false} charging={false} label={`${model.name} preview`} />
+            <CarStage key={modelId} modelId={modelId} paint={paint} connected driving={false} charging={false} label={`${model.name} preview`} />
           </div>
           <p class="onboard__model">
             <strong>{model.name}</strong>

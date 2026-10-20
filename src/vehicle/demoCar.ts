@@ -101,8 +101,14 @@ export class DemoCarSource implements VehicleSource {
   async connect(): Promise<void> {
     if (this.timer) return;
     this.listeners.emit(this.reading());
+    let last = Date.now();
     this.timer = setInterval(() => {
-      this.step((this.tickMs / 1000) * this.speedup);
+      // Timers fire late on a busy page (a 3D map in drive mode); keep the demo at its speedup,
+      // but cap a catch-up so a tab returning from the background doesn't jump kilometres.
+      const now = Date.now();
+      const realMs = Math.min(Math.max(now - last, this.tickMs), this.tickMs * 4);
+      last = now;
+      this.step((realMs / 1000) * this.speedup);
       if (this.finished) this.clearTimer();
     }, this.tickMs);
   }

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Capacitor } from '@capacitor/core';
+import { ApiError, api } from '../lib/api.ts';
+import { hdVoiceOn, setHdVoice } from './hd.ts';
 import { listen, pickVoice, speak, speechSupport, stopSpeaking } from './speech.ts';
 
 const native = vi.hoisted(() => {
@@ -22,6 +24,7 @@ const native = vi.hoisted(() => {
 });
 
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: vi.fn(() => false) } }));
+vi.mock('../lib/api.ts', async (actual) => ({ ...(await actual<typeof import('../lib/api.ts')>()), api: { voiceTts: vi.fn() } }));
 vi.mock('@capacitor-community/speech-recognition', () => ({ SpeechRecognition: native.sr }));
 vi.mock('@capacitor-community/text-to-speech', () => ({ TextToSpeech: native.tts, QueueStrategy: { Flush: 0, Add: 1 } }));
 
@@ -204,6 +207,118 @@ describe('pickVoice', () => {
     expect(pickVoice(list, 'en-IN')?.name).toBe('local');
     expect(pickVoice([voice('en-GB')], 'en-IN')?.lang).toBe('en-GB');
     expect(pickVoice([voice('en-GB')], 'hi-IN')).toBeNull();
+  });
+
+  it('prefers a neural Indian voice, and an Indian accent over a nicer foreign one', () => {
+    const edge = [
+      voice('en-IN', 'Microsoft Heera - English (India)'),
+      voice('en-IN', 'Microsoft Neerja Online (Natural) - English (India)', false),
+      voice('en-GB', 'Microsoft Sonia Online (Natural) - English (United Kingdom)', false),
+    ];
+    expect(pickVoice(edge, 'en-IN')?.name).toMatch(/Neerja/);
+    const chrome = [voice('hi-IN', 'Lekha'), voice('hi-IN', 'Google हिन्दी', false)];
+    expect(pickVoice(chrome, 'hi-IN')?.name).toBe('Google हिन्दी');
+    expect(pickVoice([voice('en-IN', 'Rishi'), voice('en-US', 'Samantha (Enhanced)')], 'en-IN')?.name).toBe('Rishi');
+  });
+});
+
+describe('speaking naturally', () => {
+  it('says units and symbols as words, one sentence at a time', async () => {
+    const synth = fakeSynth([voice('en-IN', 'Rishi')]);
+    vi.stubGlobal('speechSynthesis', synth);
+    vi.stubGlobal('SpeechSynthesisUtterance', FakeUtterance);
+    await speak('Charge to 80% at Zeon Charging, Salem. It costs about ₹450 for 30 kWh.', 'en');
+    expect(synth.speak.mock.calls.map((c) => c[0].text)).toEqual([
+      'Charge to 80 percent at Zeon Charging, Salem.',
+      'It costs about 450 rupees for 30 kilowatt-hours.',
+    ]);
+  });
+
+  it('stops before the next sentence', async () => {
+    const synth = fakeSynth([]);
+    synth.speak.mockImplementation((u: FakeUtterance) => queueMicrotask(() => {
+      void stopSpeaking();
+      u.onend?.();
+    }));
+    vi.stubGlobal('speechSynthesis', synth);
+    vi.stubGlobal('SpeechSynthesisUtterance', FakeUtterance);
+    await speak('The first sentence is long enough. The second one is too.', 'en');
+    expect(synth.speak).toHaveBeenCalledTimes(1);
+  });
+});
+
+class FakeAudio {
+  static played: string[] = [];
+  static fail = false;
+  onended: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onpause: (() => void) | null = null;
+  constructor(readonly src: string) {}
+  play() {
+    if (FakeAudio.fail) return Promise.reject(new Error('NotAllowedError'));
+    FakeAudio.played.push(this.src);
+    queueMicrotask(() => this.onended?.());
+    return Promise.resolve();
+  }
+  pause() {
+    this.onpause?.();
+  }
+}
+
+describe('HD voice', () => {
+  const tts = vi.mocked(api.voiceTts);
+  const clip = (text: string) => ({ mime: 'audio/mpeg', audio: btoa(text), cached: false });
+
+  beforeEach(() => {
+    FakeAudio.played = [];
+    FakeAudio.fail = false;
+    vi.stubGlobal('Audio', FakeAudio);
+    vi.stubGlobal('speechSynthesis', fakeSynth([]));
+    vi.stubGlobal('SpeechSynthesisUtterance', FakeUtterance);
+    setHdVoice(true);
+  });
+  afterEach(() => setHdVoice(false));
+
+  it('plays each sentence from the server, fetching the next one while the first plays', async () => {
+    tts.mockImplementation(async (text) => clip(text));
+    const [a, b] = ['Charge at Zeon Charging in Salem.', 'Then drive on to Chennai.'];
+    await speak(`${a} ${b}`, 'en');
+    expect(tts.mock.calls).toEqual([[a, 'en'], [b, 'en']]);
+    expect(FakeAudio.played).toEqual([`data:audio/mpeg;base64,${btoa(a)}`, `data:audio/mpeg;base64,${btoa(b)}`]);
+    expect(vi.mocked(speechSynthesis.speak)).not.toHaveBeenCalled();
+  });
+
+  it('asks the server once for a line it has already read', async () => {
+    tts.mockImplementation(async (text) => clip(text));
+    await speak('You have arrived.', 'en');
+    await speak('You have arrived.', 'en');
+    expect(tts).toHaveBeenCalledTimes(1);
+    expect(FakeAudio.played).toHaveLength(2);
+  });
+
+  it('lets the system voice finish when the server fails part-way', async () => {
+    tts.mockImplementation(async (text) => {
+      if (text.startsWith('The second')) throw new ApiError(503, 'voice_unavailable', 'down', {});
+      return clip(text);
+    });
+    await speak('The first line is read by the server. The second line is not.', 'en');
+    expect(FakeAudio.played).toHaveLength(1);
+    expect(vi.mocked(speechSynthesis.speak).mock.calls.map((c) => (c[0] as unknown as FakeUtterance).text)).toEqual(['The second line is not.']);
+    expect(hdVoiceOn()).toBe(true);
+  });
+
+  it("turns itself off for the session when today's allowance is used", async () => {
+    tts.mockRejectedValue(new ApiError(429, 'voice_limit', 'limit', {}));
+    await speak('Limit reached now.', 'en');
+    expect(hdVoiceOn()).toBe(false);
+    expect(vi.mocked(speechSynthesis.speak)).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back when the WebView refuses to play audio', async () => {
+    FakeAudio.fail = true;
+    tts.mockImplementation(async (text) => clip(text));
+    await speak('Playback blocked here.', 'en');
+    expect(vi.mocked(speechSynthesis.speak)).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -20,6 +20,10 @@ export interface Env {
   /** Google Play Developer API service account key (JSON). Unset = Play billing off. */
   PLAY_SERVICE_ACCOUNT_JSON?: string;
   PLAY_PACKAGE_NAME?: string;
+  /** The owner's voice-server (Supertonic 3), e.g. https://voice.example.in. Unset = HD voice off. */
+  VOICE_TTS_URL?: string;
+  /** Shared secret for voice-server, at least 24 characters. */
+  VOICE_TTS_TOKEN?: string;
   AGENT_MODEL?: string;
   AGENT_FALLBACK_MODEL?: string;
 }

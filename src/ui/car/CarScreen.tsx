@@ -7,6 +7,7 @@ import { efficiencyScore, sohLabel } from '../../vehicle/health.ts';
 import type { SourceKind, Telemetry } from '../../vehicle/types.ts';
 import { Page } from '../shell/Page.tsx';
 import { CarHero } from './CarHero.tsx';
+import { CarStage } from './CarStage.tsx';
 import { PAINTS } from './carArt.ts';
 import { connectDemo, connectObd, connectPhone, disconnectCar, setBatteryPct, useCarLink } from './carLink.ts';
 import './car.css';
@@ -168,7 +169,7 @@ export function CarScreen({ vehicle, paint, canConnect, trialAvailable, onPaint,
       }
     >
       <div class="car-stage">
-        <CarHero modelId={vehicle.modelId} paint={paint} connected={live} driving={driving} charging={charging} speedKmh={t?.speedKmh} label={`${vehicle.name}${live ? ', connected' : ''}`} />
+        <CarStage key={vehicle.modelId} modelId={vehicle.modelId} paint={paint} connected={live} driving={driving} charging={charging} speedKmh={t?.speedKmh} label={`${vehicle.name}${live ? ', connected' : ''}`} />
         <div class="swatches swatches--small" role="radiogroup" aria-label="Paint">
           {PAINTS.map((p) => (
             <button

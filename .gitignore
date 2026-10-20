@@ -9,6 +9,8 @@ screenshots/
 *.log
 .DS_Store
 .scratch/
+voice-server/models/
+__pycache__/
 # Native builds and device runs
 native-artifacts/
 playwright-report/

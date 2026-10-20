@@ -42,7 +42,8 @@ export default defineConfig({
         // Charger and city pages are real documents for search engines, not app routes.
         navigateFallbackDenylist: [/^\/api\//, /^\/charger\//, /^\/ev-charging\//],
         globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
-        globIgnores: ['charger/**', 'ev-charging/**', 'seo.css'],
+        // Font subsets for scripts the app never shows still load on demand, just not at install.
+        globIgnores: ['charger/**', 'ev-charging/**', 'seo.css', '**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {
@@ -57,6 +58,15 @@ export default defineConfig({
             options: {
               cacheName: 'map-tiles',
               expiration: { maxEntries: 1500, maxAgeSeconds: 7 * 24 * 3600 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: ({ url }) => url.hostname === 'tiles.mapterhorn.com',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'terrain-tiles',
+              expiration: { maxEntries: 400, maxAgeSeconds: 30 * 24 * 3600 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

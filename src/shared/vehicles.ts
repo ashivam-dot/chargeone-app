@@ -33,6 +33,9 @@ export const VEHICLES: VehicleModel[] = [
   { id: 'mahindra-xuv400', name: 'Mahindra XUV400 EV', batteryKwh: 39.4, highwayWhPerKm: 160, maxDcKw: 50, maxAcKw: 7.2, massKg: 1650, dcConnector: 'CCS2' },
   { id: 'mahindra-be6-79', name: 'Mahindra BE 6 (79 kWh)', batteryKwh: 79, highwayWhPerKm: 165, maxDcKw: 175, maxAcKw: 11, massKg: 2050, dcConnector: 'CCS2' },
   { id: 'mahindra-xev9e-79', name: 'Mahindra XEV 9e (79 kWh)', batteryKwh: 79, highwayWhPerKm: 175, maxDcKw: 175, maxAcKw: 11, massKg: 2250, dcConnector: 'CCS2' },
+  // XEV 9S (7-seater): Mahindra brochure, 20-80% in 20 min on a 140 kW (59) or 180 kW (79) charger, 11.2 kW AC.
+  { id: 'mahindra-xev9s-59', name: 'Mahindra XEV 9S (59 kWh)', batteryKwh: 59, highwayWhPerKm: 170, maxDcKw: 140, maxAcKw: 11.2, massKg: 2150, dcConnector: 'CCS2' },
+  { id: 'mahindra-xev9s-79', name: 'Mahindra XEV 9S (79 kWh)', batteryKwh: 79, highwayWhPerKm: 175, maxDcKw: 180, maxAcKw: 11.2, massKg: 2150, dcConnector: 'CCS2' },
   { id: 'hyundai-creta-electric-51', name: 'Hyundai Creta Electric 51.4', batteryKwh: 51.4, highwayWhPerKm: 150, maxDcKw: 75, maxAcKw: 11, massKg: 1650, dcConnector: 'CCS2' },
   { id: 'hyundai-ioniq5', name: 'Hyundai Ioniq 5', batteryKwh: 72.6, highwayWhPerKm: 170, maxDcKw: 220, maxAcKw: 11, massKg: 2100, dcConnector: 'CCS2' },
   { id: 'kia-ev6', name: 'Kia EV6', batteryKwh: 84, highwayWhPerKm: 175, maxDcKw: 240, maxAcKw: 11, massKg: 2100, dcConnector: 'CCS2' },

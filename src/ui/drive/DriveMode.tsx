@@ -56,7 +56,7 @@ export function planStops(req: DriveRequest): PlanStops {
   return { stops, demo, startSocPct: req.journey.days[0]?.startSocPct ?? 80 };
 }
 
-const LIVE_TEXT: Record<LiveState, string> = { working: 'Working', in_use: 'In use', problem: 'Reported problem', unknown: 'No recent reports' };
+const LIVE_TEXT: Record<LiveState, string> = { working: 'Available', in_use: 'Occupied', problem: 'Reported not working', unknown: 'Status unknown' };
 
 function fmtEta(min: number): string {
   if (!Number.isFinite(min)) return '--';

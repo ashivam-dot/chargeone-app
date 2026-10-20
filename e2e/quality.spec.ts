@@ -71,8 +71,12 @@ test.describe('robustness', () => {
     const page = await ctx.newPage();
     await openApp(page);
     await page.getByTestId('tab-car').click();
-    const seconds = await page.locator('.car-hero__car').first().evaluate((el) => parseFloat(getComputedStyle(el).animationDuration) || 0);
-    expect(seconds).toBeLessThan(0.01);
+    await expect(page.getByTestId('car-3d')).toHaveAttribute('data-motion', 'still');
+    // The 2D car is only on screen until the 3D view is ready, so it may already be gone.
+    const durations = await page
+      .locator('.car-hero__car')
+      .evaluateAll((els) => els.map((el) => parseFloat(getComputedStyle(el).animationDuration) || 0));
+    for (const seconds of durations) expect(seconds).toBeLessThan(0.01);
     await ctx.close();
   });
 });

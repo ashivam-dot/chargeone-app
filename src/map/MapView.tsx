@@ -16,6 +16,8 @@ import type { Station } from '../data/model.ts';
 import { INDIA_BBOX } from '../lib/geocode.ts';
 import type { Coord } from '../planner/geometry.ts';
 import { LIVE_COLOUR, liveState, type StationStatus } from '../shared/status.ts';
+import { setMapMoving } from '../ui/glass.ts';
+import { drawRoute, futuristicStyle, setTerrain3d, shouldPlayIntro, Tilt3dControl } from './futuristic.ts';
 
 export type FlyTarget =
   | { kind: 'point'; lat: number; lng: number; zoom: number }
@@ -264,6 +266,19 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
       'circle-stroke-width': 3,
     },
   });
+  // A soft static halo in the live colour, so free and busy chargers glow without per-frame repaints.
+  map.addLayer({
+    id: 'stations-glow',
+    type: 'circle',
+    source: SOURCE,
+    filter: ['all', ['!', ['has', 'point_count']], ['in', ['get', 'live'], ['literal', ['working', 'in_use']]]],
+    paint: {
+      'circle-color': ['match', ['get', 'live'], 'working', LIVE_COLOUR.working, LIVE_COLOUR.in_use],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 11, 14, 26],
+      'circle-blur': 0.85,
+      'circle-opacity': dark ? 0.6 : 0.35,
+    },
+  });
   map.addLayer({
     id: 'stations',
     type: 'circle',
@@ -306,16 +321,19 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
 }
 
 /** While a route is shown, other chargers fade so the numbered stops and overnight markers stay readable. */
-function applyTripMode(map: MapLibreMap, on: boolean): void {
+function applyTripMode(map: MapLibreMap, on: boolean, dark: boolean): void {
   if (!map.getLayer('clusters')) return;
   map.setPaintProperty('clusters', 'circle-opacity', on ? 0.35 : 0.92);
   map.setPaintProperty('cluster-count', 'text-opacity', on ? 0 : 1);
   map.setPaintProperty('stations', 'circle-opacity', on ? 0.55 : 1);
+  map.setPaintProperty('stations-glow', 'circle-opacity', on ? 0 : dark ? 0.6 : 0.35);
 }
 
 export function MapView(props: Props) {
   const { stations, statuses, selectedId, flyTarget, dark, attribution, insets, route, altRoutes, car, follow, stops, places, selectedPlace } = props;
   const carMarker = useRef<Marker | null>(null);
+  const pulseMarker = useRef<Marker | null>(null);
+  const tilt = useRef<Tilt3dControl | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const styleUrl = useRef(dark ? DARK_STYLE : LIGHT_STYLE);
@@ -324,29 +342,49 @@ export function MapView(props: Props) {
 
   useEffect(() => {
     if (!container.current) return;
+    const india: [[number, number], [number, number]] = [
+      [INDIA_BBOX[0], INDIA_BBOX[1]],
+      [INDIA_BBOX[2], INDIA_BBOX[3]],
+    ];
+    // A portrait phone is narrow: keep the padding small so all of India, including Ladakh and Arunachal, fits as large as possible.
+    const fitPadding = container.current.clientWidth < 600 ? 6 : 24;
+    const intro = shouldPlayIntro();
     const map = new MapLibreMap({
       container: container.current,
       style: styleUrl.current,
-      bounds: [
-        [INDIA_BBOX[0], INDIA_BBOX[1]],
-        [INDIA_BBOX[2], INDIA_BBOX[3]],
-      ],
-      // A portrait phone is narrow: keep the padding small so all of India, including Ladakh and Arunachal, fits as large as possible.
-      fitBoundsOptions: { padding: container.current.clientWidth < 600 ? 6 : 24 },
+      ...(intro ? { center: [79, 18] as [number, number], zoom: 1.1, pitch: 0 } : { bounds: india, fitBoundsOptions: { padding: fitPadding } }),
       attributionControl: false,
-      maxPitch: 60,
+      maxPitch: 75,
       dragRotate: false,
     });
     map.touchZoomRotate.disableRotation();
     map.addControl(new AttributionControl({ compact: true, customAttribution: attribution }), 'bottom-left');
+    tilt.current = new Tilt3dControl();
+    map.addControl(tilt.current, 'bottom-right');
     map.addControl(
       new GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true, showAccuracyCircle: true }),
       'bottom-right',
     );
+    if (intro) {
+      map.once('load', () => {
+        // Stop the opening flight as soon as the user takes the map.
+        const stop = () => map.stop();
+        map.getCanvasContainer().addEventListener('pointerdown', stop, { once: true });
+        map.fitBounds(india, { padding: fitPadding, duration: 3200, curve: 1.6, essential: false });
+      });
+    }
+    map.on('movestart', () => setMapMoving(true));
+    map.on('moveend', () => setMapMoving(false));
 
     map.on('style.load', () => {
       const l = latest.current;
       englishLabels(map);
+      try {
+        futuristicStyle(map, l.dark);
+      } catch (err) {
+        console.warn('Map styling skipped', err);
+      }
+      if (tilt.current?.on || l.follow) setTerrain3d(map, true);
       addLayers(
         map,
         {
@@ -360,7 +398,7 @@ export function MapView(props: Props) {
         l.selectedPlace,
         l.dark,
       );
-      applyTripMode(map, Boolean(l.route));
+      applyTripMode(map, Boolean(l.route), l.dark);
     });
 
     map.on('click', async (e) => {
@@ -417,7 +455,10 @@ export function MapView(props: Props) {
   useEffect(() => {
     const source = mapRef.current?.getSource(ROUTE) as GeoJSONSource | undefined;
     void source?.setData(routeGeoJson(route));
-    if (mapRef.current) applyTripMode(mapRef.current, Boolean(route));
+    const map = mapRef.current;
+    if (!map) return;
+    applyTripMode(map, Boolean(route), dark);
+    if (route && route.length > 1 && !follow) drawRoute(map);
   }, [route]);
 
   useEffect(() => {
@@ -436,18 +477,50 @@ export function MapView(props: Props) {
     if (!carMarker.current) {
       const el = document.createElement('div');
       el.className = 'car-marker';
-      el.innerHTML = '<span class="car-marker__pulse"></span><span class="car-marker__arrow"></span>';
+      for (const part of ['pulse', 'arrow']) {
+        const span = document.createElement('span');
+        span.className = `car-marker__${part}`;
+        el.appendChild(span);
+      }
       carMarker.current = new Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat([car.lng, car.lat]).addTo(map);
     }
     carMarker.current.setLngLat([car.lng, car.lat]);
     carMarker.current.setRotation(car.headingDeg ?? 0);
-    if (follow) map.easeTo({ center: [car.lng, car.lat], bearing: car.headingDeg ?? map.getBearing(), pitch: 55, zoom: Math.max(map.getZoom(), 13.5), duration: 900, essential: true });
+    if (follow) map.easeTo({ center: [car.lng, car.lat], bearing: car.headingDeg ?? map.getBearing(), pitch: 62, zoom: Math.max(map.getZoom(), 14.5), duration: 900, essential: true });
   }, [car?.lng, car?.lat, car?.headingDeg, follow]);
 
+  // Drive mode raises the land and buildings around the car; leaving it returns to the flat overview.
   useEffect(() => {
     const map = mapRef.current;
-    if (map && !follow && (map.getPitch() > 0 || map.getBearing() !== 0)) map.easeTo({ pitch: 0, bearing: 0, duration: 700 });
+    if (!map) return;
+    if (follow) {
+      setTerrain3d(map, true);
+      return;
+    }
+    if (tilt.current?.on) return;
+    setTerrain3d(map, false);
+    if (map.getPitch() > 0 || map.getBearing() !== 0) map.easeTo({ pitch: 0, bearing: 0, duration: 700 });
   }, [follow]);
+
+  // The chosen charger gets a ring that pulses on the compositor, with no map repaint.
+  useEffect(() => {
+    const map = mapRef.current;
+    const s = selectedId ? stations.find((x) => x.id === selectedId) : undefined;
+    if (!map || !s) {
+      pulseMarker.current?.remove();
+      pulseMarker.current = null;
+      return;
+    }
+    if (!pulseMarker.current) {
+      const el = document.createElement('div');
+      el.className = 'station-pulse';
+      el.setAttribute('aria-hidden', 'true');
+      pulseMarker.current = new Marker({ element: el, pitchAlignment: 'map' });
+    }
+    const live = liveState(statuses.get(s.id), new Date());
+    pulseMarker.current.getElement().style.setProperty('--live', LIVE_COLOUR[live]);
+    pulseMarker.current.setLngLat([s.lng, s.lat]).addTo(map);
+  }, [selectedId, stations, statuses]);
 
   useEffect(() => {
     const source = mapRef.current?.getSource(STOPS) as GeoJSONSource | undefined;
