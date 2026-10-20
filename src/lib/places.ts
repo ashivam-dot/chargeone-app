@@ -7,9 +7,10 @@ export function loadPlaces(): Promise<PlacesData | null> {
   pending ??= fetch('/data/places.json')
     .then((r) => (r.ok ? (r.json() as Promise<PlacesData>) : null))
     .then((d) => (d && Array.isArray(d.places) && d.near ? d : null))
-    .catch(() => {
-      pending = null;
-      return null;
+    .catch(() => null)
+    .then((d) => {
+      if (!d) pending = null;
+      return d;
     });
   return pending;
 }

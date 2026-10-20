@@ -269,6 +269,26 @@ export function robots(site: string): string {
   return `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${site}/sitemap.xml\n`;
 }
 
+/** Canonical link, absolute share image and app structured data for the app shell's `<!--seo-->` slot. */
+export function indexHead(site: string): string {
+  const app = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'ChargeOne',
+    url: `${site}/`,
+    applicationCategory: 'TravelApplication',
+    operatingSystem: 'Android, iOS, Web',
+    description: 'EV trip planner for India: every charger with live driver reports, food and hotels near each charger, and multi-day trips with overnight stays.',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'INR' },
+  };
+  return [
+    `<link rel="canonical" href="${esc(site)}/">`,
+    `<meta property="og:url" content="${esc(site)}/">`,
+    `<meta property="og:image" content="${esc(site)}/icon-512.png">`,
+    `<script type="application/ld+json">${jsonLd(app)}</script>`,
+  ].join('\n    ');
+}
+
 /** Normalises SITE_URL: https origin only, no trailing slash. */
 export function siteOrigin(raw: string | undefined): string | null {
   if (!raw) return null;

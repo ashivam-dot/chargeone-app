@@ -19,7 +19,7 @@
     "icons": "node scripts/make-icons.ts",
     "smoke:api": "node scripts/api-smoke.ts",
     "smoke:ui": "node scripts/ui-smoke.ts",
-    "deploy": "npm run build && wrangler d1 migrations apply chargeone --remote && wrangler deploy"
+    "deploy": "npm run build -- --require-site-url && wrangler d1 migrations apply chargeone --remote && wrangler deploy"
   },
   "dependencies": {
     "lucide-preact": "1.59.0",

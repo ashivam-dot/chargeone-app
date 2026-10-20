@@ -62,8 +62,9 @@ const STOPS = 'stops';
 const PLACES = 'places';
 const FOOD_COLOUR = '#f97316';
 const STAY_COLOUR = '#8b5cf6';
-/** Top-most first: the first hit under a tap wins. */
-const CLICKABLE = ['stop-labels', 'stops', 'stations', 'clusters', 'places'];
+/** Rough on-screen radius of each tappable marker; a tap goes to the marker whose edge is nearest. */
+const TAP_RADIUS_PX: Record<string, number> = { 'stop-labels': 13, stops: 13, stations: 8, clusters: 20, places: 5 };
+const CLICKABLE = Object.keys(TAP_RADIUS_PX);
 const TAP_SLOP_PX = 8;
 const LIGHT_STYLE = 'https://tiles.openfreemap.org/styles/positron';
 const DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark';
@@ -230,6 +231,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     id: 'stops',
     type: 'circle',
     source: STOPS,
+    layout: { 'circle-sort-key': ['case', ['get', 'overnight'], 1, 0] },
     paint: {
       'circle-radius': 13,
       'circle-color': ['case', ['get', 'overnight'], STAY_COLOUR, '#14b8a6'],
@@ -241,9 +243,25 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     id: 'stop-labels',
     type: 'symbol',
     source: STOPS,
-    layout: { 'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-allow-overlap': true, 'icon-allow-overlap': true },
+    layout: {
+      'text-field': ['get', 'label'],
+      'text-font': ['Noto Sans Bold'],
+      'text-size': 12,
+      // Stop labels may hide each other (overnight wins) but never give way to the base map's labels.
+      'text-allow-overlap': false,
+      'text-ignore-placement': true,
+      'symbol-sort-key': ['case', ['get', 'overnight'], 0, 1],
+    },
     paint: { 'text-color': ['case', ['get', 'overnight'], '#ffffff', '#04201d'] },
   });
+}
+
+/** While a route is shown, other chargers fade so the numbered stops and overnight markers stay readable. */
+function applyTripMode(map: MapLibreMap, on: boolean): void {
+  if (!map.getLayer('clusters')) return;
+  map.setPaintProperty('clusters', 'circle-opacity', on ? 0.35 : 0.92);
+  map.setPaintProperty('cluster-count', 'text-opacity', on ? 0 : 1);
+  map.setPaintProperty('stations', 'circle-opacity', on ? 0.55 : 1);
 }
 
 export function MapView(props: Props) {
@@ -284,6 +302,7 @@ export function MapView(props: Props) {
         l.selectedPlace,
         l.dark,
       );
+      applyTripMode(map, Boolean(l.route));
     });
 
     map.on('click', async (e) => {
@@ -297,7 +316,12 @@ export function MapView(props: Props) {
         ],
         { layers },
       );
-      const top = layers.map((id) => hits.find((h) => h.layer.id === id)).find(Boolean) as MapGeoJSONFeature | undefined;
+      const gap = (h: MapGeoJSONFeature) => {
+        if (h.geometry.type !== 'Point') return Infinity;
+        const p = map.project(h.geometry.coordinates as [number, number]);
+        return Math.hypot(p.x - x, p.y - y) - (TAP_RADIUS_PX[h.layer.id] ?? 0);
+      };
+      const top = hits.reduce<MapGeoJSONFeature | undefined>((best, h) => (!best || gap(h) < gap(best) ? h : best), undefined);
       if (!top) {
         latest.current.onSelect(null);
         return;
@@ -335,6 +359,7 @@ export function MapView(props: Props) {
   useEffect(() => {
     const source = mapRef.current?.getSource(ROUTE) as GeoJSONSource | undefined;
     void source?.setData(routeGeoJson(route));
+    if (mapRef.current) applyTripMode(mapRef.current, Boolean(route));
   }, [route]);
 
   useEffect(() => {

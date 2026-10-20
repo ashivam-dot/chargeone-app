@@ -90,9 +90,9 @@ For front-end work with hot reload, run `npm run dev` alongside `npm run dev:api
 
 | Command | What it checks |
 |---|---|
-| `npm test` | 88 unit and integration tests: data import, filters, plans and quotas, the trip planner, sessions, Google token verification, Razorpay signatures, and the full payment flows on a real SQL database |
+| `npm test` | 116 unit and integration tests: data import, food and stay places, filters, plans and quotas, the trip and multi-day planner, SEO pages, sessions, Google token verification, Razorpay signatures, and the full payment flows on a real SQL database |
 | `npm run smoke:api` | 28 checks against the running local server: sign-in, cross-site blocking, geofenced check-ins, live status, the 100 km free limit, quotas, re-plans, and account deletion |
-| `npm run smoke:ui` | Headless phone-sized browser: map, deep link, sign-in, check-in, car choice, paywall, paid trip with stops, dark mode. Screenshots go to `screenshots/` |
+| `npm run smoke:ui` | Headless phone-sized browser: map, deep link, sign-in, check-in, car choice, paywall, paid trip with stops, food and stays near a charger, place sheet, multi-day trip with overnight hotels, SEO pages, dark mode. Screenshots go to `screenshots/` |
 | `npm run typecheck` | Strict TypeScript for the app and the Worker |
 
 ## Security
@@ -107,5 +107,6 @@ For front-end work with hot reload, run `npm run dev` alongside `npm run dev:api
 ## Honest limits
 
 - **Live status is community-reported.** Charging companies don't share live data with independent apps yet; that needs partnerships or the UBC/OCPI roaming networks. Until then, status is only as fresh as the last driver report.
-- **Food and hotel data is OpenStreetMap's.** It's good in cities (most chargers have food and stays nearby) and patchy on highways, so some overnight stops show no hotel. Ratings, photos and room prices aren't shown in the app because no free source allows it; "Check prices" hands over to Booking.com. Places that are tagged as hotels but are really eateries or student hostels are filtered out by name.
+- **Food and hotel data is OpenStreetMap's.** It's good in cities (most chargers have food and stays nearby) and patchy on highways, so some overnight stops show no hotel. Ratings, photos and room prices aren't shown in the app because no free source allows it; "Check prices" hands over to Booking.com. Places that are tagged as hotels but are really eateries or student hostels are filtered out by name. Food and stays are fetched around OpenStreetMap's chargers, so chargers that come only from Open Charge Map show none until they're added to OpenStreetMap.
+- **Overnight charging is estimated** for 10 hours on the charger. On a slow AC charger the next day starts below 100% and the plan says so.
 - **The open data is thin.** It covers about 500 of India's 25,000+ public chargers, and many lack connector details. The app says so, labels unverified connectors, and links every charger to OpenStreetMap so drivers can fix or add them. Adding the Open Charge Map key and operator lists (with permission) is the biggest quality win.

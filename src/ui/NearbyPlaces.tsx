@@ -120,26 +120,29 @@ interface NearbyProps {
   stays: NearbyPlace[];
   area: string | null;
   loading: boolean;
+  failed?: boolean;
   onOpen?: (place: Place) => void;
 }
 
-/** Food and stays near a charger, in two tabs. */
-export function NearbyPlaces({ food, stays, area, loading, onOpen }: NearbyProps) {
+/** Food and stays near a charger, with a switch between the two lists. */
+export function NearbyPlaces({ food, stays, area, loading, failed, onOpen }: NearbyProps) {
   const [tab, setTab] = useState<'food' | 'stays'>(food.length || !stays.length ? 'food' : 'stays');
   const items = tab === 'food' ? food : stays;
   return (
     <section class="nearby" aria-label="Food and stays nearby">
       <h3>While you charge</h3>
-      <div class="segmented" role="tablist" aria-label="Nearby places">
-        <button role="tab" aria-selected={tab === 'food'} onClick={() => setTab('food')}>
+      <div class="segmented" role="group" aria-label="Show nearby">
+        <button aria-pressed={tab === 'food'} onClick={() => setTab('food')}>
           <Utensils size={15} aria-hidden="true" /> Food <span class="count">{food.length}</span>
         </button>
-        <button role="tab" aria-selected={tab === 'stays'} onClick={() => setTab('stays')}>
+        <button aria-pressed={tab === 'stays'} onClick={() => setTab('stays')}>
           <BedDouble size={15} aria-hidden="true" /> Stays <span class="count">{stays.length}</span>
         </button>
       </div>
       {loading ? (
         <p class="muted">Loading nearby places…</p>
+      ) : failed ? (
+        <p class="muted small">Couldn't load nearby food and stays. Check your connection and open this charger again.</p>
       ) : items.length === 0 ? (
         <p class="muted small">
           {tab === 'food' ? 'No restaurants or cafés mapped within a short walk.' : 'No hotels or guest houses mapped within 3 km.'} Know one? Add it on
@@ -148,7 +151,7 @@ export function NearbyPlaces({ food, stays, area, loading, onOpen }: NearbyProps
       ) : (
         <>
           {tab === 'stays' && <p class="small muted">Stays within 3 km, ones with a charger on site first. Prices and booking open on Booking.com.</p>}
-          <PlaceList items={items} area={area} limit={4} onOpen={onOpen} />
+          <PlaceList key={tab} items={items} area={area} limit={4} onOpen={onOpen} />
         </>
       )}
       <p class="small muted">Places from OpenStreetMap. Hours can change, so call ahead late at night.</p>

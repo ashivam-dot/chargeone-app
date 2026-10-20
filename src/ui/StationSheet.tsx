@@ -20,6 +20,7 @@ interface Props {
   onPlanTo: (s: Station) => void;
   places: PlacesData | null;
   placesLoading: boolean;
+  placesFailed: boolean;
   onOpenPlace: (p: Place) => void;
 }
 
@@ -189,7 +190,7 @@ export function StationSheet(props: Props) {
         )}
       </section>
 
-      <NearbyPlaces key={`${station.id}:${places ? 1 : 0}`} food={food} stays={stays} area={area} loading={props.placesLoading} onOpen={props.onOpenPlace} />
+      <NearbyPlaces key={`${station.id}:${places ? 1 : 0}`} food={food} stays={stays} area={area} loading={props.placesLoading} failed={props.placesFailed} onOpen={props.onOpenPlace} />
 
       {station.connectors.length > 0 ? (
         <section aria-label="Connectors">

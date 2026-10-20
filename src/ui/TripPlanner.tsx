@@ -375,6 +375,7 @@ interface ResultProps {
 }
 
 function verdictText(j: Journey): string {
+  if (j.tooLong) return 'Too long for your daily driving limit';
   if (!j.feasible) return 'Not safe as planned';
   const stops = `${j.stopCount} charging stop${j.stopCount === 1 ? '' : 's'}`;
   if (j.days.length > 1) {
@@ -532,7 +533,7 @@ function JourneyResult({ result, journey, alerts, busy, error, me, onReplan, onC
           <h3>
             <BedDouble size={16} aria-hidden="true" /> Staying at {result.to.name}?
           </h3>
-          <p class="small muted">Hotels near your destination with a charger on site or a short walk away.</p>
+          <p class="small muted">Hotels near your destination with a public charger on site or within 3 km. Distances are from your destination.</p>
           <PlaceList items={result.destStays} area={result.to.name} limit={3} from="destination" onOpen={onOpenPlace} />
         </section>
       )}
@@ -593,9 +594,12 @@ function OvernightCard({ day, index, area, onSelectStation, onOpenPlace }: Overn
           {area ? ` · ${area}` : ''}
         </span>
         <div class="timeline__charge">
-          Arrive {Math.max(0, day.plan.arrivalSocPct)}% → <strong>100% by morning</strong> · about {night.hoursToFull} h on {night.mode.toUpperCase()}{' '}
-          {night.powerKw} kW
+          Arrive {Math.max(0, day.plan.arrivalSocPct)}% → <strong>{night.morningSocPct === 100 ? '100%' : `about ${night.morningSocPct}%`} by morning</strong> ·{' '}
+          {night.morningSocPct === 100 ? `about ${night.hoursToFull} h` : `${night.hoursToFull} h to full`} on {night.mode.toUpperCase()} {night.powerKw} kW
         </div>
+        {night.morningSocPct < 100 && (
+          <p class="small muted">A slow charger: a night here won't fill the battery, so day {index + 2} starts lower and may need an extra stop.</p>
+        )}
         {night.stays.length > 0 ? (
           <>
             <p class="small muted">

@@ -6,7 +6,7 @@ import type { Place, PlacesData } from './data/places.ts';
 import { api, type Config, type Me } from './lib/api.ts';
 import { loadPlaces } from './lib/places.ts';
 import { isObject, loadJson, saveJson } from './lib/storage.ts';
-import { MapView, type FlyTarget, type PlaceMarker } from './map/MapView.tsx';
+import { MapView, type FlyTarget, type PlaceMarker, type StopMarker } from './map/MapView.tsx';
 import { liveState, type StationStatus } from './shared/status.ts';
 import type { MyVehicle } from './shared/vehicles.ts';
 import { About } from './ui/About.tsx';
@@ -26,6 +26,7 @@ const STATUS_POLL_MS = 60_000;
 /** Must match the side panel width plus margin in styles.css (min-width: 820px). */
 const DESKTOP_PANEL_PX = 452;
 const NO_INSETS = { bottom: 0, left: 0 };
+const NO_STOPS: StopMarker[] = [];
 const readViewport = () => ({ height: window.innerHeight, desktop: window.innerWidth >= 820 });
 const isVehicle = (v: unknown): v is MyVehicle => isObject(v) && typeof v.modelId === 'string' && typeof v.batteryKwh === 'number';
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
@@ -40,8 +41,11 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [places, setPlaces] = useState<PlacesData | null>(null);
   const [placesLoading, setPlacesLoading] = useState(false);
+  const [placesFailed, setPlacesFailed] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<number | null>(null);
   const placesRequested = useRef(false);
+  /** Set once the user picks something, so a late deep-link load doesn't override it. */
+  const userPicked = useRef(false);
   const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [tripOpen, setTripOpen] = useState(false);
@@ -85,7 +89,7 @@ export function App() {
     if (placeId) {
       ensurePlaces().then((d) => {
         const i = d ? d.places.findIndex((x) => x.id === placeId) : -1;
-        if (!d || i < 0) return;
+        if (!d || i < 0 || userPicked.current) return;
         setSelectedPlace(i);
         setFlyTarget({ kind: 'point', lat: d.places[i].lat, lng: d.places[i].lng, zoom: 15 });
       });
@@ -102,6 +106,9 @@ export function App() {
     return loadPlaces().then((d) => {
       setPlaces(d);
       setPlacesLoading(false);
+      setPlacesFailed(d === null);
+      // A failed load can be retried the next time something needs places.
+      if (!d) placesRequested.current = false;
       return d;
     });
   }
@@ -151,11 +158,12 @@ export function App() {
 
   // Places are a separate, larger file: fetch it only once something needs it.
   useEffect(() => {
-    if (selectedId || filters.showFood || filters.showStays || tripOpen) void ensurePlaces();
-  }, [selectedId, filters.showFood, filters.showStays, tripOpen]);
+    if (!places && (selectedId || filters.showFood || filters.showStays || tripOpen)) void ensurePlaces();
+  }, [places, selectedId, filters.showFood, filters.showStays, tripOpen]);
 
   const select = useCallback(
     (id: string | null) => {
+      userPicked.current = true;
       setSelectedId(id);
       setSelectedPlace(null);
       const url = new URL(location.href);
@@ -171,6 +179,7 @@ export function App() {
 
   const selectPlace = useCallback(
     (index: number | null, fly = false) => {
+      userPicked.current = true;
       const place = index !== null ? places?.places[index] : undefined;
       setSelectedPlace(place ? index : null);
       setSelectedId(null);
@@ -201,7 +210,7 @@ export function App() {
     if (view) setFlyTarget({ kind: 'bbox', bbox: view.bbox });
   };
 
-  const stopMarkers = tripView?.markers ?? [];
+  const stopMarkers = tripView?.markers ?? NO_STOPS;
 
   // Food and stays on the map: the chosen categories, plus what is near the open charger or trip.
   const placeMarkers: PlaceMarker[] = useMemo(() => {
@@ -335,6 +344,7 @@ export function App() {
           onPlanTo={(s: Station) => openTrip({ name: s.name, lat: s.lat, lng: s.lng, bbox: null, stationId: s.id })}
           places={places}
           placesLoading={placesLoading}
+          placesFailed={placesFailed}
           onOpenPlace={openPlace}
         />
       )}

@@ -203,7 +203,7 @@ try {
   await wait(1800);
   await page.locator('section.nearby').evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   await wait(700);
-  await tap(page.getByRole('tab', { name: /Stays/ }));
+  await tap(page.locator('.segmented button', { hasText: 'Stays' }));
   await say('Stays within 3 km', 'Hotels with a charger on site come first', 3500);
   const priceLink = page.locator('a.chip-link--accent').first();
   const priceBox = await priceLink.boundingBox();
@@ -239,7 +239,7 @@ try {
   await wait(600);
 
   // ---- Multi-day trip ----
-  await say('Plan a road trip', 'Bengaluru → Kochi, about 550 km', 1500);
+  await say('Plan a road trip', 'Bengaluru → Kochi, about 500 km', 1500);
   await tap(page.getByRole('button', { name: 'Plan a trip' }));
   await ready(page, 'section[aria-label="Plan a trip"]');
   await tap(page.getByRole('button', { name: 'Choose your car' }));

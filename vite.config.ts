@@ -1,10 +1,22 @@
 import { defineConfig } from 'vitest/config';
 import preact from '@preact/preset-vite';
+import type { Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { indexHead, siteOrigin } from './src/seo/pages.ts';
+
+/** Fills the app shell's `<!--seo-->` slot at build time, before the service worker hashes it. */
+function seoHead(): Plugin {
+  const site = siteOrigin(process.env.SITE_URL);
+  return {
+    name: 'chargeone-seo-head',
+    transformIndexHtml: (html) => html.replace('<!--seo-->', site ? indexHead(site) : ''),
+  };
+}
 
 export default defineConfig({
   plugins: [
     preact(),
+    seoHead(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],

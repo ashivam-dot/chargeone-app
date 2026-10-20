@@ -117,7 +117,7 @@ function boundedNumber(raw: string | undefined, min: number, max: number): numbe
  * Such places are tagged as stays in OSM but can't take a traveller for the night.
  */
 const NOT_A_STAY =
-  /\b(mess|parotta|biriyani|biryani|tiffins?|meals|dhaba|canteen|restaurant|cafe|bakery|sweets?|juice|chai|pg|paying guest|boys|girls|ladies|gents|students?|working wom[ae]n|co-?living|nestaway|zolo|stanza living)\b/i;
+  /\b(mess|parotta|biriyani|biryani|tiffins?|meals|dhaba|canteen|restaurant|cafe|bakery|sweets?|juice|chai|tea|coffee|dining|kitchen|food|snacks?|chaat|vada ?pav|idli|dosa|pizza|burger|bhojanalaya|khanaval|pg|paying guest|boys|girls|ladies|gents|students?|working wom[ae]n|co-?living|nestaway|zolo|stanza living)\b/i;
 
 export function osmToPlace(el: OsmElement): Place | null {
   const tags = el.tags ?? {};
@@ -228,6 +228,7 @@ export function linkPlaces(stations: Station[], places: Place[]): PlacesData['ne
   for (const s of stations) {
     const f: NearRef[] = [];
     const st: NearRef[] = [];
+    const carCanCharge = !s.batterySwap && (s.vehicles.length === 0 || s.vehicles.includes('car'));
     const cy = Math.floor(s.lat / cellDeg);
     const cx = Math.floor(s.lng / cellDeg);
     for (let dy = -1; dy <= 1; dy++) {
@@ -238,7 +239,7 @@ export function linkPlaces(stations: Station[], places: Place[]): PlacesData['ne
           if (p.cat === 'food' && d <= FOOD_RADIUS_M) f.push([i, d]);
           if (p.cat === 'stay' && d <= STAY_RADIUS_M) {
             st.push([i, d]);
-            if (d <= ON_SITE_M) p.chargerOnSite = true;
+            if (d <= ON_SITE_M && carCanCharge) p.chargerOnSite = true;
           }
         }
       }

@@ -3,7 +3,7 @@ import type { Station } from '../data/model.ts';
 import type { Place, PlacesData } from '../data/places.ts';
 import { VEHICLES, myVehicleFromModel } from '../shared/vehicles.ts';
 import type { Coord } from './geometry.ts';
-import { chooseOvernight, planJourney, sortStays, staysNearDestination } from './journey.ts';
+import { chooseOvernight, morningSoc, planJourney, sortStays, staysNearDestination } from './journey.ts';
 import { DEFAULT_OPTIONS } from './planner.ts';
 
 const KM_PER_DEG_LAT = 111.2;
@@ -82,8 +82,33 @@ describe('planJourney', () => {
     expect(j.distanceKm).toBeCloseTo(1000, -1);
   });
 
+  it('never charges at the overnight charger as a stop on the same day', () => {
+    for (const hours of [4, 6, 8]) {
+      const j = journey(1000, hours);
+      for (const d of j.days) {
+        if (d.overnight) expect(d.plan.stops.map((s) => s.station.id)).not.toContain(d.overnight.station.id);
+      }
+    }
+  });
+
   it('has no daily limit when set to 0', () => {
     expect(journey(1000, 0).days).toHaveLength(1);
+  });
+
+  it('starts the next day below 100% after a night on a slow AC charger', () => {
+    expect(morningSoc(20, 45, 'dc', 30)).toBe(100);
+    expect(morningSoc(20, 45, 'ac', 7.4)).toBe(100);
+    // 3.3 kW for 10 h adds about 27 kWh to a 45 kWh battery: 20% + 59% → 75%.
+    expect(morningSoc(20, 45, 'ac', 3.3)).toBe(75);
+  });
+
+  it('calls a trip too long, not unsafe, when it needs more than 7 days', () => {
+    const j = journey(1000, 2);
+    expect(j.days).toHaveLength(7);
+    expect(j.tooLong).toBe(true);
+    expect(j.feasible).toBe(false);
+    expect(j.warnings.join(' ')).toContain('more than 7 days');
+    expect(journey(1000, 8).tooLong).toBe(false);
   });
 
   it('still splits the trip without any stay data', () => {

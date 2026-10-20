@@ -56,6 +56,9 @@ describe('osmToPlace', () => {
     expect(osmToPlace(node(7, { tourism: 'hotel', name: 'Sri Iyappa Mess' }))).toBeNull();
     expect(osmToPlace(node(8, { tourism: 'hotel', name: 'Kongu Parotta Stall' }))).toBeNull();
     expect(osmToPlace(node(9, { tourism: 'hostel', name: 'Balaji PG for Boys' }))).toBeNull();
+    expect(osmToPlace(node(12, { tourism: 'hotel', name: 'Pawan Dining Hall' }))).toBeNull();
+    expect(osmToPlace(node(13, { tourism: 'hotel', name: 'Chintamni Vadapav' }))).toBeNull();
+    expect(osmToPlace(node(14, { tourism: 'hotel', name: 'Teakwood Residency' }))?.cat).toBe('stay');
     expect(osmToPlace(node(10, { tourism: 'guest_house', name: 'Hotel Sampoorna' }))?.cat).toBe('stay');
     expect(osmToPlace(node(11, { amenity: 'restaurant', name: 'Annapoorna Mess' }))?.cat).toBe('food');
   });
@@ -95,7 +98,21 @@ describe('helpers', () => {
 });
 
 describe('linking places to chargers', () => {
-  const station = (id: string, lat: number, lng: number) => ({ id, lat, lng }) as Station;
+  const station = (id: string, lat: number, lng: number, extra: Partial<Station> = {}) =>
+    ({ id, lat, lng, vehicles: [], batterySwap: false, ...extra }) as Station;
+
+  it('only counts a charger a car can use as "charger on site"', () => {
+    const hotel = () => osmToPlace(node(3, { tourism: 'hotel', name: 'Onsite hotel' }, 12.9701, 77.5901))!;
+    const swap = [hotel()];
+    linkPlaces([station('s1', 12.97, 77.59, { batterySwap: true })], swap);
+    expect(swap[0].chargerOnSite).toBeUndefined();
+    const bikes = [hotel()];
+    linkPlaces([station('s1', 12.97, 77.59, { vehicles: ['2w'] })], bikes);
+    expect(bikes[0].chargerOnSite).toBeUndefined();
+    const cars = [hotel()];
+    linkPlaces([station('s1', 12.97, 77.59, { vehicles: ['2w', 'car'] })], cars);
+    expect(cars[0].chargerOnSite).toBe(true);
+  });
 
   it('links food within 800 m and stays within 3 km, nearest first, and marks chargers on site', () => {
     const places = [

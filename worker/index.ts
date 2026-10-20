@@ -174,9 +174,37 @@ route('POST', '/api/dev/grant', async (req, env) => {
   return json(await meResponse(env, user.id, user.email, user.name));
 });
 
+const SEO_PATH = /^\/(charger|ev-charging)\//;
+const NOT_FOUND_PAGE =
+  '<!doctype html><html lang="en-IN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
+  '<meta name="robots" content="noindex"><title>Page not found | ChargeOne</title><link rel="stylesheet" href="/seo.css"></head>' +
+  '<body><main><h1>This page no longer exists</h1><p>The charger may have been removed or renamed. ' +
+  '<a href="/ev-charging/">Browse chargers by city</a> or <a href="/">open the live map</a>.</p></main></body></html>';
+
+/**
+ * Charger and city pages are static files. A path with no file would get the app shell with a 200
+ * from the single-page fallback, which search engines treat as a soft 404, so answer with a real 404.
+ */
+async function seoPage(req: Request, env: Env): Promise<Response> {
+  const res = await env.ASSETS.fetch(req);
+  if (res.status !== 200 || !(res.headers.get('content-type') ?? '').includes('text/html')) return res;
+  const html = await res.text();
+  if (!html.includes('<div id="app">')) return new Response(html, res);
+  return new Response(NOT_FOUND_PAGE, {
+    status: 404,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Security-Policy': "default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'public, max-age=300',
+    },
+  });
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
+    if (SEO_PATH.test(url.pathname)) return seoPage(req, env);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
     try {
       const candidates = routes.filter((r) => r.pattern.test(url.pathname));

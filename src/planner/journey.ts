@@ -17,6 +17,8 @@ export interface Overnight {
   powerKw: number;
   /** Hours to charge from arrival to 100% on this charger. */
   hoursToFull: number;
+  /** Battery after a night on this charger; below 100 on slow AC. */
+  morningSocPct: number;
   stays: NearbyPlace[];
   food: NearbyPlace[];
 }
@@ -40,6 +42,8 @@ export interface Journey {
   costInr: number;
   arrivalSocPct: number;
   stopCount: number;
+  /** The trip needs more than MAX_DAYS at the chosen daily limit. */
+  tooLong: boolean;
   warnings: string[];
 }
 
@@ -53,6 +57,10 @@ const OVERNIGHT_CORRIDOR_KM = 6;
 /** Part of each day kept free for charging stops and breaks. */
 const DAY_BUFFER = 0.85;
 const MAX_DAYS = 7;
+/** Hours on the charger between arriving in the evening and leaving in the morning. */
+const NIGHT_HOURS = 10;
+/** Below this an AC charger can't refill most cars overnight. */
+const SLOW_AC_KW = 6;
 
 export function nearbyPlaces(places: PlacesData | null, stationId: string, cat: 'f' | 's'): NearbyPlace[] {
   const refs = places?.near[stationId]?.[cat] ?? [];
@@ -124,16 +132,25 @@ export function chooseOvernight(candidates: OvernightCandidate[], fromKm: number
     );
     if (!inWindow.length) continue;
     const score = (c: OvernightCandidate) =>
-      (c.stays.length ? 0 : 400) - (c.stays[0]?.place.chargerOnSite ? 120 : 0) - Math.min(c.stays.length, 5) * 8 + (targetKm - c.alongKm) + c.detourKm * 4;
+      (c.stays.length ? 0 : 400) - (c.stays[0]?.place.chargerOnSite ? 120 : 0) - Math.min(c.stays.length, 5) * 8 + (targetKm - c.alongKm) + c.detourKm * 4 + (c.mode === 'ac' && c.powerKw < SLOW_AC_KW ? 60 : 0);
     return inWindow.reduce((best, c) => (score(c) < score(best) ? c : best));
   }
   return null;
 }
 
+/** Average kWh per hour into the battery for a full charge, including taper and losses. */
+function fullChargeRate(mode: ChargeMode, powerKw: number): number {
+  return (mode === 'dc' ? powerKw * 0.5 : powerKw * 0.9) * 0.9;
+}
+
 function hoursToFull(fromPct: number, batteryKwh: number, mode: ChargeMode, powerKw: number): number {
   const kwh = (Math.max(0, 100 - fromPct) / 100) * batteryKwh;
-  const rate = mode === 'dc' ? powerKw * 0.5 : powerKw * 0.9;
-  return Math.round((kwh / rate / 0.9) * 10) / 10;
+  return Math.round((kwh / fullChargeRate(mode, powerKw)) * 10) / 10;
+}
+
+export function morningSoc(fromPct: number, batteryKwh: number, mode: ChargeMode, powerKw: number): number {
+  const pct = Math.max(0, fromPct) + ((fullChargeRate(mode, powerKw) * NIGHT_HOURS) / batteryKwh) * 100;
+  return pct >= 100 ? 100 : Math.floor(pct / 5) * 5;
 }
 
 /** Plans a trip as one or more days, with overnight stops at chargers that have stays nearby. */
@@ -162,10 +179,14 @@ export function planJourney(input: JourneyInput): Journey {
     }
     const endKm = overnight ? overnight.alongKm : totalKm;
     const leg = sliceRoute(index, fromKm, endKm, input.route);
+    // The night's charger ends the day, so it can't also be a stop on the way, and reaching it only
+    // needs the usual charging-stop reserve.
     const options = overnight
-      ? { ...input.options, startSocPct: soc, arriveReservePct: Math.max(input.options.stopReservePct + 5, 10) }
+      ? { ...input.options, startSocPct: soc, arriveReservePct: input.options.stopReservePct }
       : { ...input.options, startSocPct: soc };
-    const plan = planTrip({ ...input, route: leg, options });
+    const stations = overnight ? input.stations.filter((s) => s.id !== overnight.station.id) : input.stations;
+    const plan = planTrip({ ...input, stations, route: leg, options });
+    const morning = overnight ? morningSoc(plan.arrivalSocPct, input.vehicle.batteryKwh, overnight.mode, overnight.powerKw) : 0;
     days.push({
       startKm: fromKm,
       endKm,
@@ -177,18 +198,21 @@ export function planJourney(input: JourneyInput): Journey {
         mode: overnight.mode,
         powerKw: Math.round(overnight.powerKw * 10) / 10,
         hoursToFull: hoursToFull(plan.arrivalSocPct, input.vehicle.batteryKwh, overnight.mode, overnight.powerKw),
+        morningSocPct: morning,
         stays: overnight.stays,
         food: nearbyPlaces(input.places, overnight.station.id, 'f'),
       },
     });
     if (!overnight || !plan.feasible) break;
     fromKm = overnight.alongKm;
-    soc = 100;
+    soc = morning;
   }
 
   const last = days[days.length - 1];
-  const feasible = days.every((d) => d.plan.feasible) && last.endKm >= totalKm - 0.5;
-  if (days.length === MAX_DAYS && last.endKm < totalKm - 0.5) warnings.push(`This trip needs more than ${MAX_DAYS} days at your daily limit.`);
+  const reached = last.endKm >= totalKm - 0.5;
+  const tooLong = !reached && days.length === MAX_DAYS && last.plan.feasible;
+  const feasible = days.every((d) => d.plan.feasible) && reached;
+  if (tooLong) warnings.push(`This trip needs more than ${MAX_DAYS} days at your daily limit. Allow more driving per day, or plan it in parts.`);
   return {
     days,
     feasible,
@@ -198,6 +222,7 @@ export function planJourney(input: JourneyInput): Journey {
     costInr: days.reduce((a, d) => a + d.plan.totalCostInr, 0),
     arrivalSocPct: last.plan.arrivalSocPct,
     stopCount: days.reduce((a, d) => a + d.plan.stops.length, 0),
+    tooLong,
     warnings: [...warnings, ...new Set(days.flatMap((d) => d.plan.warnings))],
   };
 }

@@ -49,7 +49,7 @@ try {
   await page.screenshot({ path: `${shots}02-station.png` });
 
   check('charger sheet lists food nearby', await visible(page, 'section[aria-label="Food and stays nearby"] .poi'));
-  await page.getByRole('tab', { name: /Stays/ }).click();
+  await page.locator('.segmented button', { hasText: 'Stays' }).click();
   check('stays tab lists hotels', await visible(page, '.poi__icon--stay'));
   const bookingHref = await page.locator('a.chip-link--accent').first().getAttribute('href');
   check('stay links to Booking.com search', bookingHref?.startsWith('https://www.booking.com/searchresults.html?ss=') ?? false);
