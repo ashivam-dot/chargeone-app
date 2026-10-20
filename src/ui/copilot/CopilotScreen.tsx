@@ -1,7 +1,7 @@
 import { ArrowUp, Lock, Mic, Sparkles, Square, Volume2, VolumeX } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ApiError } from '../../lib/api.ts';
-import { parseTrip, streamAgent } from '../../lib/agentClient.ts';
+import { chatHistory, parseTrip, streamAgent } from '../../lib/agentClient.ts';
 import { searchPlaces } from '../../lib/geocode.ts';
 import { haptic } from '../../native/platform.ts';
 import type { AgentLang, AgentMessage, TripIntent } from '../../shared/contracts.ts';
@@ -27,6 +27,8 @@ export interface VoiceTrip {
 
 interface Props {
   signedIn: boolean;
+  /** Who the conversation belongs to; it starts over when this changes. */
+  account: string | null;
   /** Plus or a running trial. */
   canUse: boolean;
   trialAvailable: boolean;
@@ -48,6 +50,8 @@ type Orb = 'idle' | 'listening' | 'thinking' | 'speaking';
 
 const MAX_HISTORY = 12;
 const BARE_NUMBER = /^\D*(\d{1,3})\D*$/;
+/** Ends a "where to?" follow-up instead of searching for the reply as a place. */
+const CANCEL = /^\s*(?:cancel|stop|never\s*mind|forget it|leave it|no|nope|nahi|nahin|rehne do|chhodo|chodo|रहने दो|छोड़ो|नहीं|कैंसल)(?:$|[\s,.!?।])/i;
 
 const SUGGEST: Record<AgentLang, { trip: string[]; none: string[] }> = {
   en: {
@@ -66,7 +70,7 @@ const GREETING: Record<AgentLang, [string, string]> = {
 };
 
 // The conversation survives switching tabs.
-let memory: { bubbles: Bubble[]; lang: AgentLang; speakOn: boolean } = { bubbles: [], lang: 'en', speakOn: true };
+let memory: { account: string | null; bubbles: Bubble[]; lang: AgentLang; speakOn: boolean } = { account: null, bubbles: [], lang: 'en', speakOn: true };
 let nextId = 1;
 
 async function resolvePlace(name: string, signal: AbortSignal): Promise<PickedPlace | null> {
@@ -74,8 +78,9 @@ async function resolvePlace(name: string, signal: AbortSignal): Promise<PickedPl
   return p ? { name: p.name, lat: p.lat, lng: p.lng, bbox: p.bbox } : null;
 }
 
-export function CopilotScreen({ signedIn, canUse, trialAvailable, vehicle, trip, onPlanTrip, onUnlock, onStartTrial, onSignIn }: Props) {
-  const [bubbles, setBubbles] = useState<Bubble[]>(memory.bubbles);
+export function CopilotScreen({ signedIn, account, canUse, trialAvailable, vehicle, trip, onPlanTrip, onUnlock, onStartTrial, onSignIn }: Props) {
+  const [bubbles, setBubbles] = useState<Bubble[]>(memory.account === account ? memory.bubbles : []);
+  const owner = useRef(account);
   const [lang, setLang] = useState<AgentLang>(memory.lang);
   const [speakOn, setSpeakOn] = useState(memory.speakOn);
   const [orb, setOrb] = useState<Orb>('idle');
@@ -89,8 +94,16 @@ export function CopilotScreen({ signedIn, canUse, trialAvailable, vehicle, trip,
   const text = VOICE_TEXT[lang];
 
   useEffect(() => {
-    memory = { bubbles, lang, speakOn };
-  }, [bubbles, lang, speakOn]);
+    memory = { account, bubbles, lang, speakOn };
+  }, [account, bubbles, lang, speakOn]);
+
+  useEffect(() => {
+    if (owner.current === account) return;
+    owner.current = account;
+    abort.current?.abort();
+    pendingTrip.current = null;
+    setBubbles([]);
+  }, [account]);
 
   useEffect(() => {
     void speechSupport().then((s) => setCanListen(s.listen));
@@ -137,6 +150,7 @@ export function CopilotScreen({ signedIn, canUse, trialAvailable, vehicle, trip,
       intent.from ? resolvePlace(intent.from, ctrl.signal).catch(() => null) : Promise.resolve(null),
       resolvePlace(intent.to!, ctrl.signal).catch(() => null),
     ]);
+    if (ctrl.signal.aborted) return;
     setOrb('idle');
     if (!to || (intent.from && !from)) {
       const missing = !to ? intent.to : intent.from;
@@ -165,7 +179,7 @@ export function CopilotScreen({ signedIn, canUse, trialAvailable, vehicle, trip,
       position: t && t.lat !== null && t.lng !== null ? { lat: t.lat, lng: t.lng } : null,
     });
     try {
-      const full = await streamAgent({ messages: history.slice(-MAX_HISTORY), context, lang: l }, { signal: ctrl.signal, onText: (_c, all) => patch(id, { content: all }) });
+      const full = await streamAgent({ messages: history, context, lang: l }, { signal: ctrl.signal, onText: (_c, all) => patch(id, { content: all }) });
       patch(id, { content: full, pending: false });
       setOrb('idle');
       void say(full, l, voice);
@@ -187,9 +201,10 @@ export function CopilotScreen({ signedIn, canUse, trialAvailable, vehicle, trip,
     void stopSpeaking();
     const l = voice ? lang : detectLang(input) === 'hi' ? 'hi' : lang;
     setDraft('');
-    const history: AgentMessage[] = [...bubbles.filter((b) => !b.error && b.content).map(({ role, content }) => ({ role, content })), { role: 'user', content: input }];
+    const history = chatHistory([...bubbles.filter((b) => !b.error).map(({ role, content }) => ({ role, content })), { role: 'user', content: input }], MAX_HISTORY);
     add({ role: 'user', content: input });
 
+    if (pendingTrip.current && CANCEL.test(input)) pendingTrip.current = null;
     const pending = pendingTrip.current;
     if (pending) {
       const more = parseTripIntent(input, l);
@@ -209,8 +224,11 @@ export function CopilotScreen({ signedIn, canUse, trialAvailable, vehicle, trip,
 
     const local = parseTripIntent(input, l);
     if (looksLikeTripRequest(input, local)) {
+      const ctrl = new AbortController();
+      abort.current = ctrl;
       setOrb('thinking');
-      const intent = await parseTrip(input, l, { remote: canUse });
+      const intent = await parseTrip(input, l, { remote: canUse, signal: ctrl.signal });
+      if (ctrl.signal.aborted) return;
       const soc = carLinkState().telemetry?.socPct;
       await handoff({ ...intent, lang: l, batteryPct: intent.batteryPct ?? (soc !== undefined && soc !== null ? Math.round(soc) : null) }, voice);
       return;

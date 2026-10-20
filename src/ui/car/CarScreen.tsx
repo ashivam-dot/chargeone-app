@@ -128,6 +128,8 @@ export function CarScreen({ vehicle, paint, canConnect, trialAvailable, onPaint,
     try {
       await fn();
       void haptic('success');
+    } catch {
+      void haptic('error');
     } finally {
       setBusy(null);
     }

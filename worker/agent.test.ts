@@ -211,6 +211,26 @@ describe('agent limits', () => {
     await api('POST', '/api/agent/chat', ask('Hi'));
     expect(sqlite.prepare("SELECT count FROM rate_limits WHERE key = 'agent-global'").get()).toEqual({ count: 2 });
   });
+
+  it('counts every model run, including tool rounds and the fallback model', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { api, sqlite } = await setup([
+      { toolCalls: [{ name: 'charger_status', arguments: { station_id: station.id } }] },
+      { fail: true },
+      { text: 'It has no recent reports.' },
+    ]);
+    expect((await api('POST', '/api/agent/chat', ask('Is it working?'), JSON_ACCEPT)).body.text).toBe('It has no recent reports.');
+    expect(sqlite.prepare("SELECT count FROM rate_limits WHERE key = 'agent-global'").get()).toEqual({ count: 3 });
+  });
+
+  it('stops a conversation whose next model run would go over the shared limit', async () => {
+    const { api, sqlite, ai } = await setup([{ toolCalls: [{ name: 'charger_status', arguments: { station_id: station.id } }] }, { text: 'Never sent.' }]);
+    sqlite.prepare('INSERT INTO rate_limits (key, window_start, count) VALUES (?, ?, ?)').run('agent-global', indianDayStart(), AGENT_CALLS_PER_DAY - 1);
+    const res = await api('POST', '/api/agent/chat', ask('Is it working?'), JSON_ACCEPT);
+    expect(res.status).toBe(429);
+    expect(res.body.error).toBe('agent_busy');
+    expect(ai.calls).toHaveLength(1);
+  });
 });
 
 describe('parse-trip', () => {

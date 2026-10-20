@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Capacitor } from '@capacitor/core';
 import type { AgentChatRequest } from '../shared/contracts.ts';
-import { parseTrip, parseTripRemote, sseEvents, streamAgent } from './agentClient.ts';
+import { chatHistory, parseTrip, parseTripRemote, sseEvents, streamAgent } from './agentClient.ts';
 import { ApiError, OFFLINE } from './api.ts';
 import { apiFetch, type ApiResponse } from './transport.ts';
 
@@ -30,6 +30,20 @@ const req: AgentChatRequest = { messages: [{ role: 'user', content: 'Where do I 
 beforeEach(() => {
   fetchMock.mockReset();
   nativeMock.mockReturnValue(false);
+});
+
+describe('chatHistory', () => {
+  const u = (content: string) => ({ role: 'user' as const, content });
+  const a = (content: string) => ({ role: 'assistant' as const, content });
+
+  it('drops a question whose answer failed, so turns still alternate', () => {
+    expect(chatHistory([u('Q1'), u('Q2')], 12)).toEqual([u('Q2')]);
+    expect(chatHistory([u('Q1'), a('A1'), u('Q2'), a(''), u('Q3')], 12)).toEqual([u('Q1'), a('A1'), u('Q3')]);
+  });
+
+  it('starts with the driver after trimming to the most recent turns', () => {
+    expect(chatHistory([u('Q1'), a('A1'), u('Q2'), a('A2'), u('Q3')], 4)).toEqual([u('Q2'), a('A2'), u('Q3')]);
+  });
 });
 
 describe('sseEvents', () => {

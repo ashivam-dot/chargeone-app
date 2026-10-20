@@ -585,6 +585,17 @@ describe('Plus trial', () => {
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM entitlements').get()).toMatchObject({ n: 0 });
     expect((await start(await as('back-again@local.test'))).body.error).toBe('trial_used');
   });
+
+  it('refuses a second trial to the same Google account after deletion, even on a new phone', async () => {
+    const { as } = trialSetup();
+    const api = await as('again@local.test');
+    await start(api);
+    expect((await api('POST', '/api/me/delete', {})).status).toBe(200);
+    const fresh = await as('again@local.test', PHONE_B);
+    expect((await fresh('GET', '/api/me')).body.trial.eligible).toBe(false);
+    expect((await start(fresh)).body.error).toBe('trial_used');
+    expect((await start(await as('someone-else@local.test', 'a1b2c3d4-0000-4000-8000-0000000000c3'))).status).toBe(200);
+  });
 });
 
 describe('webhook authenticity', () => {

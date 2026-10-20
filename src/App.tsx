@@ -379,8 +379,10 @@ export function App() {
     const onBack = (e: Event) => {
       if (drive) return e.preventDefault();
       if (feedback) setFeedback(null);
-      else if (overlay) setOverlay(null);
-      else if (selectedId || selectedPlace !== null) {
+      else if (overlay) {
+        trialWanted.current = false;
+        setOverlay(null);
+      } else if (selectedId || selectedPlace !== null) {
         setSelectedId(null);
         setSelectedPlace(null);
       } else if (tab !== 'explore') setTab('explore');
@@ -580,6 +582,7 @@ export function App() {
       {tab === 'copilot' && !drive && (
         <CopilotScreen
           signedIn={signedIn}
+          account={me?.user?.email ?? null}
           canUse={plan.copilot}
           trialAvailable={trialAvailable}
           vehicle={vehicle}

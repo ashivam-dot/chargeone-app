@@ -16,7 +16,10 @@ const MAX_CONTEXT_BYTES = 8 * 1024;
 const MAX_TRIP_TEXT = 300;
 export const CHATS_PER_USER_PER_DAY = 40;
 export const PARSES_PER_USER_PER_DAY = 60;
-/** Shared by chat and parse-trip, sized to stay inside the free Workers AI allowance. */
+/**
+ * Model runs a day across chat and parse-trip (a tool round or a fallback is another run). At
+ * about 9 to 14 neurons a run this stays inside the free 10,000-neuron Workers AI allowance.
+ */
 export const AGENT_CALLS_PER_DAY = 400;
 const GLOBAL_SLOT = 'agent-global';
 const MAX_TOOL_ROUNDS = 2;
@@ -72,14 +75,28 @@ function aiOf(env: Env): AiRunner {
   return env.AI as unknown as AiRunner;
 }
 
-/** Counts one model request against the user's and everyone's daily allowance. */
-async function claimAgentCall(env: Env, userSlot: string, perUser: number, limitMessage: string): Promise<void> {
+const busy = () => new HttpError(429, 'agent_busy', 'The copilot is very busy today. Please try again tomorrow.');
+
+/** Model runs made for one request; the first is paid for by `claimAgentCall`. */
+interface RunBudget {
+  runs: number;
+}
+
+/** Counts one request against the user's daily allowance and its first model run against everyone's. */
+async function claimAgentCall(env: Env, userSlot: string, perUser: number, limitMessage: string): Promise<RunBudget> {
   const day = indianDayStart();
   if ((await claimSlot(env.DB, userSlot, perUser, day)) === null) throw new HttpError(429, 'agent_limit', limitMessage);
   if ((await claimSlot(env.DB, GLOBAL_SLOT, AGENT_CALLS_PER_DAY, day)) === null) {
     await releaseSlot(env.DB, userSlot, day);
-    throw new HttpError(429, 'agent_busy', 'The copilot is very busy today. Please try again tomorrow.');
+    throw busy();
   }
+  return { runs: 0 };
+}
+
+/** Tool rounds and the fallback model each cost a run, so every run after the first takes a slot. */
+async function takeRun(env: Env, budget: RunBudget): Promise<void> {
+  if (budget.runs++ === 0) return;
+  if ((await claimSlot(env.DB, GLOBAL_SLOT, AGENT_CALLS_PER_DAY, indianDayStart())) === null) throw busy();
 }
 
 // ---- Model calls ----
@@ -92,9 +109,10 @@ function logModelError(model: string, err: unknown): void {
 }
 
 /** Runs the configured model, then the fallback model if the first one errors. */
-async function runModel(env: Env, inputs: Record<string, unknown>): Promise<unknown> {
+async function runModel(env: Env, inputs: Record<string, unknown>, budget: RunBudget): Promise<unknown> {
   const ai = aiOf(env);
   for (const model of [env.AGENT_MODEL || DEFAULT_MODEL, env.AGENT_FALLBACK_MODEL || DEFAULT_FALLBACK_MODEL]) {
+    await takeRun(env, budget);
     try {
       const out = await ai.run(model, inputs);
       const usage = (out as { usage?: { prompt_tokens?: number; completion_tokens?: number } } | null)?.usage;
@@ -171,8 +189,8 @@ interface PartialCall {
 }
 
 /** Forwards text as it streams in and collects any tool calls, which arrive in fragments. */
-async function streamReply(env: Env, inputs: Record<string, unknown>, emit: (text: string) => Promise<void>): Promise<ModelReply> {
-  const out = await runModel(env, { ...inputs, stream: true, stream_options: { include_usage: true } });
+async function streamReply(env: Env, inputs: Record<string, unknown>, budget: RunBudget, emit: (text: string) => Promise<void>): Promise<ModelReply> {
+  const out = await runModel(env, { ...inputs, stream: true, stream_options: { include_usage: true } }, budget);
   if (!(out instanceof ReadableStream)) {
     const reply = readReply(out);
     if (reply.text && reply.toolCalls.length === 0) await emit(reply.text);
@@ -347,7 +365,7 @@ export function systemPrompt(lang: AgentLang, context: AgentContext, now = new D
  * Answers the conversation, letting the model call tools for at most two rounds; after that it
  * must answer from what it has. With `emit`, text is passed on as it is generated.
  */
-async function converse(env: Env, chat: AgentChatRequest, emit?: (text: string) => Promise<void>): Promise<string> {
+async function converse(env: Env, chat: AgentChatRequest, budget: RunBudget, emit?: (text: string) => Promise<void>): Promise<string> {
   const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt(chat.lang, chat.context) }, ...chat.messages];
   const tools = new ToolRunner(env);
   for (let round = 0; ; round++) {
@@ -359,7 +377,7 @@ async function converse(env: Env, chat: AgentChatRequest, emit?: (text: string) 
       chat_template_kwargs: { enable_thinking: false },
       ...(allowTools ? { tools: TOOLS } : {}),
     };
-    const reply = emit ? await streamReply(env, inputs, emit) : readReply(await runModel(env, inputs));
+    const reply = emit ? await streamReply(env, inputs, budget, emit) : readReply(await runModel(env, inputs, budget));
     if (!allowTools || reply.toolCalls.length === 0) return reply.text;
     messages.push({
       role: 'assistant',
@@ -403,16 +421,16 @@ export async function agentChat(req: Request, env: Env, user: User): Promise<Res
   await requireCopilot(env, user);
   aiOf(env);
   const chat = parseChat(await readJson(req, 64 * 1024));
-  await claimAgentCall(
+  const budget = await claimAgentCall(
     env,
     `agent-chat:${user.id}`,
     CHATS_PER_USER_PER_DAY,
     `You've asked the copilot ${CHATS_PER_USER_PER_DAY} questions today. It will be ready again tomorrow.`,
   );
-  if (wantsJson(req)) return json({ text: (await converse(env, chat)) || noAnswer(chat.lang) });
+  if (wantsJson(req)) return json({ text: (await converse(env, chat, budget)) || noAnswer(chat.lang) });
   return sseResponse(async (emit) => {
     let sent = false;
-    const answer = await converse(env, chat, async (t) => {
+    const answer = await converse(env, chat, budget, async (t) => {
       sent = true;
       await emit(t);
     });
@@ -496,7 +514,7 @@ export async function parseTrip(req: Request, env: Env, user: User): Promise<Tri
   if (lang !== 'en' && lang !== 'hi') throw invalid('lang');
   const text = cleanContent(raw);
   if (!text) throw invalid('text');
-  await claimAgentCall(
+  const budget = await claimAgentCall(
     env,
     `agent-parse:${user.id}`,
     PARSES_PER_USER_PER_DAY,
@@ -511,6 +529,6 @@ export async function parseTrip(req: Request, env: Env, user: User): Promise<Tri
     max_tokens: PARSE_MAX_TOKENS,
     temperature: 0,
     chat_template_kwargs: { enable_thinking: false },
-  });
+  }, budget);
   return toIntent(out, text, lang);
 }

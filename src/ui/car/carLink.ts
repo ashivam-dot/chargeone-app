@@ -59,8 +59,22 @@ export function densify(coords: Coord[], stepKm = 0.5): Coord[] {
 
 export const DEMO_ROUTE = densify(DEMO_WAYPOINTS);
 
+/** Bumped by every connect and disconnect, so a slower earlier call can't install its source. */
+let generation = 0;
+
+async function teardown(): Promise<void> {
+  const s = source;
+  source = null;
+  unsubscribe?.();
+  unsubscribe = null;
+  if (s) await s.disconnect().catch(() => undefined);
+}
+
+/** Rejects if the car couldn't connect; resolves quietly if a newer connect replaced this one. */
 async function attach(next: VehicleSource) {
-  await disconnectCar();
+  const gen = ++generation;
+  await teardown();
+  if (gen !== generation) return;
   source = next;
   set({ kind: next.kind, state: 'connecting', error: null, telemetry: null, history: [] });
   unsubscribe = next.subscribe((t) => {
@@ -71,12 +85,12 @@ async function attach(next: VehicleSource) {
     await next.connect();
     if (source === next && current.state === 'connecting') set({ state: 'connected' });
   } catch (e) {
-    if (source === next) {
-      unsubscribe?.();
-      unsubscribe = null;
-      source = null;
-      set({ kind: null, state: 'error', error: e instanceof Error ? e.message : 'Could not connect.' });
-    }
+    if (source !== next) return;
+    unsubscribe?.();
+    unsubscribe = null;
+    source = null;
+    set({ kind: null, state: 'error', error: e instanceof Error ? e.message : 'Could not connect.' });
+    throw e;
   }
 }
 
@@ -105,15 +119,23 @@ export async function connectObd(vehicle: MyVehicle): Promise<void> {
     import('../../vehicle/obd/bleTransport.ts'),
     import('../../native/position.ts'),
   ]);
-  await attach(new ObdSource({ vehicle, openTransport: () => connectBleObd({ onDisconnect: () => set({ state: 'error', error: 'The OBD-II adapter disconnected.' }) }), watch: watchPosition }));
+  // BLE also reports a disconnect we asked for, so only the source still in use shows the error.
+  const obd: VehicleSource = new ObdSource({
+    vehicle,
+    openTransport: () =>
+      connectBleObd({
+        onDisconnect: () => {
+          if (source === obd) set({ state: 'error', error: 'The OBD-II adapter disconnected.' });
+        },
+      }),
+    watch: watchPosition,
+  });
+  await attach(obd);
 }
 
 export async function disconnectCar(): Promise<void> {
-  const s = source;
-  source = null;
-  unsubscribe?.();
-  unsubscribe = null;
-  if (s) await s.disconnect().catch(() => undefined);
+  generation++;
+  await teardown();
   set(IDLE);
 }
 

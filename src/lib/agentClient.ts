@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import type { AgentChatRequest, AgentLang, AgentStreamEvent, TripIntent } from '../shared/contracts.ts';
+import type { AgentChatRequest, AgentLang, AgentMessage, AgentStreamEvent, TripIntent } from '../shared/contracts.ts';
 import { parseTripIntent } from '../voice/intent.ts';
 import { ApiError, errorFrom, OFFLINE } from './api.ts';
 import { apiFetch, type ApiResponse } from './transport.ts';
@@ -23,6 +23,22 @@ async function send(path: string, body: unknown, signal: AbortSignal | undefined
   }
   if (!res.ok) throw await errorFrom(res);
   return res;
+}
+
+/**
+ * The last `max` turns, alternating and starting with the driver, as the server requires. When two
+ * turns from the same side meet (a question whose answer failed or was stopped), the later one wins.
+ */
+export function chatHistory(turns: readonly AgentMessage[], max: number): AgentMessage[] {
+  const out: AgentMessage[] = [];
+  for (const t of turns) {
+    if (!t.content.trim()) continue;
+    if (out.length && out[out.length - 1].role === t.role) out[out.length - 1] = t;
+    else out.push(t);
+  }
+  const recent = out.slice(-max);
+  while (recent.length && recent[0].role !== 'user') recent.shift();
+  return recent;
 }
 
 /** Splits a server-sent event stream into the JSON payloads of its `data:` lines. */

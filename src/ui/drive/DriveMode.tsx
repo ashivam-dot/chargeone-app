@@ -92,11 +92,15 @@ export function DriveMode({ request, vehicle, stations, statuses, canDriveLive, 
     return m;
   }, [statuses]);
 
+  /** Set when this drive connected the car itself; a link made on the Car tab stays up. */
+  const ownsLink = useRef(false);
+
   useEffect(() => {
     void keepAwake(true);
     return () => {
       void keepAwake(false);
       onCar(null);
+      if (ownsLink.current) void disconnectCar();
     };
   }, []);
 
@@ -117,8 +121,10 @@ export function DriveMode({ request, vehicle, stations, statuses, canDriveLive, 
     void ensureNotifyPermission();
     try {
       if (useDemo) {
+        ownsLink.current = true;
         await connectDemo({ vehicle, route: request.route, startSocPct: plan.startSocPct, scenario: 'range_drop', chargeStops: plan.demo, speedup: 60 });
       } else if (link.state !== 'connected' || link.kind === 'demo') {
+        ownsLink.current = true;
         await connectPhone(vehicle, plan.startSocPct);
       }
       setPhase('driving');
@@ -170,7 +176,10 @@ export function DriveMode({ request, vehicle, stations, statuses, canDriveLive, 
   const end = async () => {
     void haptic('light');
     void import('../../voice/speech.ts').then((m) => m.stopSpeaking());
-    if (demo) await disconnectCar();
+    if (ownsLink.current) {
+      ownsLink.current = false;
+      await disconnectCar();
+    }
     onClose();
   };
 
