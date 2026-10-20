@@ -1,7 +1,7 @@
 import { AlertTriangle, BatteryCharging, Check, FlaskConical, Flag, Gauge, MapPin, Navigation, Smartphone, Star, Volume2, VolumeX, X, Zap } from 'lucide-preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Station } from '../../data/model.ts';
-import { createDriveSession, type DriveAlert, type DriveSession, type DriveState, type PlannedStop } from '../../drive/driveEngine.ts';
+import { createDriveSession, type DriveAlert, type DriveSession, type DriveState, type PlannedStop, formatKm } from '../../drive/driveEngine.ts';
 import { ensureNotifyPermission, haptic, isNative, keepAwake, notify } from '../../native/platform.ts';
 import { liveState, type LiveState, type StationStatus } from '../../shared/status.ts';
 import type { MyVehicle } from '../../shared/vehicles.ts';
@@ -319,7 +319,7 @@ export function DriveMode({ request, vehicle, stations, statuses, canDriveLive, 
                 <strong>{alert.suggestion.name}</strong>
                 <span class="small muted">
                   {' '}
-                  {Math.round(alert.suggestion.kmAway)} km away · {Math.round(alert.suggestion.powerKw)} kW · arrive with {Math.round(alert.suggestion.projectedArriveSocPct)}% · {LIVE_TEXT[alert.suggestion.liveState]}
+                  {formatKm(alert.suggestion.kmAway)} km away · {Math.round(alert.suggestion.powerKw)} kW · arrive with {Math.round(alert.suggestion.projectedArriveSocPct)}% · {LIVE_TEXT[alert.suggestion.liveState]}
                 </span>
               </span>
             </div>
@@ -370,10 +370,15 @@ export function DriveMode({ request, vehicle, stations, statuses, canDriveLive, 
           </div>
         </div>
         <div class="drive-panel__foot">
-          <span class={`drive-delta${delta !== null && delta > 10 ? ' drive-delta--bad' : delta !== null && delta < -5 ? ' drive-delta--good' : ''}`}>
-            <Gauge size={15} aria-hidden="true" />
-            {delta === null ? 'Learning your consumption…' : delta >= 0 ? `Using ${Math.round(delta)}% more than planned` : `Using ${Math.round(-delta)}% less than planned`}
-          </span>
+          {/* An open alert quotes consumption from when it fired; a live figure beside it would contradict it. */}
+          {alert ? (
+            <span />
+          ) : (
+            <span class={`drive-delta${delta !== null && delta > 10 ? ' drive-delta--bad' : delta !== null && delta < -5 ? ' drive-delta--good' : ''}`}>
+              <Gauge size={15} aria-hidden="true" />
+              {delta === null ? 'Learning your consumption…' : delta >= 0 ? `Using ${Math.round(delta)}% more than planned` : `Using ${Math.round(-delta)}% less than planned`}
+            </span>
+          )}
           <button class="btn btn--glass" onClick={() => void end()} data-testid="drive-end">
             <Navigation size={16} aria-hidden="true" /> End
           </button>

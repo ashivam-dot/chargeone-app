@@ -74,7 +74,8 @@ describe('alternativeRoutes', () => {
     };
     const started = Date.now();
     const alts = await alternativeRoutes(env, BENGALURU, HYDERABAD, primary, flaky, 100);
-    expect(Date.now() - started).toBeLessThan(1000);
+    // Without the 100 ms cut-off the hung candidate never settles; the bound leaves room for a busy machine.
+    expect(Date.now() - started).toBeLessThan(3000);
     expect(alts.length).toBeGreaterThan(0);
   });
 

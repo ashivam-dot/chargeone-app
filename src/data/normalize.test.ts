@@ -6,6 +6,7 @@ import {
   osmConnectors,
   osmToStation,
   parsePowerKw,
+  unnamedStation,
 } from './normalize.ts';
 
 describe('parsePowerKw', () => {
@@ -146,5 +147,14 @@ describe('dedupeStations', () => {
 
   it('keeps stations further than 60 m apart', () => {
     expect(dedupeStations([mk('1', 28.6, 77.2, 'Statiq'), mk('2', 28.601, 77.2, 'Statiq')])).toHaveLength(2);
+  });
+});
+
+describe('unnamedStation', () => {
+  it('names a charger after its operator without repeating "charging"', () => {
+    expect(unnamedStation('Statiq')).toBe('Statiq charging station');
+    expect(unnamedStation('Zeon Charging')).toBe('Zeon Charging station');
+    expect(unnamedStation('Tata Power EZ Charge')).toBe('Tata Power EZ Charge station');
+    expect(unnamedStation(null)).toBe('EV charging station');
   });
 });

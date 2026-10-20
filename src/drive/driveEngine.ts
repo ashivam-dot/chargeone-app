@@ -394,7 +394,7 @@ class Session implements DriveSession {
     const off = offKm !== null && offKm > OFF_ROUTE_KM && !t.charging && !this.nearStop(t);
     this.offCount = off ? this.offCount + 1 : 0;
     if (this.offCount < OFF_ROUTE_UPDATES || offKm === null) return;
-    const km = offKm >= 10 ? Math.round(offKm) : round1(offKm);
+    const km = formatKm(offKm);
     this.fire(alerts, 'off_route', 'off_route', 'warn', nowMs, "You're off the planned route",
       `You're about ${km} km from the planned route, so charge estimates may be off. Head back to the route or plan again from here.`);
   }
@@ -428,7 +428,7 @@ class Session implements DriveSession {
       const nearest = this.nearestAhead(soc, whNow, next ? projTarget : -Infinity, false);
       if (!nearest || nearest.projectedArriveSocPct < CANT_REACH_PCT) {
         const body = nearest
-          ? `Even the nearest charger, ${nearest.name} (${nearest.kmAway} km), is out of safe reach: about ${nearest.projectedArriveSocPct}% on arrival at this rate. ` +
+          ? `Even the nearest charger, ${nearest.name} (${formatKm(nearest.kmAway)} km), is out of safe reach: about ${nearest.projectedArriveSocPct}% on arrival at this rate. ` +
             'Slow to 60–70 km/h and switch the AC off to stretch your range.'
           : 'No compatible charger ahead is within reach at this rate. Slow to 60–70 km/h, switch the AC off and look for a charger or a 3-pin socket nearby.';
         const suggestion = nearest && !this.rejected.has(nearest.stationId) ? nearest : undefined;
@@ -448,7 +448,7 @@ class Session implements DriveSession {
     }
     const reach = projTarget <= 0 ? `you may not make it to ${targetName}` : `you'd reach ${targetName} with about ${Math.round(projTarget)}%`;
     const advice = suggestion
-      ? ` Charge earlier at ${suggestion.name}, ${suggestion.kmAway} km ahead (about ${suggestion.projectedArriveSocPct}% on arrival).`
+      ? ` Charge earlier at ${suggestion.name === targetName ? `another ${suggestion.name}` : suggestion.name}, ${formatKm(suggestion.kmAway)} km ahead (about ${suggestion.projectedArriveSocPct}% on arrival).`
       : ' Slow down a little and switch the AC off to stretch your range.';
     const [title, cause] = consumptionHigh
       ? ['Using more charge than planned', `You're using about ${Math.round(delta!)}% more energy than planned. At this rate`]
@@ -585,6 +585,11 @@ class Session implements DriveSession {
 function rank(live: LiveState, c: Candidate): number {
   const powerClass = c.powerKw >= 50 ? 0 : c.powerKw >= 25 ? 1 : 2;
   return LIVE_RANK[live] * 100 + (c.mode === 'dc' ? 0 : 10) + powerClass;
+}
+
+/** Distances in alerts and on the drive screen: whole km from 10 km up, one decimal below. */
+export function formatKm(km: number): number {
+  return km >= 10 ? Math.round(km) : round1(km);
 }
 
 function round1(n: number): number {

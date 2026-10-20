@@ -48,13 +48,13 @@ export interface Journey {
 }
 
 export interface JourneyInput extends PlanInput {
-  /** Driving plus charging per day, in hours. 0 means no limit. */
+  /** Driving per day, in hours ("Drive per day" in the planner). 0 means no limit. */
   dailyHours: number;
   places: PlacesData | null;
 }
 
 const OVERNIGHT_CORRIDOR_KM = 6;
-/** Part of each day kept free for charging stops and breaks. */
+/** A day that has to end early is planned to this share of the limit, leaving room for charging stops and breaks. */
 const DAY_BUFFER = 0.85;
 const MAX_DAYS = 7;
 /** Hours on the charger between arriving in the evening and leaving in the morning. */
@@ -159,16 +159,19 @@ export function planJourney(input: JourneyInput): Journey {
   const totalKm = index.lengthKm || input.route.distanceKm;
   const warnings: string[] = [];
   const days: DayPlan[] = [];
-  const dailyMin = input.dailyHours > 0 ? input.dailyHours * 60 * DAY_BUFFER : Infinity;
+  // A trip within the daily limit is driven in one day; only a longer one gets nights, each day planned to the
+  // buffered limit. Splitting at the buffer itself put the night a few minutes short of the destination.
+  const limitMin = input.dailyHours > 0 ? input.dailyHours * 60 : Infinity;
+  const dailyMin = limitMin * DAY_BUFFER;
   const kmPerMin = totalKm / Math.max(1, input.route.durationMin);
-  const candidates = Number.isFinite(dailyMin) && input.route.durationMin > dailyMin ? overnightCandidates(index, input) : [];
+  const candidates = input.route.durationMin > limitMin ? overnightCandidates(index, input) : [];
 
   let fromKm = 0;
   let soc = input.options.startSocPct;
   for (let day = 0; day < MAX_DAYS; day++) {
     const remainingMin = (totalKm - fromKm) / kmPerMin;
     let overnight: OvernightCandidate | null = null;
-    if (remainingMin > dailyMin) {
+    if (remainingMin > limitMin) {
       overnight = chooseOvernight(candidates, fromKm + 5, fromKm + dailyMin * kmPerMin);
       if (!overnight) {
         warnings.push(

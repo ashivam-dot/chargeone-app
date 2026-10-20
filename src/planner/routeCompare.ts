@@ -164,18 +164,25 @@ export function compareRoutes(
   }
 
   for (const r of rows) {
+    if (!r.feasible) r.cons.push('Not safe as planned with your battery');
     const others = rows.filter((o) => o !== r);
     const minOther = (f: (o: RouteAnalysis) => number) => Math.min(...others.map(f));
     const maxOther = (f: (o: RouteAnalysis) => number) => Math.max(...others.map(f));
-    const faster = minOther((o) => o.totalMinutes) - r.totalMinutes;
-    if (faster >= 5) r.pros.push(`${hm(faster)} faster`);
-    else if (faster <= -10) r.cons.push(`${hm(-faster)} slower`);
-    const fewer = minOther((o) => o.stops) - r.stops;
-    if (fewer > 0) r.pros.push(`${fewer} fewer charging stop${fewer > 1 ? 's' : ''}`);
+    // An unsafe route is only quick and cheap because it skips charging the car needs, so time, stops and cost
+    // are compared among safe routes.
+    const rivals = others.filter((o) => o.feasible);
+    const minRival = (f: (o: RouteAnalysis) => number) => Math.min(...rivals.map(f));
+    if (r.feasible && rivals.length) {
+      const faster = minRival((o) => o.totalMinutes) - r.totalMinutes;
+      if (faster >= 5) r.pros.push(`${hm(faster)} faster`);
+      else if (faster <= -10) r.cons.push(`${hm(-faster)} slower`);
+      const fewer = minRival((o) => o.stops) - r.stops;
+      if (fewer > 0) r.pros.push(`${fewer} fewer charging stop${fewer > 1 ? 's' : ''}`);
+      const cheaper = minRival((o) => o.costInr) - r.costInr;
+      if (cheaper >= 30) r.pros.push(`About ₹${cheaper} cheaper`);
+    }
     if (r.dcChargers > 0) r.pros.push(`DC chargers at most ${r.longestDcGapKm} km apart`);
     if (r.longestDcGapKm > maxOther((o) => o.longestDcGapKm) && r.longestDcGapKm > 80) r.cons.push(`${r.longestDcGapKm} km with no fast charger`);
-    const cheaper = minOther((o) => o.costInr) - r.costInr;
-    if (cheaper >= 30) r.pros.push(`About ₹${cheaper} cheaper`);
     if (r.dcWorking > 0) r.pros.push(`${r.dcWorking} charger${r.dcWorking > 1 ? 's' : ''} reported working today`);
     if (r.stops > 0 && r.stopsWithFood === r.stops) r.pros.push('Food at every stop');
     if (r.climbM !== null && others.every((o) => o.climbM !== null)) {
@@ -184,7 +191,6 @@ export function compareRoutes(
     }
     const longer = r.distanceKm - minOther((o) => o.distanceKm);
     if (longer >= 10) r.cons.push(`${longer} km longer`);
-    if (!r.feasible) r.cons.push('Not safe as planned with your battery');
   }
   return rows;
 }

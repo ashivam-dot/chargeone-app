@@ -84,6 +84,16 @@ describe('compareRoutes', () => {
     expect(rows[0].pros).toContain('DC chargers at most 60 km apart');
   });
 
+  it('never sells an unsafe route as faster or with fewer stops', () => {
+    const bare = { ...candidate(road(79, 400, 90), { lat: 21, lng: 79 }) };
+    bare.journey = { ...bare.journey, feasible: false, stopCount: 0, chargeMinutes: 0 };
+    const [safe, unsafe] = compareRoutes([main, bare], stations, new Map(), places, now);
+    expect(unsafe.cons[0]).toBe('Not safe as planned with your battery');
+    expect(unsafe.pros.some((p) => p.endsWith('faster') || p.includes('fewer charging stop'))).toBe(false);
+    expect(unsafe.tags).not.toContain('fastest');
+    expect(safe.cons.some((c) => c.endsWith('slower'))).toBe(false);
+  });
+
   it('returns a single row unchanged when there is nothing to compare', () => {
     const one = compareRoutes([main], stations, new Map(), places, now);
     expect(one).toHaveLength(1);

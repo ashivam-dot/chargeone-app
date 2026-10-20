@@ -1311,63 +1311,6 @@ a {
   font-size: inherit;
 }
 
-/* ---------- Welcome ---------- */
-.welcome__lead {
-  margin: 0 0 14px;
-  font-size: 1.02rem;
-  line-height: 1.45;
-}
-.welcome__stats {
-  list-style: none;
-  margin: 0 0 16px;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.welcome__stats li {
-  padding: 12px 8px;
-  border-radius: 14px;
-  text-align: center;
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
-}
-.welcome__stats strong {
-  display: block;
-  font-size: 1.35rem;
-  letter-spacing: -0.02em;
-  color: var(--accent-strong);
-}
-.welcome__stats span {
-  font-size: 0.72rem;
-  color: var(--muted);
-  line-height: 1.2;
-}
-.welcome__points {
-  list-style: none;
-  margin: 0 0 8px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  font-size: 0.92rem;
-}
-.welcome__points li {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  line-height: 1.35;
-}
-.welcome__icon {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent-strong);
-}
-
 /* ---------- Account plan card ---------- */
 .plan-card--paid {
   border: 2px solid var(--accent);

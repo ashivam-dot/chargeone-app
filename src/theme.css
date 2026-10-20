@@ -74,8 +74,7 @@ body {
 
 .num,
 .stats strong,
-.plan__price strong,
-.welcome__stats strong {
+.plan__price strong {
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;

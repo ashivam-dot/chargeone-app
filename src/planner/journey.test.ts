@@ -68,6 +68,13 @@ describe('planJourney', () => {
     expect(j.feasible).toBe(true);
   });
 
+  it("doesn't add a night to a trip that just fits the daily limit", () => {
+    // 450 km at 60 km/h is 7.5 h: over the 85% planning buffer, under the 8 h limit.
+    const j = journey(450, 8);
+    expect(j.days).toHaveLength(1);
+    expect(j.days[0].overnight).toBeNull();
+  });
+
   it('splits a long trip at a charger with stays, preferring a charger on site', () => {
     // 1000 km at 60 km/h is ~16.7 h; 8 h/day with the buffer is ~408 km a day.
     const j = journey(1000, 8);

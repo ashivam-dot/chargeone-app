@@ -177,6 +177,12 @@ export interface OsmElement {
   tags?: Record<string, string>;
 }
 
+/** A name for a charger whose source gives none: "Zeon Charging station", not "Zeon Charging charging station". */
+export function unnamedStation(operator: string | null): string {
+  if (!operator) return 'EV charging station';
+  return /charg(e|er|ing)$/i.test(operator) ? `${operator} station` : `${operator} charging station`;
+}
+
 export function osmToStation(el: OsmElement): Station | null {
   const tags = el.tags ?? {};
   const lat = el.lat ?? el.center?.lat;
@@ -192,9 +198,7 @@ export function osmToStation(el: OsmElement): Station | null {
   );
   const operator = normaliseOperator(tags.operator ?? tags.brand ?? tags.network);
   const hours = tags.opening_hours?.trim() || null;
-  const name =
-    tags.name?.trim() ||
-    (operator ? `${operator} charging station` : 'EV charging station');
+  const name = tags.name?.trim() || unnamedStation(operator);
 
   const addressParts = [
     [tags['addr:housenumber'], tags['addr:street']].filter(Boolean).join(' '),
@@ -299,7 +303,7 @@ export function ocmToStation(poi: OcmPoi): Station | null {
 
   return {
     id: `ocm-${poi.ID}`,
-    name: a.Title?.trim() || (operator ? `${operator} charging station` : 'EV charging station'),
+    name: a.Title?.trim() || unnamedStation(operator),
     operator,
     lat: round6(a.Latitude),
     lng: round6(a.Longitude),
