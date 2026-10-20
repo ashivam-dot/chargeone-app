@@ -11,12 +11,13 @@ import type { StopMarker } from '../map/MapView.tsx';
 import type { Coord } from '../planner/geometry.ts';
 import { nearbyPlaces, planJourney, staysNearDestination, type DayPlan, type Journey } from '../planner/journey.ts';
 import { DEFAULT_OPTIONS, navigationUrl, planTrip, type DrivingStyle, type PlanOptions, type TripPlan } from '../planner/planner.ts';
-import { FREE_TRIP_KM, PLANS, cheapestWith, type Plan } from '../shared/plans.ts';
+import { FREE_TRIP_KM, PLANS, REPLAN_WINDOW_HOURS, cheapestWith, formatRupees, type Perk, type Plan, type PlanId } from '../shared/plans.ts';
 import { LIVE_COLOUR, LIVE_LABEL, liveState, timeAgo, type StationStatus } from '../shared/status.ts';
 import type { MyVehicle } from '../shared/vehicles.ts';
 import { PlaceList } from './NearbyPlaces.tsx';
 import { PerkLock } from './PerkLock.tsx';
 import { PlaceInput, type PickedPlace } from './PlaceInput.tsx';
+import type { Paywall } from './Plans.tsx';
 import { Sheet } from './Sheet.tsx';
 
 export interface TripView {
@@ -32,11 +33,13 @@ interface Props {
   statuses: Map<string, StationStatus>;
   vehicle: MyVehicle | null;
   me: Me | null;
+  /** The current plan, or the last known one while offline. */
+  planId: PlanId;
   initialTo: PickedPlace | null;
   onClose: () => void;
   onNeedVehicle: () => void;
   onRequireSignIn: () => void;
-  onPaywall: (message: string) => void;
+  onPaywall: (reason: Paywall) => void;
   onPlans: () => void;
   onShow: (view: TripView | null) => void;
   onSelectStation: (id: string) => void;
@@ -53,6 +56,10 @@ interface Result {
   from: Point;
   to: Point;
   plannedAt: Date;
+  /** When this trip was first planned; re-plans keep it, and it starts the free re-plan window. */
+  startedAt: Date;
+  /** Set when the result was opened from a saved trip rather than planned now. */
+  savedAt: string | null;
 }
 
 type Point = { name: string; lat: number; lng: number };
@@ -127,7 +134,7 @@ export function TripPlanner(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [saved, setSaved] = useState<SavedTrip[]>(loadSavedTrips);
-  const plan = PLANS[me?.plan ?? 'free'];
+  const plan = PLANS[props.planId];
 
   const setOpt = <K extends keyof PlanOptions>(key: K, value: PlanOptions[K]) => {
     const next = { ...options, [key]: value };
@@ -148,7 +155,15 @@ export function TripPlanner(props: Props) {
     }
   };
 
-  const present = (car: MyVehicle, response: RouteResponse, places: PlacesData | null, start: Point, end: Point) => {
+  const present = (
+    car: MyVehicle,
+    response: RouteResponse,
+    places: PlacesData | null,
+    start: Point,
+    end: Point,
+    startedAt: Date,
+    savedAt: string | null = null,
+  ) => {
     const input = {
       route: { coords: response.route.coords, distanceKm: response.route.distanceKm, durationMin: response.route.durationMin },
       stations,
@@ -160,7 +175,7 @@ export function TripPlanner(props: Props) {
     const journey = planJourney({ ...input, dailyHours: plan.multiDay ? dailyHours : 0, places });
     const tip = journey.days.length === 1 ? fullChargeTip(journey.days[0].plan, input) : null;
     const destStays = staysNearDestination({ stations, places }, end);
-    setResult({ response, journey, places, destStays, tip, from: start, to: end, plannedAt: new Date() });
+    setResult({ response, journey, places, destStays, tip, from: start, to: end, plannedAt: new Date(), startedAt, savedAt });
     props.onShow(tripView(journey, destStays, response.route.coords));
   };
 
@@ -172,13 +187,16 @@ export function TripPlanner(props: Props) {
     setBusy('Opening saved trip…');
     setError(null);
     try {
-      present(vehicle, trip.response, await loadPlaces(), trip.from, trip.to);
+      present(vehicle, trip.response, await loadPlaces(), trip.from, trip.to, new Date(trip.plannedAt), trip.savedAt);
+    } catch {
+      setError("This saved trip couldn't be opened. Remove it and plan the trip again.");
     } finally {
       setBusy(null);
     }
   };
 
   const run = async (start: Point, end: Point, tripId?: string) => {
+    const startedAt = tripId && result ? result.startedAt : new Date();
     if (!vehicle) {
       props.onNeedVehicle();
       return;
@@ -194,11 +212,11 @@ export function TripPlanner(props: Props) {
         api.route({ lat: start.lat, lng: start.lng }, { lat: end.lat, lng: end.lng }, tripId),
         loadPlaces(),
       ]);
-      present(vehicle, response, places, start, end);
+      present(vehicle, response, places, start, end, response.counted === 'replan' ? startedAt : new Date());
       props.onUsageChanged();
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) props.onRequireSignIn();
-      else if (e instanceof ApiError && e.status === 402) props.onPaywall(e.message);
+      else if (e instanceof ApiError && e.status === 402) props.onPaywall({ kind: 'trip', message: e.message });
       else setError(e instanceof Error ? e.message : 'Could not plan this trip.');
     } finally {
       setBusy(null);
@@ -235,9 +253,19 @@ export function TripPlanner(props: Props) {
 
   const journey = result?.journey;
   const free = plan.id === 'free';
-  const unlock = (text: string, perk: Parameters<typeof cheapestWith>[0]) => {
-    const p = cheapestWith(perk);
-    props.onPaywall(`${text} ${p.id === 'trip_pass' ? 'come with Trip Pass and Plus' : 'come with Plus'}.`);
+  const unlock = (label: string, perk: Perk) => props.onPaywall({ kind: 'perk', perk, label });
+
+  const savedCopy = result ? saved.find((t) => t.id === result.response.tripId) : undefined;
+  const saveState: SaveState = !savedCopy
+    ? 'none'
+    : savedCopy.savedAt === result?.savedAt || Date.parse(savedCopy.savedAt) >= (result?.plannedAt.getTime() ?? 0)
+      ? 'current'
+      : 'stale';
+  const save = () => {
+    if (!result) return;
+    const list = saveTrip(result.from, result.to, result.response, result.startedAt, plan.savedTrips);
+    if (list) setSaved(list);
+    else setError("Couldn't save: this phone's storage is full or blocked.");
   };
 
   return (
@@ -308,7 +336,7 @@ export function TripPlanner(props: Props) {
               </select>
             </label>
           ) : (
-            <PerkLock text={MULTI_DAY_LABEL} plan={cheapestWith('multiDay')} onUnlock={() => unlock(MULTI_DAY_LABEL, 'multiDay')} />
+            <PerkLock text={MULTI_DAY_LABEL} plan={cheapestWith('multiDay')} onUnlock={() => unlock('Multi-day trips', 'multiDay')} />
           )}
 
           <button type="button" class="link" aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>
@@ -373,12 +401,12 @@ export function TripPlanner(props: Props) {
             <p class="small muted center">
               Free plan: trips up to {FREE_TRIP_KM} km, {PLANS.free.shortTripsPerDay} a day.{' '}
               <button type="button" class="link link--inline" onClick={props.onPlans}>
-                Longer trips from ₹49
+                Longer trips from {formatRupees(PLANS.trip_pass.pricePaise)}
               </button>
             </p>
           )}
 
-          {plan.savedTrips > 0 && saved.length > 0 && (
+          {saved.length > 0 && (
             <section class="saved" aria-label="Saved trips">
               <h3>
                 <BookmarkCheck size={16} aria-hidden="true" /> Saved trips
@@ -394,7 +422,7 @@ export function TripPlanner(props: Props) {
                         {Math.round(t.response.route.distanceKm)} km · saved {formatDate(t.savedAt)}
                       </span>
                     </button>
-                    <button type="button" class="icon-btn icon-btn--small" aria-label={`Remove ${t.to.name} trip`} onClick={() => setSaved(removeSavedTrip(t.id))}>
+                    <button type="button" class="icon-btn icon-btn--small" aria-label={`Remove saved trip ${t.from.name} to ${t.to.name}, saved ${formatDate(t.savedAt)}`} onClick={() => setSaved(removeSavedTrip(t.id))}>
                       <X size={16} aria-hidden="true" />
                     </button>
                   </li>
@@ -415,8 +443,8 @@ export function TripPlanner(props: Props) {
           me={me}
           plan={plan}
           statuses={statuses}
-          saved={saved.some((t) => t.id === result.response.tripId)}
-          onSave={() => setSaved(saveTrip(result.from, result.to, result.response, plan.savedTrips))}
+          saveState={saveState}
+          onSave={save}
           onUnlock={unlock}
           onReplan={() => void replanFromHere()}
           onClear={clear}
@@ -428,6 +456,9 @@ export function TripPlanner(props: Props) {
   );
 }
 
+/** Whether this trip is saved on the phone, and whether the saved copy is older than the route on screen. */
+type SaveState = 'none' | 'current' | 'stale';
+
 interface ResultProps {
   result: Result;
   journey: Journey;
@@ -437,9 +468,9 @@ interface ResultProps {
   me: Me | null;
   plan: Plan;
   statuses: Map<string, StationStatus>;
-  saved: boolean;
+  saveState: SaveState;
   onSave: () => void;
-  onUnlock: (text: string, perk: Parameters<typeof cheapestWith>[0]) => void;
+  onUnlock: (label: string, perk: Perk) => void;
   onReplan: () => void;
   onClear: () => void;
   onSelectStation: (id: string) => void;
@@ -458,11 +489,13 @@ function verdictText(j: Journey): string {
 }
 
 function JourneyResult(props: ResultProps) {
-  const { result, journey, alerts, busy, error, me, plan, statuses, saved, onSave, onUnlock, onReplan, onClear, onSelectStation, onOpenPlace } = props;
+  const { result, journey, alerts, busy, error, me, plan, statuses, saveState, onSave, onUnlock, onReplan, onClear, onSelectStation, onOpenPlace } = props;
   const ends = dayEnds(journey, result.from, result.to);
   const multi = journey.days.length > 1;
   const area = (stationId: string) => result.places?.area[stationId] ?? null;
   const now = new Date();
+  const replanFree = plan.freeReplans && now.getTime() - result.startedAt.getTime() < REPLAN_WINDOW_HOURS * 3600_000;
+  const replanCost = plan.freeReplans ? 'uses a long trip' : "uses one of today's trips";
   let stopNo = 0;
 
   return (
@@ -586,7 +619,7 @@ function JourneyResult(props: ResultProps) {
                           <PerkLock
                             text={`${s.backups.length} backup charger${s.backups.length > 1 ? 's' : ''} found for this stop`}
                             plan={cheapestWith('backups')}
-                            onUnlock={() => onUnlock('Backup chargers for your stops', 'backups')}
+                            onUnlock={() => onUnlock('Backup chargers', 'backups')}
                           />
                         ))}
                       {food.length > 0 && (
@@ -629,9 +662,9 @@ function JourneyResult(props: ResultProps) {
 
       {!plan.liveAlerts && journey.stopCount > 0 && (
         <PerkLock
-          text={`Get alerted if any of your ${journey.stopCount} stop${journey.stopCount > 1 ? 's' : ''} breaks on the way`}
+          text={`In-app alert if ${journey.stopCount > 1 ? `any of your ${journey.stopCount} stops is` : 'your stop is'} reported broken while this trip is open`}
           plan={cheapestWith('liveAlerts')}
-          onUnlock={() => onUnlock('Live alerts for the stops on your route', 'liveAlerts')}
+          onUnlock={() => onUnlock('In-app alerts for broken stops', 'liveAlerts')}
         />
       )}
       {error && (
@@ -649,15 +682,17 @@ function JourneyResult(props: ResultProps) {
           {multi ? 'Start day 1 in Google Maps' : 'Start navigation in Google Maps'}
         </a>
         {plan.savedTrips > 0 ? (
-          <button class="btn btn--block" disabled={saved} onClick={onSave}>
-            {saved ? <BookmarkCheck size={18} aria-hidden="true" /> : <Bookmark size={18} aria-hidden="true" />}
-            {saved ? 'Saved on this phone' : 'Save trip for no-signal areas'}
+          <button class="btn btn--block" disabled={saveState === 'current'} onClick={onSave}>
+            {saveState === 'current' ? <BookmarkCheck size={18} aria-hidden="true" /> : <Bookmark size={18} aria-hidden="true" />}
+            {saveState === 'current' ? 'Saved on this phone' : saveState === 'stale' ? 'Update saved trip' : 'Save trip for no-signal areas'}
           </button>
         ) : (
-          <PerkLock text="Save this trip to open without signal" plan={cheapestWith('savedTrips')} onUnlock={() => onUnlock('Saved trips', 'savedTrips')} />
+          saveState === 'none' && (
+            <PerkLock text="Save this trip to open without signal" plan={cheapestWith('savedTrips')} onUnlock={() => onUnlock('Saved trips', 'savedTrips')} />
+          )
         )}
         <button class="btn btn--block" disabled={busy !== null} onClick={onReplan}>
-          {busy ?? (plan.freeReplans ? 'Re-plan from where I am (free)' : "Re-plan from where I am (uses one of today's trips)")}
+          {busy ?? `Re-plan from where I am (${replanFree ? 'free' : replanCost})`}
         </button>
         <button class="btn btn--block btn--ghost" onClick={onClear}>
           Plan another trip
@@ -666,7 +701,11 @@ function JourneyResult(props: ResultProps) {
       <p class="small muted">
         Estimates use your car's typical consumption, the terrain and your settings. Costs assume about ₹22/kWh for DC and ₹14/kWh for AC. Hotel
         prices and availability are on Booking.com.
-        {result.response.counted === 'long' && me?.usage ? ` Long trips used: ${me.usage.longInWindow} of ${me.limits.longTripQuota}.` : ''}
+        {result.savedAt
+          ? ` Opened from your saved trips (saved ${formatDate(result.savedAt)}); it didn't use a trip.`
+          : result.response.counted === 'long' && me?.usage
+            ? ` Long trips used: ${me.usage.longInWindow} of ${me.limits.longTripQuota}.`
+            : ''}
       </p>
     </div>
   );

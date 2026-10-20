@@ -1,8 +1,9 @@
-import { Check, Minus, Sparkles } from 'lucide-preact';
+import { Sparkles } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { api, type Me } from '../lib/api.ts';
-import { PLANS, PLAN_ROWS } from '../shared/plans.ts';
+import { FEATURE_ROWS, PLANS } from '../shared/plans.ts';
 import type { MyVehicle } from '../shared/vehicles.ts';
+import { PerkItem } from './Plans.tsx';
 import { Sheet } from './Sheet.tsx';
 
 interface Props {
@@ -92,18 +93,9 @@ export function Account({ me, vehicle, dark, onToggleDark, onClose, onChanged, o
           </div>
         )}
         <ul class="perks perks--compact">
-          {PLAN_ROWS.slice(2).map((r) => {
-            const v = r.value(plan);
-            return (
-              <li key={r.label} class={`perk${v === false ? ' perk--no' : ''}`}>
-                {v === false ? <Minus size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
-                <span>
-                  {r.label}
-                  {v === false && <span class="visually-hidden"> (not included)</span>}
-                </span>
-              </li>
-            );
-          })}
+          {FEATURE_ROWS.map((r) => (
+            <PerkItem key={r.label} label={r.label} value={r.value(plan)} />
+          ))}
         </ul>
         {subscribed && (
           <button

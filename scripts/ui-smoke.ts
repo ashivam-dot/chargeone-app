@@ -28,8 +28,10 @@ const context = await browser.newContext({
   locale: 'en-IN',
 });
 const page = await context.newPage();
+/** Set while the test blocks /api/me on purpose, so the failed request it causes isn't reported as an app error. */
+let blockingMe = false;
 page.on('console', (m) => {
-  if (m.type() === 'error') problems.push(`console: ${m.text().slice(0, 200)}`);
+  if (m.type() === 'error' && !(blockingMe && m.text().includes('net::ERR_FAILED'))) problems.push(`console: ${m.text().slice(0, 200)}`);
 });
 page.on('pageerror', (e) => problems.push(`pageerror: ${e.message.slice(0, 200)}`));
 page.on('console', (m) => {
@@ -40,7 +42,7 @@ try {
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   check('map canvas renders', await visible(page, '.maplibregl-canvas'));
   check('first visit shows the welcome sheet', await visible(page, 'section[aria-label="Welcome to ChargeOne"]'));
-  check('welcome shows the real charger count', await visible(page, `.welcome__stats >> text=${dataset.stations.length}`, 3000));
+  check('welcome shows the real charger count', await visible(page, `.welcome__stats >> text=${dataset.stations.length.toLocaleString('en-IN')}`, 3000));
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${shots}00-welcome.png` });
   await page.getByRole('button', { name: 'Explore the charger map' }).click();
@@ -102,6 +104,11 @@ try {
   await page.getByRole('button', { name: 'Save car' }).click();
   check('car saved', await visible(page, 'text=Tata Nexon EV 45'));
   check('free plan shows multi-day trips as a Trip Pass feature', await visible(page, '.perk-lock:has-text("Multi-day")', 3000));
+  await page.locator('.perk-lock:has-text("Multi-day")').click();
+  const perkWall = 'section[aria-label="Unlock multi-day trips"]';
+  check('a locked feature opens a paywall about that feature', await visible(page, perkWall, 3000));
+  check('Trip Pass is marked as including it', await visible(page, `${perkWall} li[aria-label="Trip Pass"] .plan__ribbon:has-text("Includes this")`, 3000));
+  await page.locator(perkWall).getByRole('button', { name: 'Close' }).click();
 
   await page.context().setGeolocation({ latitude: 12.9756, longitude: 77.6066, accuracy: 20 });
   await page.getByPlaceholder('Start: city, area or charger').click();
@@ -149,6 +156,10 @@ try {
 
   await page.getByRole('button', { name: 'Plan another trip' }).click();
   check('saved trip is listed', await visible(page, 'section[aria-label="Saved trips"] .saved__open', 3000));
+  await page.locator('section[aria-label="Saved trips"] .saved__open').first().click();
+  check('saved trip opens without using a trip', await visible(page, "text=/Opened from your saved trips.*didn't use a trip/", 5000));
+  check('opened saved trip shows as saved', await visible(page, 'text=Saved on this phone', 3000));
+  await page.getByRole('button', { name: 'Plan another trip' }).click();
   await dest.fill('Kochi');
   const kochi = page.locator('.place__list [role="option"]').filter({ hasText: /Kochi/ }).first();
   if (await kochi.waitFor({ timeout: 15000 }).then(() => true, () => false)) await kochi.click();
@@ -175,6 +186,24 @@ try {
   await page.waitForTimeout(2500);
   check('dark mode applied', (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark');
   await page.screenshot({ path: `${shots}07-dark.png` });
+
+  await page.getByRole('button', { name: 'Account' }).click();
+  await page.locator('section[aria-label="Account"]').getByRole('button', { name: 'Plans', exact: true }).click();
+  const plans = 'section[aria-label="Choose your plan"]';
+  check('a Plus member cannot buy Trip Pass', await visible(page, `${plans} li[aria-label="Trip Pass"] button:disabled:has-text("Included in your Plus")`, 3000));
+  await page.locator(`${plans} .segmented button`, { hasText: 'Yearly' }).click();
+  check('Plus monthly sees "You have Plus" on yearly', await visible(page, `${plans} li[aria-label="Plus Yearly"] button:disabled:has-text("You have Plus")`, 3000));
+  await page.locator(plans).getByRole('button', { name: 'Close' }).click();
+
+  // No answer from /api/me, as with no signal: the last known plan and saved trips must still work.
+  blockingMe = true;
+  await page.route('**/api/me', (route) => route.abort());
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'Plan a trip' }).click();
+  check('without /api/me, saved trips are still listed', await visible(page, 'section[aria-label="Saved trips"] .saved__open', 5000));
+  check('without /api/me, Plus features stay unlocked', await visible(page, '.inline-select select', 3000));
+  await page.unroute('**/api/me');
+  blockingMe = false;
 
   await page.goto(`${BASE}/privacy.html`);
   check('privacy page is served', await visible(page, 'h1:has-text("Privacy policy")'));

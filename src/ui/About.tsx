@@ -69,7 +69,8 @@ export function About({ dataset, onClose }: Props) {
       <h3>Privacy</h3>
       <p class="small">
         Your location is used on your phone to show nearby chargers and is only sent to us when you report a charger or plan a trip. Your car
-        and trip settings stay on your device. <a href="/privacy.html">Privacy policy</a> · <a href="/terms.html">Terms</a>
+        and trip settings stay on your device. We never sell your data and show no ads. Hotel "Check prices" links open Booking.com, which may
+        pay ChargeOne a commission; your price is the same. <a href="/privacy.html">Privacy policy</a> · <a href="/terms.html">Terms</a>
       </p>
     </Sheet>
   );

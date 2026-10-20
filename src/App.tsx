@@ -5,8 +5,10 @@ import type { Dataset, Station } from './data/model.ts';
 import type { Place, PlacesData } from './data/places.ts';
 import { api, type Config, type Me } from './lib/api.ts';
 import { loadPlaces } from './lib/places.ts';
-import { isObject, loadJson, saveJson } from './lib/storage.ts';
+import { clearSavedTrips } from './lib/savedTrips.ts';
+import { isObject, loadJson, removeJson, saveJson } from './lib/storage.ts';
 import { MapView, type FlyTarget, type PlaceMarker, type StopMarker } from './map/MapView.tsx';
+import { PLANS, type PlanId } from './shared/plans.ts';
 import { liveState, type StationStatus } from './shared/status.ts';
 import type { MyVehicle } from './shared/vehicles.ts';
 import { About } from './ui/About.tsx';
@@ -15,7 +17,7 @@ import { FilterBar, type MapFilters } from './ui/FilterBar.tsx';
 import { Garage } from './ui/Garage.tsx';
 import { PlaceInput, type PickedPlace } from './ui/PlaceInput.tsx';
 import { PlaceSheet } from './ui/PlaceSheet.tsx';
-import { Plans } from './ui/Plans.tsx';
+import { Plans, type Paywall } from './ui/Plans.tsx';
 import { SignIn } from './ui/SignIn.tsx';
 import { StationSheet } from './ui/StationSheet.tsx';
 import { TripPlanner, type TripView } from './ui/TripPlanner.tsx';
@@ -31,6 +33,17 @@ const NO_STOPS: StopMarker[] = [];
 const readViewport = () => ({ height: window.innerHeight, desktop: window.innerWidth >= 820 });
 const isVehicle = (v: unknown): v is MyVehicle => isObject(v) && typeof v.modelId === 'string' && typeof v.batteryKwh === 'number';
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
+
+/** The last plan /api/me reported, so a paid user offline (or before /api/me answers) still gets their features. */
+interface CachedPlan {
+  plan: PlanId;
+  until: string;
+}
+const isCachedPlan = (v: unknown): v is CachedPlan => isObject(v) && typeof v.plan === 'string' && v.plan in PLANS && typeof v.until === 'string';
+function loadCachedPlan(): PlanId {
+  const c = loadJson<CachedPlan | null>('plan', null, (v): v is CachedPlan | null => v === null || isCachedPlan(v));
+  return c && Date.parse(c.until) > Date.now() ? c.plan : 'free';
+}
 
 export function App() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
@@ -53,7 +66,8 @@ export function App() {
   const [tripTo, setTripTo] = useState<PickedPlace | null>(null);
   const [tripKey, setTripKey] = useState(0);
   const [tripView, setTripView] = useState<TripView | null>(null);
-  const [paywallReason, setPaywallReason] = useState<string | null>(null);
+  const [paywallReason, setPaywallReason] = useState<Paywall | null>(null);
+  const [cachedPlan] = useState(loadCachedPlan);
   const [vehicle, setVehicle] = useState<MyVehicle | null>(() => loadJson<MyVehicle | null>('vehicle', null, (v): v is MyVehicle | null => v === null || isVehicle(v)));
   const [dark, setDark] = useState(() => loadJson('dark', window.matchMedia('(prefers-color-scheme: dark)').matches, isBool));
   const [online, setOnline] = useState(navigator.onLine);
@@ -146,6 +160,14 @@ export function App() {
   const refreshMe = useCallback(() => {
     api.me().then(setMe).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!me) return;
+    const until = me.entitlement?.activeUntil;
+    if (me.user && me.plan !== 'free' && until) saveJson('plan', { plan: me.plan, until });
+    else removeJson('plan');
+  }, [me]);
+  const planId = me?.plan ?? cachedPlan;
 
   const stations = dataset?.stations ?? [];
   const byId = useMemo(() => new Map(stations.map((s) => [s.id, s])), [stations]);
@@ -250,6 +272,7 @@ export function App() {
     saveJson('welcomed', true);
   };
   const paid = me !== null && me.plan !== 'free';
+  const accountLabel = me?.user ? (paid ? `Account, ${PLANS[me.plan].name} plan` : 'Account') : 'Sign in';
 
   return (
     <div class="app">
@@ -289,7 +312,7 @@ export function App() {
         <button
           class={`avatar${paid ? ' avatar--paid' : ''}`}
           onClick={() => setOverlay(me?.user ? 'account' : 'signin')}
-          aria-label={me?.user ? 'Account' : 'Sign in'}
+          aria-label={accountLabel}
         >
           {paid && (
             <span class="avatar__badge" aria-hidden="true">
@@ -329,6 +352,7 @@ export function App() {
             statuses={statuses}
             vehicle={vehicle}
             me={me}
+            planId={planId}
             initialTo={tripTo}
             onClose={() => {
               setTripOpen(false);
@@ -410,6 +434,10 @@ export function App() {
           onClose={() => setOverlay(null)}
           onChanged={refreshMe}
           onSignedOut={() => {
+            clearSavedTrips();
+            removeJson('plan');
+            setTripOpen(false);
+            setTripView(null);
             setOverlay(null);
             refreshMe();
           }}

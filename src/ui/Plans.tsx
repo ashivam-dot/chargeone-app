@@ -1,13 +1,16 @@
-import { Check, EyeOff, Minus, RotateCcw, Route, ShieldCheck, Smartphone, Sparkles } from 'lucide-preact';
+import { Check, EyeOff, Lock, Minus, RotateCcw, Route, ShieldCheck, Smartphone, Sparkles } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { ApiError, api, loadScript, type Config, type Me } from '../lib/api.ts';
-import { COMPARE, FREE_TRIP_KM, PLANS, PLAN_ROWS, YEARLY_SAVING_PCT, formatRupees, isPlus, type Plan, type PlanId } from '../shared/plans.ts';
+import { COMPARE, FREE_TRIP_KM, PLANS, PLAN_ROWS, YEARLY_SAVING_PCT, cheapestWith, formatRupees, isPlus, type Perk, type Plan, type PlanId } from '../shared/plans.ts';
 import { Sheet } from './Sheet.tsx';
+
+/** Why the plans screen opened: the server refused a trip, or the user tapped a locked feature. */
+export type Paywall = { kind: 'trip'; message: string } | { kind: 'perk'; perk: Perk; label: string };
 
 interface Props {
   config: Config | null;
   me: Me | null;
-  reason: string | null;
+  reason: Paywall | null;
   onClose: () => void;
   onRequireSignIn: () => void;
   onActivated: () => void;
@@ -65,7 +68,9 @@ const FAQ: Array<[string, string]> = [
   ['Is paying here safe?', "Payment happens entirely in Razorpay's secure checkout. ChargeOne never sees your card, UPI or bank details."],
 ];
 
-function Perk({ label, value }: { label: string; value: boolean | string }) {
+const PLUS_SUMMARY = `${PLANS.plus_monthly.longTripQuota} long trips a month, any distance`;
+
+export function PerkItem({ label, value }: { label: string; value: boolean | string }) {
   const included = value !== false;
   return (
     <li class={`perk${included ? '' : ' perk--no'}`}>
@@ -152,8 +157,23 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
     }
   };
 
+  const hasPlus = isPlus(current);
+  const onPass = current === 'trip_pass';
+  // A new Trip Pass starts a fresh 7 days and 10 trips, which only helps once this one's trips are used.
+  const renewPass = onPass && reason?.kind === 'trip';
+  const passFits = !hasPlus && (reason?.kind === 'trip' || (reason?.kind === 'perk' && Boolean(PLANS.trip_pass[reason.perk])));
+  const perkPlan = reason?.kind === 'perk' ? cheapestWith(reason.perk) : null;
+
+  const buttonLabel = (p: Plan, featured: boolean): { text: string; disabled: boolean } => {
+    if (busy === p.id) return { text: 'Opening payment…', disabled: true };
+    if (featured && hasPlus) return { text: current === p.id ? 'Your plan' : 'You have Plus', disabled: true };
+    if (!featured && hasPlus) return { text: 'Included in your Plus', disabled: true };
+    if (!featured && onPass) return renewPass ? { text: 'Start a new Trip Pass', disabled: busy !== null } : { text: 'Your plan', disabled: true };
+    return { text: `Get ${p.name}`, disabled: busy !== null };
+  };
+
   const card = (p: Plan, featured: boolean) => {
-    const active = current === p.id || (featured && isPlus(current) && isPlus(p.id));
+    const button = buttonLabel(p, featured);
     return (
       <li key={featured ? 'plus' : p.id} class={`plan${featured ? ' plan--featured' : ''}`} aria-label={p.name}>
         {featured && (
@@ -161,7 +181,9 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
             <Sparkles size={12} aria-hidden="true" /> Best value
           </span>
         )}
-        {!featured && reason && <span class="plan__ribbon plan__ribbon--quiet">Covers this trip</span>}
+        {!featured && passFits && (!onPass || renewPass) && (
+          <span class="plan__ribbon plan__ribbon--quiet">{reason?.kind === 'trip' ? 'Covers this trip' : 'Includes this'}</span>
+        )}
         <div class="plan__head">
           <div>
             <h3>{featured ? 'Plus' : p.name}</h3>
@@ -185,28 +207,38 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
         <p class="plan__note">{PRICE_NOTE[p.id]}</p>
         <ul class="perks">
           {PLAN_ROWS.map((r) => (
-            <Perk key={r.label} label={r.label} value={r.value(p)} />
+            <PerkItem key={r.label} label={r.label} value={r.value(p)} />
           ))}
         </ul>
-        <button class={`btn btn--block ${featured ? 'btn--primary btn--lg' : ''}`} disabled={active || busy !== null} onClick={() => void buy(p.id)}>
-          {active ? 'Your plan' : busy === p.id ? 'Opening payment…' : `Get ${p.name}`}
+        <button class={`btn btn--block ${featured ? 'btn--primary btn--lg' : ''}`} disabled={button.disabled} onClick={() => void buy(p.id)}>
+          {button.text}
         </button>
       </li>
     );
   };
 
+  const pass = formatRupees(PLANS.trip_pass.pricePaise);
+  const tripHint = hasPlus
+    ? `Plus includes ${PLUS_SUMMARY}. Each long trip stops counting 30 days after you plan it.`
+    : onPass
+      ? `A new Trip Pass gives ${PLANS.trip_pass.longTripQuota} more long trips over ${PLANS.trip_pass.periodDays} days for ${pass}. Plus gives ${PLUS_SUMMARY}.`
+      : `Trip Pass covers it for ${pass}. Plus gives ${PLUS_SUMMARY}, with in-app alerts and saved trips.`;
+  const perkHint =
+    perkPlan?.id === 'trip_pass'
+      ? `Trip Pass includes them for ${pass} for ${PLANS.trip_pass.periodDays} days. Plus includes them with ${PLUS_SUMMARY}.`
+      : `Plus is ${formatRupees(PLANS.plus_monthly.pricePaise)} a month or ${formatRupees(PLANS.plus_yearly.pricePaise)} a year.`;
+  const title = !reason ? 'Choose your plan' : reason.kind === 'trip' ? 'Unlock this trip' : `Unlock ${reason.label.toLowerCase()}`;
+
   return (
-    <Sheet title={reason ? 'Unlock this trip' : 'Choose your plan'} onClose={onClose} modal>
+    <Sheet title={title} onClose={onClose} modal>
       {reason ? (
         <div class="unlock">
           <span class="unlock__icon" aria-hidden="true">
-            <Route size={20} />
+            {reason.kind === 'trip' ? <Route size={20} /> : <Lock size={20} />}
           </span>
           <div>
-            <strong>{reason}</strong>
-            <span>
-              Trip Pass covers it for {formatRupees(PLANS.trip_pass.pricePaise)}. Plus covers every trip, with alerts if a charger on your route breaks.
-            </span>
+            <strong>{reason.kind === 'trip' ? reason.message : `${reason.label} come with ${perkPlan?.id === 'trip_pass' ? 'Trip Pass and Plus' : 'Plus'}.`}</strong>
+            <span>{reason.kind === 'trip' ? tripHint : perkHint}</span>
           </div>
         </div>
       ) : (

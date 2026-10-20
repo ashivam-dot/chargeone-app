@@ -33,7 +33,7 @@ export function Welcome({ dataset, statuses, onExplore, onPlanTrip }: Props) {
   return (
     <Sheet title="Welcome to ChargeOne" onClose={onExplore} modal>
       <div class="welcome">
-        <p class="welcome__lead">Plan any EV road trip in India: chargers that work, food while you charge, a hotel for the night.</p>
+        <p class="welcome__lead">Plan any EV road trip in India: chargers drivers report working, food while you charge, a hotel for the night.</p>
         <ul class="welcome__stats">
           {stats.map(([n, label]) => (
             <li key={label}>

@@ -12,7 +12,11 @@ from pathlib import Path
 DEMO = Path(__file__).resolve().parent.parent.parent / "demo"
 RAW = DEMO / "raw"
 OUT = DEMO / "ChargeOne-demo.mp4"
-VIDEO_FILTER = "fps=30,pad=412:916:0:0:color=0x0f172a,scale=824:1832:flags=lanczos,format=yuv420p"
+# Frames are 824x1830; H.264 needs even dimensions, so pad to 1832.
+VIDEO_FILTER = (
+    "fps=30,scale=824:1832:force_original_aspect_ratio=decrease:flags=lanczos,"
+    "pad=824:1832:0:0:color=0x0f172a,format=yuv420p"
+)
 
 
 def main() -> int:

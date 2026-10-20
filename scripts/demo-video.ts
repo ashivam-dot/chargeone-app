@@ -2,16 +2,22 @@
 // Usage: <kokoro python> scripts/demo-voice.py, then node scripts/demo-video.ts [baseUrl], then python3 scripts/demo-mix.py
 //   → ../demo/raw/frames/*.jpg, ../demo/raw/frames.txt (an ffmpeg concat list with real frame timings) and
 //     ../demo/raw/cues.json (when each narration line starts, in seconds from the first frame).
-// Chrome's screencast is used instead of Playwright's recorder because it captures at device resolution.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+// Chrome's screencast is used instead of Playwright's recorder because, with --force-device-scale-factor, it captures
+// at device resolution (824x1830) rather than CSS pixels.
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { chromium, devices, type Locator, type Page } from 'playwright';
 
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8787';
 const rawDir = new URL('../../demo/raw/', import.meta.url).pathname;
 const frameDir = `${rawDir}frames/`;
 mkdirSync(frameDir, { recursive: true });
+const durations = `${rawDir}voice/durations.json`;
+if (!existsSync(durations)) {
+  console.log('Run demo-voice.py first: no narration audio found.');
+  process.exit(1);
+}
 /** Seconds of speech per narration line, written by demo-voice.py. */
-const voice = JSON.parse(readFileSync(`${rawDir}voice/durations.json`, 'utf8')) as Record<string, number>;
+const voice = JSON.parse(readFileSync(durations, 'utf8')) as Record<string, number>;
 const narration = JSON.parse(readFileSync(new URL('./demo-narration.json', import.meta.url), 'utf8')) as { lines: Array<{ id: string }> };
 const LINE_GAP_MS = 450;
 
@@ -104,7 +110,7 @@ const overlay = () => {
   };
 };
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: ['--force-device-scale-factor=2'] });
 const context = await browser.newContext({
   ...devices['Pixel 7'],
   deviceScaleFactor: 2,
@@ -186,7 +192,7 @@ try {
 
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
-  await card({ lines: ['Plan any EV road trip in India.', 'Chargers that work, food while you charge, a hotel for the night.'] }, 300);
+  await card({ lines: ['Plan any EV road trip in India.', 'Chargers drivers report working, food while you charge, a hotel for the night.'] }, 300);
   await narrate('intro', '');
   await ready(page, '.maplibregl-canvas');
   await settle(300);
@@ -274,7 +280,7 @@ try {
   await tap(page.getByRole('button', { name: 'Charged fine' }));
   await ready(page, 'text=Thanks! Other drivers can see this now.');
   await settle();
-  await narrate('reported', 'Everyone sees it instantly', '"Last charged fine just now at 45 kW"');
+  await narrate('reported', 'The status updates for every driver', '"Last charged fine just now at 45 kW"');
   await point(page.locator('.live').first());
   await settle();
   await tap(page.getByRole('button', { name: 'Close' }).first(), 200);
@@ -319,7 +325,7 @@ try {
 
   // ---- Plans ----
   await paywallBody.evaluate((node) => node.scrollTo({ top: 150, behavior: 'smooth' }));
-  await narrate('plus', 'Plus · ₹149 a month', 'Every trip, backups, multi-day hotels, live alerts, saved trips');
+  await narrate('plus', 'Plus · ₹149 a month', '30 long trips a month, backups, multi-day hotels, in-app alerts, saved trips');
   await wait(3500);
   await paywallBody.evaluate((node) => node.scrollTo({ top: 330, behavior: 'smooth' }));
   await settle();
@@ -328,7 +334,7 @@ try {
   await settle(300);
   await tap(page.locator(`${paywall} .segmented button`, { hasText: 'Monthly' }), 300);
   await page.locator('li[aria-label="Trip Pass"]').evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  await narrate('pass', 'Trip Pass · ₹49 once', 'One road trip: backups and multi-day, no alerts or saved trips');
+  await narrate('pass', 'Trip Pass · ₹49 once', '10 long trips in 7 days: backups and multi-day, no alerts or saved trips');
   await wait(3000);
   await point(page.locator('li[aria-label="Trip Pass"] .perk--no').first());
   await settle();
@@ -359,7 +365,7 @@ try {
   const verdict = (await page.locator('.verdict strong').textContent())?.trim() ?? 'Trip planned';
   await narrate('verdict', verdict, 'Charging stops, overnight stay and arrival battery, all worked out');
   await settle();
-  await narrate('alerts', 'Plus: alerts are on', 'A stop reported broken shows here with a one-tap re-plan');
+  await narrate('alerts', 'Plus: alerts are on', 'While this trip is open, a stop reported broken shows here with a one-tap re-plan');
   await point(page.locator('.perk-on').first());
   await settle();
   await tap(page.getByRole('button', { name: 'Collapse panel to see the map' }));
@@ -372,7 +378,7 @@ try {
   const backups = page.locator('.backups').first();
   if (await backups.count()) {
     await backups.evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-    await narrate('backups', 'A backup for every stop', 'If the charger is busy or down, the next one is ready');
+    await narrate('backups', 'Backup chargers for your stops', 'If the charger is busy or down, the next one is listed');
     await wait(900);
     await point(page.locator('.backup').first());
     await settle();
@@ -382,20 +388,26 @@ try {
     await stopFood.evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'center' }));
     await wait(700);
     await tap(stopFood);
-    await narrate('stopfood', 'Food at every charging stop', 'What is open within a short walk while the car charges');
+    await narrate('stopfood', 'Food near your charging stop', 'Places within a short walk while the car charges');
     await settle();
   }
-  await page.locator('.overnight').first().evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  // The narration for the night and day 2 says the battery is full by morning, so stop if this plan says otherwise.
+  const night = page.locator('.overnight').first();
+  const nightCharge = (await night.locator('.timeline__charge').textContent())?.trim() ?? '';
+  if (!nightCharge.includes('100% by morning')) throw new Error(`Narration says 100% by morning, but the plan shows: ${nightCharge}`);
+  await night.evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   await wait(700);
-  await narrate('overnight', 'Night 1: charger + hotel', 'Arrive, plug in, 100% by morning · charger-on-site hotels first');
+  await narrate('overnight', 'Night 1: charger + hotel', `${nightCharge.split('·')[0].trim()} · charger-on-site hotels first`);
   await settle();
   await tripBody.evaluate((node) => node.scrollBy({ top: 330, behavior: 'smooth' }));
   await narrate('book', 'Book in one tap', 'Directions, call, reviews, or check prices on Booking.com');
   await settle();
   const day2 = page.locator('.day__head').nth(1);
   if (await day2.count()) {
+    const leave = (await page.locator('section[aria-label="Day 2"] .timeline__end .muted').first().textContent())?.trim() ?? '';
+    if (leave !== 'Leave with 100%') throw new Error(`Narration says day 2 starts full, but the plan shows: ${leave}`);
     await day2.evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-    await narrate('day2', 'Day 2 starts at 100%', 'Each day gets its own Google Maps navigation');
+    await narrate('day2', 'Day 2: leave with 100%', 'Each day gets its own Google Maps navigation');
     await settle();
   }
   const destStays = page.locator('.dest-stays');
@@ -441,8 +453,8 @@ try {
       lines: ['Chargers, food and hotels for your whole road trip.', 'Start free. Upgrade only when you drive out of town.'],
       items: [
         ['Free', 'map, live status, food & stays, trips up to 100 km'],
-        ['Trip Pass ₹49', 'one road trip: backups, multi-day hotels'],
-        ['Plus ₹149/mo', 'every trip, live alerts, saved trips'],
+        ['Trip Pass ₹49', '10 long trips in 7 days, backups, multi-day hotels'],
+        ['Plus ₹149/mo', '30 long trips a month, in-app alerts, saved trips'],
         ['Plus Yearly ₹999', 'save 44%'],
       ],
     },

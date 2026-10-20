@@ -129,16 +129,20 @@ export const COMPARE: CompareRow[] = [
   { label: 'Charging stops with battery, time and cost', value: () => true },
   { label: 'Backup chargers for your stops', value: (p) => p.backups },
   { label: 'Multi-day trips with a hotel and overnight charging', value: (p) => p.multiDay },
-  { label: 'Free re-plans from where you are', value: (p) => p.freeReplans },
-  { label: 'Alerts when a stop on your route breaks', value: (p) => p.liveAlerts },
+  { label: 'Free re-plans from where you are, within 24 h', value: (p) => p.freeReplans },
+  { label: 'In-app alert if a stop on your open trip breaks', value: (p) => p.liveAlerts },
   { label: 'Saved trips that open without signal', value: (p) => (p.savedTrips > 0 ? `${p.savedTrips} trips` : false) },
 ];
 
 /** Rows that differ between plans: what the plan cards list. */
 export const PLAN_ROWS = COMPARE.slice(2);
+/** Plan card rows after trip length and quota, for screens that show usage separately. */
+export const FEATURE_ROWS = PLAN_ROWS.slice(2);
+
+export type Perk = 'backups' | 'multiDay' | 'freeReplans' | 'liveAlerts' | 'savedTrips';
 
 /** The cheapest paid plan that includes a perk, for "Unlock with …" labels. */
-export function cheapestWith(perk: 'backups' | 'multiDay' | 'freeReplans' | 'liveAlerts' | 'savedTrips'): Plan {
+export function cheapestWith(perk: Perk): Plan {
   return PAID_PLANS.map((id) => PLANS[id]).find((p) => Boolean(p[perk]))!;
 }
 

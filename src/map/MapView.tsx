@@ -69,8 +69,6 @@ const CLICKABLE = Object.keys(TAP_RADIUS_PX);
 const TAP_SLOP_PX = 8;
 const LIGHT_STYLE = 'https://tiles.openfreemap.org/styles/positron';
 const DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark';
-/** On a portrait phone the whole-India box leaves half the screen on Central Asia; this one fills it with India. */
-const PHONE_BBOX: [number, number, number, number] = [69.5, 7, 92, 34];
 const ENGLISH_NAME: ExpressionSpecification = ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name:latin'], ['get', 'name']];
 
 /** The base style labels places in Latin and local script; show one English name instead. */
@@ -287,15 +285,15 @@ export function MapView(props: Props) {
 
   useEffect(() => {
     if (!container.current) return;
-    const box = container.current.clientWidth < 600 ? PHONE_BBOX : INDIA_BBOX;
     const map = new MapLibreMap({
       container: container.current,
       style: styleUrl.current,
       bounds: [
-        [box[0], box[1]],
-        [box[2], box[3]],
+        [INDIA_BBOX[0], INDIA_BBOX[1]],
+        [INDIA_BBOX[2], INDIA_BBOX[3]],
       ],
-      fitBoundsOptions: { padding: 24 },
+      // A portrait phone is narrow: keep the padding small so all of India, including Ladakh and Arunachal, fits as large as possible.
+      fitBoundsOptions: { padding: container.current.clientWidth < 600 ? 6 : 24 },
       attributionControl: false,
       maxPitch: 0,
       dragRotate: false,
