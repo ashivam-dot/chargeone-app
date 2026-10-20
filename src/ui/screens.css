@@ -1,0 +1,205 @@
+/* ---------- You ---------- */
+.you__profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.you__avatar {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.4rem;
+  font-weight: 750;
+  color: var(--text);
+  background:
+    linear-gradient(var(--panel-solid), var(--panel-solid)) padding-box,
+    var(--grad) border-box;
+  border: 2px solid transparent;
+}
+.you__avatar--plus {
+  background:
+    linear-gradient(var(--panel-solid), var(--panel-solid)) padding-box,
+    var(--grad-plus) border-box;
+  box-shadow: 0 0 30px color-mix(in srgb, var(--plus) 35%, transparent);
+}
+.you__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.you__who strong {
+  font-size: 1.08rem;
+}
+.you__who span {
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.you__plan--plus {
+  border: 1px solid transparent;
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--plus) 20%, transparent), transparent 65%) padding-box,
+    linear-gradient(color-mix(in srgb, var(--panel-solid) 92%, transparent), color-mix(in srgb, var(--panel-solid) 92%, transparent)) padding-box,
+    var(--grad-plus) border-box;
+}
+.you__tier {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 2px;
+  font-size: 1.45rem;
+  letter-spacing: -0.03em;
+}
+.you__plan--plus .you__tier .lucide {
+  color: var(--plus);
+}
+.you__danger {
+  margin-top: 22px;
+}
+.trial-ring {
+  position: relative;
+  flex: none;
+  width: 68px;
+  height: 68px;
+}
+.trial-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.trial-ring__track {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 6;
+}
+.trial-ring__bar {
+  fill: none;
+  stroke: url(#trial-ring-grad);
+  stroke-width: 6;
+  stroke-linecap: round;
+  animation: ring-draw 1.4s var(--ease-out) both;
+}
+.trial-ring > span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.trial-ring strong {
+  font-size: 1.35rem;
+}
+.trial-ring small {
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+@keyframes ring-draw {
+  from {
+    stroke-dasharray: 0 999;
+  }
+}
+
+/* ---------- Feedback ---------- */
+.feedback__faces {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 8px 0 2px;
+}
+.feedback__face {
+  flex: 1;
+  aspect-ratio: 1;
+  max-width: 64px;
+  border-radius: 20px;
+  border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  font-size: 1.9rem;
+  cursor: pointer;
+  transition: transform 0.4s var(--spring-bouncy), opacity 0.25s, filter 0.25s, border-color 0.2s, background 0.2s;
+}
+.feedback__face:active {
+  transform: scale(0.9);
+}
+.feedback__face.is-on {
+  transform: scale(1.12) translateY(-3px);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: var(--glow);
+}
+.feedback__face.is-on span {
+  display: inline-block;
+  animation: face-pop 0.6s var(--spring-bouncy);
+}
+.feedback__face.is-dim {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+}
+.feedback__label {
+  margin: 8px 0 14px;
+  min-height: 1.2em;
+  font-weight: 600;
+}
+.feedback__cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.feedback__cats .chip {
+  box-shadow: none;
+}
+.feedback__text {
+  min-height: 96px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  resize: vertical;
+}
+.feedback__count {
+  align-self: flex-end;
+}
+.feedback__done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 0 36px;
+  text-align: center;
+}
+.feedback__done strong {
+  font-size: 1.3rem;
+}
+.feedback__check {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin-bottom: 8px;
+  background: var(--grad);
+  color: var(--accent-text);
+  box-shadow: var(--glow);
+  animation: check-pop 0.7s var(--spring-bouncy) both;
+}
+@keyframes face-pop {
+  40% {
+    transform: scale(1.35) rotate(-8deg);
+  }
+}
+@keyframes check-pop {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+}

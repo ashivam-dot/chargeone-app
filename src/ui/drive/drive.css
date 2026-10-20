@@ -1,0 +1,382 @@
+/* Live drive: a heads-up display over the map, which follows the car underneath. */
+.drive {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: calc(var(--safe-top, 0px) + 12px) 12px calc(var(--safe-bottom, 0px) + 12px);
+}
+.drive > * {
+  pointer-events: auto;
+}
+.drive--choose,
+.drive--arrived {
+  justify-content: flex-end;
+  background: linear-gradient(to top, rgba(5, 7, 11, 0.85), rgba(5, 7, 11, 0.25) 60%, transparent);
+  pointer-events: auto;
+  animation: fade-in 0.3s ease both;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.drive-sheet {
+  width: min(560px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--panel-solid) 82%, transparent);
+  border: 1px solid var(--line-strong, var(--line));
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  animation: sheet-in 0.55s var(--spring) both;
+}
+.drive-sheet--center {
+  text-align: center;
+  justify-items: center;
+}
+.drive-sheet--center .tiles {
+  width: 100%;
+  text-align: left;
+}
+.drive-sheet h2 {
+  margin: 2px 0 0;
+  font-size: 1.3rem;
+  letter-spacing: -0.02em;
+}
+.drive-sheet__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.drive-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.35s var(--spring), border-color 0.2s;
+}
+.drive-option:active {
+  transform: scale(0.98);
+}
+.drive-option:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.drive-option__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  color: #04131a;
+  background: var(--grad);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.drive-option__icon--demo {
+  background: linear-gradient(135deg, #fbbf24, #f97316);
+  box-shadow: 0 8px 24px rgba(249, 115, 22, 0.3);
+}
+.drive-option__text {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.drive-option__text span {
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+/* ---------- HUD ---------- */
+.drive-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  animation: drop-in 0.6s var(--spring) both;
+}
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-24px);
+  }
+}
+.drive-top__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.icon-btn--glass {
+  background: color-mix(in srgb, var(--panel-solid) 75%, transparent);
+  border: 1px solid var(--line);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+}
+.drive-next {
+  flex: 1;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(8, 47, 56, 0.92), rgba(6, 40, 32, 0.92));
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  color: #ecfeff;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+}
+.drive-next__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--grad);
+  color: #04131a;
+}
+.drive-next__text {
+  display: grid;
+  min-width: 0;
+}
+.drive-next__text strong {
+  font-size: 1.05rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drive-next__label {
+  font-family: var(--font-num);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #67e8f9;
+  letter-spacing: 0.02em;
+}
+.drive-next__live {
+  font-size: 0.78rem;
+  color: rgba(236, 254, 255, 0.72);
+}
+.drive-next__live--working::before,
+.drive-next__live--in_use::before,
+.drive-next__live--problem::before,
+.drive-next__live--unknown::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: 1px;
+  background: #94a3b8;
+}
+.drive-next__live--working::before {
+  background: #34d399;
+  box-shadow: 0 0 8px #34d399;
+}
+.drive-next__live--in_use::before {
+  background: #fbbf24;
+}
+.drive-next__live--problem::before {
+  background: #f87171;
+}
+
+.drive-alert {
+  width: min(520px, 100%);
+  margin: 0 auto;
+  padding: 18px;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--panel-solid) 92%, transparent);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  box-shadow: 0 0 0 6px rgba(251, 191, 36, 0.12), 0 30px 80px rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  animation: alert-in 0.6s var(--spring-bouncy) both;
+}
+.drive-alert--critical {
+  border-color: rgba(248, 113, 113, 0.7);
+  box-shadow: 0 0 0 6px rgba(248, 113, 113, 0.15), 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+.drive-alert--info {
+  border-color: rgba(34, 211, 238, 0.5);
+  box-shadow: 0 0 0 6px rgba(34, 211, 238, 0.1), 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+@keyframes alert-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.92);
+  }
+}
+.drive-alert__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.05rem;
+}
+.drive-alert__icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(251, 191, 36, 0.16);
+  color: #fbbf24;
+  animation: alert-pulse 1.6s ease-in-out infinite;
+}
+.drive-alert--critical .drive-alert__icon {
+  background: rgba(248, 113, 113, 0.16);
+  color: #f87171;
+}
+.drive-alert--info .drive-alert__icon {
+  background: rgba(34, 211, 238, 0.14);
+  color: var(--accent);
+}
+@keyframes alert-pulse {
+  50% {
+    transform: scale(1.12);
+  }
+}
+.drive-alert p {
+  margin: 10px 0 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.drive-alert__suggest {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent-2, #34d399) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-2, #34d399) 30%, transparent);
+  color: var(--text);
+}
+.drive-alert__suggest svg {
+  flex: none;
+  color: var(--accent-2, #34d399);
+  margin-top: 2px;
+}
+
+.drive-panel {
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: 16px;
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--panel-solid) 86%, transparent);
+  border: 1px solid var(--line);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  display: grid;
+  gap: 14px;
+  animation: sheet-in 0.6s var(--spring) both;
+}
+.drive-progress {
+  position: relative;
+  height: 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.drive-progress__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--grad);
+  transform-origin: left;
+  transform: scaleX(var(--p));
+  transition: transform 0.6s linear;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.drive-progress__stop {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--panel-solid);
+  border: 2px solid var(--accent);
+}
+.drive-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.drive-stats > div {
+  display: grid;
+  gap: 2px;
+}
+.drive-stats strong {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.drive-stats small {
+  margin-left: 3px;
+  font-size: 0.6em;
+  color: var(--muted);
+}
+.drive-panel__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.drive-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.drive-delta--bad {
+  color: #fbbf24;
+}
+.drive-delta--good {
+  color: #34d399;
+}
+
+.arrive-badge {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--grad);
+  color: #04131a;
+  box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 15%, transparent), 0 20px 50px color-mix(in srgb, var(--accent) 40%, transparent);
+  animation: check-pop 0.7s var(--spring-bouncy) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drive-alert__icon {
+    animation: none;
+  }
+  .drive-progress__fill {
+    transition: none;
+  }
+}
+.drive-stats__bad strong,
+.drive-stats__bad .small {
+  color: #fbbf24;
+}

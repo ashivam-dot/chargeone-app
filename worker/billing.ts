@@ -111,7 +111,9 @@ export async function createCheckout(req: Request, env: Env, user: User) {
 
   const now = new Date();
   const e = await getEntitlement(env, user.id);
-  if (isPlus(effectivePlan(e, now))) {
+  const onTrial = e?.source === 'trial' && isPlus(effectivePlan(e, now));
+  if (onTrial && plan === 'trip_pass') throw new HttpError(409, 'trial_includes', 'Your Plus trial already includes this.');
+  if (!onTrial && isPlus(effectivePlan(e, now))) {
     const until = e?.activeUntil ? new Date(e.activeUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '';
     throw new HttpError(409, 'already_subscribed', `You already have Plus${until ? ` until ${until}` : ''}.`);
   }
@@ -258,7 +260,9 @@ export async function confirmCheckout(req: Request, env: Env, user: User) {
         if (!isPlus(effectivePlan(e, now))) throw pending();
         return { plan: effectivePlan(e, now) };
       }
-      until = new Date(now.getTime() + PROVISIONAL_MS);
+      // Paying during a trial shouldn't cut the trial short while the first charge is pending.
+      const trialEnd = e?.source === 'trial' && e.activeUntil ? new Date(e.activeUntil).getTime() : 0;
+      until = new Date(Math.max(now.getTime() + PROVISIONAL_MS, trialEnd));
     } else throw pending();
   }
 

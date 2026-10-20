@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from './index.ts';
-import { client, fakeEnv } from './test-support/fake-env.ts';
+import { DEVICE, client, deviceHeaders, fakeEnv } from './test-support/fake-env.ts';
 
 const KEY_SECRET = 'local-key-secret';
 const WEBHOOK_SECRET = 'local-webhook-secret';
@@ -444,6 +444,146 @@ describe('Plus subscription', () => {
     await webhook(api, charged(now + 60 * 86400, 'pay_P3'), 'evt_p3');
     me = (await api('GET', '/api/me')).body;
     expect(me.entitlement.status).toBe('cancelled');
+  });
+});
+
+describe('Plus trial', () => {
+  const PHONE_B = 'a1b2c3d4-0000-4000-8000-0000000000b2';
+
+  function trialSetup() {
+    const { env, sqlite } = fakeEnv();
+    const as = async (email: string, device = DEVICE) => {
+      const api = client(worker, env, deviceHeaders(device));
+      await api('POST', '/api/auth/dev', { email });
+      return api;
+    };
+    return { env, sqlite, as };
+  }
+
+  const start = (api: ReturnType<typeof client>, vehicleModelId = 'tata-nexon-ev-45') => api('POST', '/api/trial/start', { vehicleModelId });
+
+  it('gives a new driver 7 days of Plus once', async () => {
+    const { as } = trialSetup();
+    const api = await as('new@local.test');
+    expect((await api('GET', '/api/me')).body.trial).toEqual({ eligible: true, endsAt: null });
+
+    const res = await start(api);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ plan: 'plus_monthly', tier: 'plus_monthly', entitlement: { source: 'trial', status: 'trial' } });
+    const days = (new Date(res.body.trial.endsAt).getTime() - Date.now()) / 86400_000;
+    expect(days).toBeGreaterThan(6.9);
+    expect(days).toBeLessThanOrEqual(7);
+    expect(res.body.trial.eligible).toBe(false);
+
+    const again = await start(api);
+    expect(again.status).toBe(409);
+  });
+
+  it('checks the request', async () => {
+    const { env, as } = trialSetup();
+    expect((await client(worker, env, deviceHeaders())('POST', '/api/trial/start', { vehicleModelId: 'custom' })).status).toBe(401);
+    const api = await as('checks@local.test');
+    expect((await start(api, 'flying-car')).status).toBe(400);
+    expect((await api('POST', '/api/trial/start', { vehicleModelId: 'custom' }, { 'X-ChargeOne-Device': 'not-a-uuid' })).body.error).toBe('device_required');
+    expect((await start(api, 'custom')).status).toBe(200);
+  });
+
+  it('allows one trial per phone and per account', async () => {
+    const { as } = trialSetup();
+    expect((await start(await as('first@local.test'))).status).toBe(200);
+    const samePhone = await start(await as('second@local.test'));
+    expect(samePhone.status).toBe(409);
+    expect(samePhone.body).toMatchObject({ error: 'trial_used', message: 'This account or phone has already used its free Plus week.' });
+    expect((await (await as('second@local.test'))('GET', '/api/me')).body.trial.eligible).toBe(false);
+    expect((await start(await as('first@local.test', PHONE_B))).body.error).toBe('trial_used');
+  });
+
+  it('lets only one of two accounts racing on one phone start a trial', async () => {
+    const { as, sqlite } = trialSetup();
+    const [a, b] = [await as('race-a@local.test'), await as('race-b@local.test')];
+    const results = await Promise.all([start(a), start(b)]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM entitlements WHERE source = 'trial'").get()).toMatchObject({ n: 1 });
+  });
+
+  it('is not offered to drivers who paid before or have Plus', async () => {
+    const { as } = trialSetup();
+    const payer = await as('payer@local.test');
+    await payer('POST', '/api/billing/checkout', { plan: 'trip_pass' });
+    await payer('POST', '/api/billing/confirm', {
+      razorpay_order_id: 'order_T1',
+      razorpay_payment_id: 'pay_TP',
+      razorpay_signature: hmac(KEY_SECRET, 'order_T1|pay_TP'),
+    });
+    expect((await payer('GET', '/api/me')).body.trial.eligible).toBe(false);
+    expect((await start(payer)).body.error).toBe('trial_not_eligible');
+
+    const plus = await as('plus@local.test', PHONE_B);
+    await plus('POST', '/api/dev/grant', { plan: 'plus_yearly' });
+    expect((await start(plus)).body.error).toBe('already_subscribed');
+  });
+
+  it('lets a trial driver buy Plus, and the paid plan replaces the trial', async () => {
+    const { as } = trialSetup();
+    const api = await as('convert@local.test');
+    await start(api);
+    const checkout = await api('POST', '/api/billing/checkout', { plan: 'plus_yearly' });
+    expect(checkout.status).toBe(200);
+    expect(checkout.body.subscriptionId).toBe('sub_T1');
+
+    const periodEnd = Math.floor(Date.now() / 1000) + 365 * 86400;
+    await webhook(
+      api,
+      { event: 'subscription.charged', payload: { subscription: { entity: { id: 'sub_T1', status: 'active', current_end: periodEnd } }, payment: { entity: { id: 'pay_Y' } } } },
+      'evt_t1',
+    );
+    const me = (await api('GET', '/api/me')).body;
+    expect(me).toMatchObject({ plan: 'plus_yearly', entitlement: { source: 'razorpay', status: 'active' }, trial: { eligible: false, endsAt: null } });
+    expect(new Date(me.entitlement.activeUntil).getTime()).toBe((periodEnd + 86400) * 1000);
+  });
+
+  it('keeps the trial running while the first Plus charge is pending', async () => {
+    const { as } = trialSetup();
+    const api = await as('pending-trial@local.test');
+    const trialEnd = (await start(api)).body.trial.endsAt;
+    await api('POST', '/api/billing/checkout', { plan: 'plus_monthly' });
+    subscriptions.sub_T1 = { status: 'authenticated', current_end: null };
+    await api('POST', '/api/billing/confirm', {
+      razorpay_subscription_id: 'sub_T1',
+      razorpay_payment_id: 'pay_PT',
+      razorpay_signature: hmac(KEY_SECRET, 'pay_PT|sub_T1'),
+    });
+    const me = (await api('GET', '/api/me')).body;
+    expect(me.entitlement.source).toBe('razorpay');
+    expect(me.entitlement.activeUntil).toBe(trialEnd);
+  });
+
+  it('refuses a Trip Pass during the trial, and flags a stale pass payment for refund', async () => {
+    const { as, sqlite } = trialSetup();
+    const api = await as('pass-trial@local.test');
+    await api('POST', '/api/billing/checkout', { plan: 'trip_pass' });
+    await start(api);
+    const res = await api('POST', '/api/billing/checkout', { plan: 'trip_pass' });
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ error: 'trial_includes', message: 'Your Plus trial already includes this.' });
+
+    await api('POST', '/api/billing/confirm', {
+      razorpay_order_id: 'order_T1',
+      razorpay_payment_id: 'pay_OLDTP',
+      razorpay_signature: hmac(KEY_SECRET, 'order_T1|pay_OLDTP'),
+    });
+    expect((await api('GET', '/api/me')).body.entitlement.source).toBe('trial');
+    expect(sqlite.prepare("SELECT status FROM checkouts WHERE id = 'order_T1'").get()).toMatchObject({ status: 'refund_due' });
+  });
+
+  it('keeps the trial record after the account is deleted', async () => {
+    const { as, sqlite } = trialSetup();
+    const api = await as('gone@local.test');
+    await start(api);
+    expect((await api('POST', '/api/me/delete', {})).status).toBe(200);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM trials').get()).toMatchObject({ n: 1 });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM entitlements').get()).toMatchObject({ n: 0 });
+    expect((await start(await as('back-again@local.test'))).body.error).toBe('trial_used');
   });
 });
 

@@ -9,3 +9,11 @@ screenshots/
 *.log
 .DS_Store
 .scratch/
+# Native builds and device runs
+native-artifacts/
+playwright-report/
+/build/
+*.apk
+*.aab
+*.jks
+*.keystore

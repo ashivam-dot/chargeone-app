@@ -8,31 +8,50 @@ import { loadPlaces } from './lib/places.ts';
 import { clearSavedTrips } from './lib/savedTrips.ts';
 import { isObject, loadJson, removeJson, saveJson } from './lib/storage.ts';
 import { MapView, type FlyTarget, type PlaceMarker, type StopMarker } from './map/MapView.tsx';
-import { PLANS, type PlanId } from './shared/plans.ts';
+import { BACK_EVENT, haptic, initNativeShell, onAppResume } from './native/platform.ts';
+import { PLANS, isPlus, type PlanId } from './shared/plans.ts';
 import { liveState, type StationStatus } from './shared/status.ts';
 import type { MyVehicle } from './shared/vehicles.ts';
 import { About } from './ui/About.tsx';
-import { Account } from './ui/Account.tsx';
+import { PAINTS } from './ui/car/carArt.ts';
+import { useCarLink } from './ui/car/carLink.ts';
+import type { VoiceTrip } from './ui/copilot/CopilotScreen.tsx';
+import type { CarPosition } from './ui/drive/DriveMode.tsx';
+import { Feedback } from './ui/Feedback.tsx';
 import { FilterBar, type MapFilters } from './ui/FilterBar.tsx';
 import { Garage } from './ui/Garage.tsx';
+import { Onboarding } from './ui/onboarding/Onboarding.tsx';
 import { PlaceInput, type PickedPlace } from './ui/PlaceInput.tsx';
 import { PlaceSheet } from './ui/PlaceSheet.tsx';
 import { Plans, type Paywall } from './ui/Plans.tsx';
+import { lazy } from './ui/shell/lazy.tsx';
+import { TabBar, type Tab } from './ui/shell/TabBar.tsx';
 import { SignIn } from './ui/SignIn.tsx';
 import { StationSheet } from './ui/StationSheet.tsx';
-import { TripPlanner, type TripView } from './ui/TripPlanner.tsx';
-import { Welcome } from './ui/Welcome.tsx';
+import { TripPlanner, type DriveRequest, type PlannedTrip, type TripView } from './ui/TripPlanner.tsx';
+import { YouScreen } from './ui/YouScreen.tsx';
 
-type Overlay = 'plans' | 'signin' | 'account' | 'about' | 'garage' | null;
+const CarScreen = lazy(() => import('./ui/car/CarScreen.tsx').then((m) => m.CarScreen));
+const CopilotScreen = lazy(() => import('./ui/copilot/CopilotScreen.tsx').then((m) => m.CopilotScreen));
+const DriveMode = lazy(() => import('./ui/drive/DriveMode.tsx').then((m) => m.DriveMode));
+
+type Overlay = 'plans' | 'signin' | 'about' | 'garage' | null;
 
 const STATUS_POLL_MS = 60_000;
 /** Must match the side panel width plus margin in styles.css (min-width: 820px). */
 const DESKTOP_PANEL_PX = 452;
+const TABBAR_PX = 76;
 const NO_INSETS = { bottom: 0, left: 0 };
 const NO_STOPS: StopMarker[] = [];
+const NO_ALTS: [number, number][][] = [];
+const TOAST_MS = 3800;
+/** Ask how the app is going once, after this many planned trips. */
+const FEEDBACK_AFTER_PLANS = 2;
 const readViewport = () => ({ height: window.innerHeight, desktop: window.innerWidth >= 820 });
 const isVehicle = (v: unknown): v is MyVehicle => isObject(v) && typeof v.modelId === 'string' && typeof v.batteryKwh === 'number';
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const isPaint = (v: unknown): v is string => typeof v === 'string' && PAINTS.some((p) => p.hex === v);
 
 /** The last plan /api/me reported, so a paid user offline (or before /api/me answers) still gets their features. */
 interface CachedPlan {
@@ -43,6 +62,18 @@ const isCachedPlan = (v: unknown): v is CachedPlan => isObject(v) && typeof v.pl
 function loadCachedPlan(): PlanId {
   const c = loadJson<CachedPlan | null>('plan', null, (v): v is CachedPlan | null => v === null || isCachedPlan(v));
   return c && Date.parse(c.until) > Date.now() ? c.plan : 'free';
+}
+
+interface FeedbackAsk {
+  screen: string;
+  title?: string;
+}
+
+interface TripSeed {
+  to: PickedPlace | null;
+  from: PickedPlace | null;
+  soc: number | null;
+  autoRun: boolean;
 }
 
 export function App() {
@@ -62,32 +93,58 @@ export function App() {
   const userPicked = useRef(false);
   const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
   const [overlay, setOverlay] = useState<Overlay>(null);
+  const [tab, setTab] = useState<Tab>('explore');
   const [tripOpen, setTripOpen] = useState(false);
-  const [tripTo, setTripTo] = useState<PickedPlace | null>(null);
+  const [tripSeed, setTripSeed] = useState<TripSeed>({ to: null, from: null, soc: null, autoRun: false });
   const [tripKey, setTripKey] = useState(0);
   const [tripView, setTripView] = useState<TripView | null>(null);
+  const [planned, setPlanned] = useState<PlannedTrip | null>(null);
+  const [drive, setDrive] = useState<DriveRequest | null>(null);
+  const [carPos, setCarPos] = useState<CarPosition | null>(null);
   const [paywallReason, setPaywallReason] = useState<Paywall | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackAsk | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [cachedPlan] = useState(loadCachedPlan);
   const [vehicle, setVehicle] = useState<MyVehicle | null>(() => loadJson<MyVehicle | null>('vehicle', null, (v): v is MyVehicle | null => v === null || isVehicle(v)));
-  const [dark, setDark] = useState(() => loadJson('dark', window.matchMedia('(prefers-color-scheme: dark)').matches, isBool));
+  const [paint, setPaint] = useState(() => loadJson('paint', PAINTS[0].hex, isPaint));
+  const [dark, setDark] = useState(() => loadJson('dark', true, isBool));
   const [online, setOnline] = useState(navigator.onLine);
   // First visit only, and not when a shared link opens a charger or place.
-  const [welcome, setWelcome] = useState(() => {
+  const [onboard, setOnboard] = useState(() => {
     const q = new URLSearchParams(location.search);
     return !loadJson('welcomed', false, isBool) && !q.has('s') && !q.has('p');
   });
   const [viewport, setViewport] = useState(readViewport);
+  /** A trial the driver asked for before signing in or adding a car; started once both are done. */
+  const trialWanted = useRef(false);
+  /** The language of a voice trip request, so its plan is read back when it's ready. */
+  const voiceLang = useRef<VoiceTrip['lang'] | null>(null);
+  const link = useCarLink();
+
+  // Fetch the other screens once the map is up, so they open instantly and still open offline.
+  useEffect(() => {
+    if (!dataset) return;
+    const t = setTimeout(() => [CarScreen, CopilotScreen, DriveMode].forEach((c) => c.preload()), 2000);
+    return () => clearTimeout(t);
+  }, [dataset]);
 
   useEffect(() => {
     const onResize = () => setViewport(readViewport());
     window.addEventListener('resize', onResize);
+    void initNativeShell();
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0b1220' : '#f8fafc');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#05070b' : '#f6f8fb');
   }, [dark]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), TOAST_MS);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   useEffect(() => {
     fetch('/data/stations.json')
@@ -140,26 +197,28 @@ export function App() {
       .catch(() => undefined);
   }, []);
 
+  const refreshMe = useCallback(() => {
+    api.me().then(setMe).catch(() => undefined);
+  }, []);
+
   useEffect(() => {
     refreshStatuses();
     const timer = setInterval(() => document.visibilityState === 'visible' && refreshStatuses(), STATUS_POLL_MS);
-    const onVisible = () => document.visibilityState === 'visible' && refreshStatuses();
+    const stopResume = onAppResume(() => {
+      refreshStatuses();
+      refreshMe();
+    });
     const onOnline = () => setOnline(true);
     const onOffline = () => setOnline(false);
-    document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
     return () => {
       clearInterval(timer);
-      document.removeEventListener('visibilitychange', onVisible);
+      stopResume();
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, [refreshStatuses]);
-
-  const refreshMe = useCallback(() => {
-    api.me().then(setMe).catch(() => undefined);
-  }, []);
+  }, [refreshStatuses, refreshMe]);
 
   useEffect(() => {
     if (!me) return;
@@ -168,10 +227,15 @@ export function App() {
     else removeJson('plan');
   }, [me]);
   const planId = me?.plan ?? cachedPlan;
+  const plan = PLANS[planId];
+  const signedIn = Boolean(me?.user);
+  const plusNow = isPlus(planId);
+  const trialAvailable = !plusNow && (signedIn ? Boolean(me?.trial?.eligible) : true);
 
   const stations = dataset?.stations ?? [];
   const byId = useMemo(() => new Map(stations.map((s) => [s.id, s])), [stations]);
   const operators = useMemo(() => operatorsByCount(stations), [stations]);
+  const dcCount = useMemo(() => stations.filter((s) => s.speed === 'dc').length, [stations]);
   const shown = useMemo(() => {
     const base = filterStations(stations, filters);
     if (!filters.workingOnly) return base;
@@ -225,18 +289,107 @@ export function App() {
     if (i !== undefined) selectPlace(i, true);
   };
 
-  const openTrip = (to: PickedPlace | null) => {
-    setTripTo(to);
+  const go = (next: Tab) => {
+    if (next === tab) return;
+    const swap = () => {
+      setTab(next);
+      if (next === 'trip' && !tripOpen) openTrip({ to: null, from: null, soc: null, autoRun: false }, false);
+    };
+    if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) document.startViewTransition(swap);
+    else swap();
+  };
+
+  const openTrip = (seed: TripSeed, switchTab = true) => {
+    setTripSeed(seed);
     setTripKey((k) => k + 1);
     setTripOpen(true);
     setTripView(null);
     select(null);
+    if (switchTab) setTab('trip');
   };
 
   const showTrip = (view: TripView | null) => {
     setTripView(view);
     if (view) setFlyTarget({ kind: 'bbox', bbox: view.bbox });
   };
+
+  const say = (message: string) => setToast(message);
+
+  const beginTrial = async (v: MyVehicle | null = vehicle) => {
+    if (!v) {
+      trialWanted.current = true;
+      setOverlay('garage');
+      return;
+    }
+    if (!signedIn) {
+      trialWanted.current = true;
+      setOverlay('signin');
+      return;
+    }
+    trialWanted.current = false;
+    try {
+      setMe(await api.startTrial(v.modelId));
+      void haptic('success');
+      say('Your Plus week has started. Enjoy the drive!');
+      setOverlay(null);
+    } catch (e) {
+      say(e instanceof Error ? e.message : "Couldn't start the trial.");
+    }
+  };
+
+  const unlock = (reason?: Paywall) => {
+    setPaywallReason(reason ?? null);
+    setOverlay('plans');
+  };
+
+  const planVoiceTrip = async (vt: VoiceTrip) => {
+    voiceLang.current = vt.lang;
+    let from = vt.from;
+    if (!from) {
+      try {
+        const { getPosition } = await import('./native/position.ts');
+        const fix = await getPosition();
+        from = { name: 'My location', lat: fix.lat, lng: fix.lng, bbox: null };
+      } catch {
+        from = null;
+      }
+    }
+    openTrip({ to: vt.to, from, soc: vt.batteryPct, autoRun: Boolean(from) });
+  };
+
+  const onPlanned = (p: PlannedTrip) => {
+    setPlanned(p);
+    const lang = voiceLang.current;
+    voiceLang.current = null;
+    if (lang) {
+      void Promise.all([import('./voice/agentContext.ts'), import('./voice/phrases.ts'), import('./voice/speech.ts')]).then(([ctx, phrases, speech]) =>
+        speech.speak(phrases.speakPlan(ctx.summarizePlan(p.journey), lang, p.to.name), lang),
+      );
+    }
+    const count = loadJson('plans-count', 0, isNum) + 1;
+    saveJson('plans-count', count);
+    if (count === FEEDBACK_AFTER_PLANS && !loadJson('feedback-asked', false, isBool)) {
+      saveJson('feedback-asked', true);
+      setTimeout(() => setFeedback({ screen: 'post-plan', title: 'How is ChargeOne working for you?' }), 2500);
+    }
+  };
+
+  // Android back: close the top-most thing, then go back to the map, then leave the app.
+  useEffect(() => {
+    const onBack = (e: Event) => {
+      if (drive) return e.preventDefault();
+      if (feedback) setFeedback(null);
+      else if (overlay) setOverlay(null);
+      else if (selectedId || selectedPlace !== null) {
+        setSelectedId(null);
+        setSelectedPlace(null);
+      } else if (tab !== 'explore') setTab('explore');
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener(BACK_EVENT, onBack);
+    return () => window.removeEventListener(BACK_EVENT, onBack);
+  }, [drive, feedback, overlay, selectedId, selectedPlace, tab]);
 
   const stopMarkers = tripView?.markers ?? NO_STOPS;
 
@@ -261,21 +414,40 @@ export function App() {
   }, [places, filters.showFood, filters.showStays, selectedId, selectedPlace, tripView, placeIndexById]);
 
   const attribution = useMemo(() => (dataset ? dataset.sources.map((s) => s.attribution) : []), [dataset]);
+  const mapTab = tab === 'explore' || tab === 'trip';
   const placeOpen = selectedPlace !== null && places !== null;
-  const sheetOpen = selected !== null || placeOpen || tripOpen;
+  const stationOpen = mapTab && (selected !== null || placeOpen);
+  const tripShown = tab === 'trip' && tripOpen;
+  const sheetOpen = !drive && (stationOpen || tripShown);
+  const insets = drive
+    ? { bottom: Math.round(viewport.height * 0.38), left: 0 }
+    : sheetOpen
+      ? viewport.desktop
+        ? { bottom: 0, left: DESKTOP_PANEL_PX }
+        : { bottom: Math.round(viewport.height * 0.52), left: 0 }
+      : viewport.desktop
+        ? NO_INSETS
+        : { bottom: TABBAR_PX, left: 0 };
   const toggleDark = () => {
     setDark(!dark);
     saveJson('dark', !dark);
   };
-  const closeWelcome = () => {
-    setWelcome(false);
+  const finishOnboarding = () => {
+    setOnboard(false);
     saveJson('welcomed', true);
   };
-  const paid = me !== null && me.plan !== 'free';
-  const accountLabel = me?.user ? (paid ? `Account, ${PLANS[me.plan].name} plan` : 'Account') : 'Sign in';
+  const saveVehicle = (v: MyVehicle) => {
+    setVehicle(v);
+    saveJson('vehicle', v);
+  };
+  const choosePaint = (hex: string) => {
+    setPaint(hex);
+    saveJson('paint', hex);
+  };
+  const canConnect = plan.carConnect;
 
   return (
-    <div class="app">
+    <div class={`app app--${tab}${drive ? ' app--driving' : ''}`}>
       <MapView
         stations={shown}
         statuses={statuses}
@@ -283,52 +455,43 @@ export function App() {
         flyTarget={flyTarget}
         dark={dark}
         attribution={attribution}
-        insets={sheetOpen ? (viewport.desktop ? { bottom: 0, left: DESKTOP_PANEL_PX } : { bottom: Math.round(viewport.height * 0.52), left: 0 }) : NO_INSETS}
-        route={tripView?.route ?? null}
+        insets={insets}
+        route={drive ? drive.route : tripView?.route ?? null}
+        altRoutes={drive ? NO_ALTS : tripView?.altRoutes ?? NO_ALTS}
         stops={stopMarkers}
         places={placeMarkers}
         selectedPlace={selectedPlace}
-        onSelect={select}
+        car={drive ? carPos : null}
+        follow={Boolean(drive && carPos)}
+        onSelect={(id) => {
+          if (tab !== 'explore' && tab !== 'trip') setTab('explore');
+          select(id);
+        }}
         onSelectPlace={(i) => selectPlace(i)}
       />
 
-      <header class="topbar">
-        <button class="brand" onClick={() => setOverlay('about')} aria-label="About ChargeOne">
-          <img src="/icon.svg" alt="" width="34" height="34" />
-        </button>
-        <div class="topbar__search">
-          <PlaceInput
-            label="Search places or chargers"
-            placeholder="Search a place or charger"
-            value={null}
-            stations={stations}
-            onPick={(p) => {
-              if (!p) return;
-              if (p.stationId) select(p.stationId);
-              else setFlyTarget(p.bbox ? { kind: 'bbox', bbox: p.bbox } : { kind: 'point', lat: p.lat, lng: p.lng, zoom: 12 });
-            }}
-          />
-        </div>
-        <button
-          class={`avatar${paid ? ' avatar--paid' : ''}`}
-          onClick={() => setOverlay(me?.user ? 'account' : 'signin')}
-          aria-label={accountLabel}
-        >
-          {paid && (
-            <span class="avatar__badge" aria-hidden="true">
-              {me?.plan === 'trip_pass' ? 'PASS' : 'PLUS'}
-            </span>
-          )}
-          {me?.user ? (me.user.name ?? me.user.email).slice(0, 1).toUpperCase() : (
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-              <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2" />
-              <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-            </svg>
-          )}
-        </button>
-      </header>
+      {mapTab && !drive && (
+        <header class="topbar">
+          <button class="brand" onClick={() => setOverlay('about')} aria-label="About ChargeOne">
+            <img src="/icon.svg" alt="" width="34" height="34" />
+          </button>
+          <div class="topbar__search">
+            <PlaceInput
+              label="Search places or chargers"
+              placeholder="Search a place or charger"
+              value={null}
+              stations={stations}
+              onPick={(p) => {
+                if (!p) return;
+                if (p.stationId) select(p.stationId);
+                else setFlyTarget(p.bbox ? { kind: 'bbox', bbox: p.bbox } : { kind: 'point', lat: p.lat, lng: p.lng, zoom: 12 });
+              }}
+            />
+          </div>
+        </header>
+      )}
 
-      {!tripOpen && <FilterBar filters={filters} operators={operators} shown={shown.length} total={stations.length} onChange={setFilters} />}
+      {tab === 'explore' && !drive && <FilterBar filters={filters} operators={operators} shown={shown.length} total={stations.length} onChange={setFilters} />}
 
       {!online && <div class="banner" role="status">You're offline. The map and saved chargers still work; status may be out of date.</div>}
       {loadError && (
@@ -337,15 +500,15 @@ export function App() {
         </div>
       )}
 
-      {!sheetOpen && (
-        <button class="fab" onClick={() => openTrip(null)}>
+      {tab === 'explore' && !stationOpen && !drive && (
+        <button class="fab" onClick={() => openTrip({ to: null, from: null, soc: null, autoRun: false })} data-testid="plan-trip">
           <Route size={22} aria-hidden="true" />
           Plan a trip
         </button>
       )}
 
       {tripOpen && (
-        <div hidden={selected !== null || placeOpen}>
+        <div hidden={!tripShown || stationOpen || Boolean(drive)}>
           <TripPlanner
             key={tripKey}
             stations={stations}
@@ -353,18 +516,25 @@ export function App() {
             vehicle={vehicle}
             me={me}
             planId={planId}
-            initialTo={tripTo}
+            initialTo={tripSeed.to}
+            initialFrom={tripSeed.from}
+            initialSoc={tripSeed.soc}
+            autoRun={tripSeed.autoRun}
             onClose={() => {
               setTripOpen(false);
               setTripView(null);
+              setPlanned(null);
+              setTab('explore');
             }}
+            onStartDrive={(d) => {
+              setDrive(d);
+              CarScreen.preload();
+            }}
+            onPlanned={onPlanned}
             onNeedVehicle={() => setOverlay('garage')}
             onRequireSignIn={() => setOverlay('signin')}
-            onPaywall={(reason) => {
-              setPaywallReason(reason);
-              setOverlay('plans');
-            }}
-            onPlans={() => setOverlay('plans')}
+            onPaywall={unlock}
+            onPlans={() => unlock()}
             onShow={showTrip}
             onSelectStation={select}
             onOpenPlace={openPlace}
@@ -373,16 +543,16 @@ export function App() {
         </div>
       )}
 
-      {selected && (
+      {stationOpen && selected && !drive && (
         <StationSheet
           station={selected}
           status={statuses.get(selected.id)}
-          signedIn={Boolean(me?.user)}
+          signedIn={signedIn}
           vehicleName={vehicle?.name ?? null}
           onClose={() => select(null)}
           onRequireSignIn={() => setOverlay('signin')}
           onReported={refreshStatuses}
-          onPlanTo={(s: Station) => openTrip({ name: s.name, lat: s.lat, lng: s.lng, bbox: null, stationId: s.id })}
+          onPlanTo={(s: Station) => openTrip({ to: { name: s.name, lat: s.lat, lng: s.lng, bbox: null, stationId: s.id }, from: null, soc: null, autoRun: false })}
           places={places}
           placesLoading={placesLoading}
           placesFailed={placesFailed}
@@ -390,14 +560,78 @@ export function App() {
         />
       )}
 
-      {places && selectedPlace !== null && !selected && (
-        <PlaceSheet
-          data={places}
-          placeIndex={selectedPlace}
-          byId={byId}
+      {stationOpen && places && selectedPlace !== null && !selected && !drive && (
+        <PlaceSheet data={places} placeIndex={selectedPlace} byId={byId} statuses={statuses} onClose={() => selectPlace(null)} onSelectStation={select} />
+      )}
+
+      {tab === 'car' && !drive && (
+        <CarScreen
+          vehicle={vehicle}
+          paint={paint}
+          canConnect={canConnect}
+          trialAvailable={trialAvailable}
+          onPaint={choosePaint}
+          onGarage={() => setOverlay('garage')}
+          onUnlock={() => unlock()}
+          onStartTrial={() => void beginTrial()}
+        />
+      )}
+
+      {tab === 'copilot' && !drive && (
+        <CopilotScreen
+          signedIn={signedIn}
+          canUse={plan.copilot}
+          trialAvailable={trialAvailable}
+          vehicle={vehicle}
+          trip={planned}
+          onPlanTrip={(vt) => void planVoiceTrip(vt)}
+          onUnlock={() => unlock()}
+          onStartTrial={() => void beginTrial()}
+          onSignIn={() => setOverlay('signin')}
+        />
+      )}
+
+      {tab === 'you' && !drive && (
+        <YouScreen
+          me={me}
+          vehicle={vehicle}
+          dark={dark}
+          onToggleDark={toggleDark}
+          onChanged={refreshMe}
+          onSignedOut={() => {
+            clearSavedTrips();
+            removeJson('plan');
+            setTripOpen(false);
+            setTripView(null);
+            setPlanned(null);
+            refreshMe();
+          }}
+          onSignIn={() => setOverlay('signin')}
+          onPlans={() => unlock()}
+          onGarage={() => setOverlay('garage')}
+          onAbout={() => setOverlay('about')}
+          onFeedback={() => setFeedback({ screen: 'you' })}
+          onStartTrial={() => void beginTrial()}
+        />
+      )}
+
+      {!drive && <TabBar tab={tab} onChange={go} live={{ car: link.state === 'connected', trip: Boolean(planned) }} />}
+
+      {drive && vehicle && (
+        <DriveMode
+          request={drive}
+          vehicle={vehicle}
+          stations={stations}
           statuses={statuses}
-          onClose={() => selectPlace(null)}
-          onSelectStation={select}
+          canDriveLive={plan.liveDrive && plan.carConnect}
+          onCar={setCarPos}
+          onUnlock={() => unlock()}
+          onFeedback={() => setFeedback({ screen: 'drive', title: 'How was the trip?' })}
+          onClose={() => {
+            setDrive(null);
+            setCarPos(null);
+            if (tripView) setFlyTarget({ kind: 'bbox', bbox: tripView.bbox });
+          }}
         />
       )}
 
@@ -405,10 +639,27 @@ export function App() {
         <SignIn
           config={config}
           dark={dark}
-          onClose={() => setOverlay(null)}
+          onClose={() => {
+            trialWanted.current = false;
+            setOverlay(null);
+          }}
           onSignedIn={(m) => {
             setMe(m);
             setOverlay(null);
+            if (trialWanted.current && m.trial?.eligible && vehicle) {
+              trialWanted.current = false;
+              void api
+                .startTrial(vehicle.modelId)
+                .then((next) => {
+                  setMe(next);
+                  void haptic('success');
+                  say('Your Plus week has started. Enjoy the drive!');
+                })
+                .catch((e: unknown) => say(e instanceof Error ? e.message : "Couldn't start the trial."));
+            } else if (trialWanted.current) {
+              trialWanted.current = false;
+              say('This account has already had its free week.');
+            }
           }}
         />
       )}
@@ -423,51 +674,50 @@ export function App() {
           }}
           onRequireSignIn={() => setOverlay('signin')}
           onActivated={refreshMe}
-        />
-      )}
-      {overlay === 'account' && me?.user && (
-        <Account
-          me={me}
-          vehicle={vehicle}
-          dark={dark}
-          onToggleDark={toggleDark}
-          onClose={() => setOverlay(null)}
-          onChanged={refreshMe}
-          onSignedOut={() => {
-            clearSavedTrips();
-            removeJson('plan');
-            setTripOpen(false);
-            setTripView(null);
-            setOverlay(null);
-            refreshMe();
-          }}
-          onPlans={() => setOverlay('plans')}
-          onGarage={() => setOverlay('garage')}
-          onAbout={() => setOverlay('about')}
+          onStartTrial={trialAvailable ? () => void beginTrial() : undefined}
         />
       )}
       {overlay === 'garage' && (
         <Garage
           vehicle={vehicle}
-          onClose={() => setOverlay(null)}
-          onSave={(v) => {
-            setVehicle(v);
-            saveJson('vehicle', v);
+          onClose={() => {
+            trialWanted.current = false;
             setOverlay(null);
+          }}
+          onSave={(v) => {
+            saveVehicle(v);
+            setOverlay(null);
+            if (trialWanted.current) void beginTrial(v);
           }}
         />
       )}
       {overlay === 'about' && <About dataset={dataset} onClose={() => setOverlay(null)} />}
-      {welcome && dataset && overlay === null && !sheetOpen && (
-        <Welcome
-          dataset={dataset}
-          statuses={statuses}
-          onExplore={closeWelcome}
-          onPlanTrip={() => {
-            closeWelcome();
-            openTrip(null);
+
+      {feedback && <Feedback signedIn={signedIn} screen={feedback.screen} title={feedback.title} onClose={() => setFeedback(null)} />}
+
+      {onboard && dataset && overlay === null && (
+        <Onboarding
+          stationCount={stations.length}
+          dcCount={dcCount}
+          vehicle={vehicle}
+          paint={paint}
+          trialAvailable={trialAvailable}
+          onPaint={choosePaint}
+          onVehicle={saveVehicle}
+          onStartTrial={(v) => {
+            finishOnboarding();
+            void beginTrial(v);
           }}
+          onFinish={finishOnboarding}
         />
+      )}
+
+      {dataset && <span data-testid="app-ready" hidden />}
+
+      {toast && (
+        <div class="toast" role="status" data-testid="toast">
+          {toast}
+        </div>
       )}
     </div>
   );

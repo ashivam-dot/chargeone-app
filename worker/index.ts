@@ -1,4 +1,5 @@
-import { PAID_PLANS, PLANS, effectivePlan, type PlanId } from '../src/shared/plans.ts';
+import { BASIC, PAID_PLANS, PLANS, effectivePlan, type PlanId } from '../src/shared/plans.ts';
+import { agentChat, parseTrip } from './agent.ts';
 import {
   clearSessionCookie,
   issueSession,
@@ -9,12 +10,15 @@ import {
   verifyGoogleIdToken,
   currentUser,
 } from './auth.ts';
+import { basicTripsToday, planBasicRoute } from './basic.ts';
 import { cancelAllSubscriptions, cancelSubscription, confirmCheckout, createCheckout, handleWebhook } from './billing.ts';
 import { getEntitlement, grantPlan, usageCounts } from './entitlements.ts';
 import { isDev, type Env } from './env.ts';
-import { HttpError, clientKey, enforceRateLimit, errorResponse, json, readJson, requireSameOrigin, str } from './http.ts';
+import { createFeedback } from './feedback.ts';
+import { HttpError, clientKey, deviceKey, enforceRateLimit, errorResponse, json, readJson, requireSameOrigin, str } from './http.ts';
 import { STATION_ID, createCheckin, recentStatuses, stationReports } from './reports.ts';
 import { planRoute } from './routing.ts';
+import { startTrial, trialInfo } from './trial.ts';
 
 type Handler = (req: Request, env: Env, params: Record<string, string>) => Promise<Response>;
 
@@ -42,16 +46,34 @@ const STATUS_CACHE_KEY = 'https://chargeone.internal/api/status';
 /** The edge cache exists only on Cloudflare; tests and Node run without it. */
 const edgeCache = (): Cache | null => (typeof caches === 'undefined' ? null : caches.default);
 
-async function meResponse(env: Env, userId: string, email: string, name: string | null) {
+async function meResponse(req: Request, env: Env, userId: string, email: string, name: string | null) {
   const now = new Date();
   const e = await getEntitlement(env, userId);
   const plan = effectivePlan(e, now);
+  const [usage, trial] = await Promise.all([usageCounts(env, userId, plan, now), trialInfo(env, userId, await deviceKey(req), e, now)]);
   return {
     user: { email, name },
     plan,
     entitlement: e ? { plan: e.plan, activeUntil: e.activeUntil, status: e.status, source: e.source } : null,
-    usage: await usageCounts(env, userId, plan, now),
+    usage,
     limits: PLANS[plan],
+    tier: plan,
+    trial,
+    basicToday: null,
+  };
+}
+
+async function guestMeResponse(req: Request, env: Env) {
+  const device = await deviceKey(req);
+  return {
+    user: null,
+    plan: 'free',
+    entitlement: null,
+    usage: null,
+    limits: BASIC,
+    tier: 'basic',
+    trial: null,
+    basicToday: device ? await basicTripsToday(env, device) : 0,
   };
 }
 
@@ -76,7 +98,7 @@ route('POST', '/api/auth/google', async (req, env) => {
   const identity = await verifyGoogleIdToken(credential, env.GOOGLE_CLIENT_ID);
   const user = await upsertUser(env, identity.sub, identity.email, identity.name);
   const token = await issueSession(env, user);
-  return json(await meResponse(env, user.id, user.email, user.name), {
+  return json(await meResponse(req, env, user.id, user.email, user.name), {
     headers: { 'Set-Cookie': sessionCookie(token, secureCookies(req, env)) },
   });
 });
@@ -87,7 +109,7 @@ route('POST', '/api/auth/dev', async (req, env) => {
   const email = str(body, 'email', { max: 80, pattern: /^[a-z0-9._-]+@local\.test$/, optional: true }) ?? 'driver@local.test';
   const user = await upsertUser(env, `dev:${email}`, email, 'Test driver');
   const token = await issueSession(env, user);
-  return json(await meResponse(env, user.id, user.email, user.name), {
+  return json(await meResponse(req, env, user.id, user.email, user.name), {
     headers: { 'Set-Cookie': sessionCookie(token, secureCookies(req, env)) },
   });
 });
@@ -104,8 +126,8 @@ route('POST', '/api/auth/logout-all', async (req, env) => {
 
 route('GET', '/api/me', async (req, env) => {
   const user = await currentUser(req, env);
-  if (!user) return json({ user: null, plan: 'free', entitlement: null, usage: null, limits: PLANS.free });
-  return json(await meResponse(env, user.id, user.email, user.name));
+  if (!user) return json(await guestMeResponse(req, env));
+  return json(await meResponse(req, env, user.id, user.email, user.name));
 });
 
 route('POST', '/api/me/delete', async (req, env) => {
@@ -114,6 +136,7 @@ route('POST', '/api/me/delete', async (req, env) => {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM trips WHERE user_id = ?1').bind(user.id),
     env.DB.prepare('DELETE FROM entitlements WHERE user_id = ?1').bind(user.id),
+    env.DB.prepare('DELETE FROM feedback WHERE user_id = ?1').bind(user.id),
     env.DB.prepare('UPDATE checkins SET vehicle = NULL, note = NULL WHERE user_id = ?1').bind(user.id),
     env.DB.prepare(
       "UPDATE users SET email = 'deleted', name = NULL, google_sub = NULL, session_version = session_version + 1 WHERE id = ?1",
@@ -146,9 +169,23 @@ route('POST', '/api/checkins', async (req, env) => {
 });
 
 route('POST', '/api/route', async (req, env) => {
-  const user = await requireUser(req, env);
-  return json(await planRoute(req, env, user));
+  const user = await currentUser(req, env);
+  return json(user ? await planRoute(req, env, user) : await planBasicRoute(req, env));
 });
+
+route('POST', '/api/trial/start', async (req, env) => {
+  const user = await requireUser(req, env);
+  await startTrial(req, env, user);
+  return json(await meResponse(req, env, user.id, user.email, user.name));
+});
+
+route('POST', '/api/feedback', async (req, env) => {
+  await createFeedback(req, env, await currentUser(req, env));
+  return json({ ok: true });
+});
+
+route('POST', '/api/agent/chat', async (req, env) => agentChat(req, env, await requireUser(req, env)));
+route('POST', '/api/agent/parse-trip', async (req, env) => json(await parseTrip(req, env, await requireUser(req, env))));
 
 route('POST', '/api/billing/checkout', async (req, env) => json(await createCheckout(req, env, await requireUser(req, env))));
 route('POST', '/api/billing/confirm', async (req, env) => json(await confirmCheckout(req, env, await requireUser(req, env))));
@@ -171,7 +208,7 @@ route('POST', '/api/dev/grant', async (req, env) => {
     status: 'active',
     periodStart: now,
   });
-  return json(await meResponse(env, user.id, user.email, user.name));
+  return json(await meResponse(req, env, user.id, user.email, user.name));
 });
 
 const SEO_PATH = /^\/(charger|ev-charging)\//;

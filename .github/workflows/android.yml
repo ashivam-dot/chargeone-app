@@ -1,0 +1,214 @@
+name: Android
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  WRANGLER_SEND_METRICS: 'false'
+
+jobs:
+  build:
+    name: Debug APK (emulator build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - uses: android-actions/setup-android@v4
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the web app for the emulator
+        env:
+          CAPACITOR: '1'
+          # adb reverse maps the emulator's localhost:8787 to wrangler dev on the runner.
+          VITE_API_ORIGIN: http://localhost:8787
+          VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+        run: npx vite build
+
+      - name: Sync the Android project
+        env:
+          # Turns on WebView debugging, which the Playwright smoke test attaches through.
+          CAP_DEBUG: '1'
+        run: npx cap sync android
+
+      - name: Assemble debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: chargeone-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  emulator-e2e:
+    name: Emulator smoke test + video
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: chargeone-debug-apk
+          path: apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Prepare the local API
+        run: |
+          npx vite build
+          npm run setup:dev
+
+      - name: Start the API (wrangler dev --env ci)
+        run: |
+          nohup npx wrangler dev --env ci --port 8787 --ip 127.0.0.1 > wrangler.log 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -sf http://127.0.0.1:8787/api/health > /dev/null; then echo "API is up"; exit 0; fi
+            sleep 2
+          done
+          echo "::error::wrangler dev did not answer /api/health"
+          cat wrangler.log
+          exit 1
+
+      - name: Boot emulator and run the smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          # The action runs each script line as its own shell, so the whole run lives in one Python driver.
+          script: python3 scripts/native-android-run.py --apk apk/app-debug.apk --out native-artifacts
+
+      - name: Upload screenshots, video and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-native-artifacts
+          path: |
+            native-artifacts/
+            wrangler.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+  release-secrets:
+    name: Check release signing secrets
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE" ] && [ -n "$STORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Release signing secrets are not set; skipping the Play Store bundle."
+          fi
+
+  bundle-release:
+    name: Signed release bundle (AAB)
+    needs: release-secrets
+    if: needs.release-secrets.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - uses: android-actions/setup-android@v4
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the web app for production
+        env:
+          CAPACITOR: '1'
+          VITE_API_ORIGIN: ${{ vars.API_ORIGIN }}
+          VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          if [ -z "$VITE_API_ORIGIN" ]; then
+            echo "::error::Set the repository variable API_ORIGIN (e.g. https://chargeone.in) for release builds."
+            exit 1
+          fi
+          npx vite build
+
+      # No CAP_DEBUG here: release builds ship with WebView debugging off.
+      - run: npx cap sync android
+
+      - name: Decode the upload keystore
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/upload.keystore"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.keystore" >> "$GITHUB_ENV"
+
+      - name: Bundle release
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_VERSION_CODE: ${{ vars.ANDROID_VERSION_CODE }}
+        run: ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Remove the keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.keystore"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: chargeone-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30

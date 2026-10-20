@@ -51,7 +51,7 @@ describe('plan perks', () => {
   it('names the cheapest plan with each perk', () => {
     expect(cheapestWith('backups').id).toBe('trip_pass');
     expect(cheapestWith('multiDay').id).toBe('trip_pass');
-    expect(cheapestWith('liveAlerts').id).toBe('plus_monthly');
+    expect(cheapestWith('liveDrive').id).toBe('plus_monthly');
     expect(cheapestWith('savedTrips').id).toBe('plus_monthly');
   });
 

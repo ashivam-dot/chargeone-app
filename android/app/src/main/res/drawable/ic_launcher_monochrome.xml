@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 13+ themed icon; kept inside the 66dp safe zone of the 108dp adaptive canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:scaleX="0.56"
+        android:scaleY="0.56">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M256 92c-75 0-136 59-136 132 0 96 136 196 136 196s136-100 136-196c0-73-61-132-136-132z M272 150l-70 96h46l-16 78 70-98h-46z" />
+    </group>
+</vector>

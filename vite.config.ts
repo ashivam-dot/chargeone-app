@@ -18,18 +18,20 @@ export default defineConfig({
     preact(),
     seoHead(),
     VitePWA({
+      // The native apps serve dist/ from the device, so a service worker would only serve stale copies.
+      disable: process.env.CAPACITOR === '1',
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'ChargeOne – EV chargers across India',
         short_name: 'ChargeOne',
-        description: 'Find EV chargers across India, check what works and plan trips.',
+        description: 'EV road trips across India: live chargers, routes compared, drive alerts and a Hindi/English copilot.',
         lang: 'en-IN',
         start_url: '/',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#0b1220',
-        theme_color: '#0b1220',
+        background_color: '#05070b',
+        theme_color: '#05070b',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },

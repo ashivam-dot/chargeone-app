@@ -86,18 +86,26 @@ export function fakeEnv(overrides: Partial<Env> = {}) {
   return { env, sqlite: d1.sqlite };
 }
 
-/** Small client that keeps the session cookie between calls, like a browser. */
-export function client(worker: { fetch: (req: Request, env: Env) => Promise<Response> }, env: Env) {
+/**
+ * Small client that keeps the session cookie between calls, like a browser. `defaults` are sent
+ * with every call (for example the device header); non-JSON bodies come back in `text`.
+ */
+export function client(worker: { fetch: (req: Request, env: Env) => Promise<Response> }, env: Env, defaults: Record<string, string> = {}) {
   const origin = 'https://chargeone.test';
   let cookie = '';
   return async (method: string, path: string, body?: unknown, headers: Record<string, string> = {}) => {
-    const h: Record<string, string> = { Origin: origin, ...headers };
+    const h: Record<string, string> = { Origin: origin, ...defaults, ...headers };
     if (body !== undefined && !h['Content-Type']) h['Content-Type'] = 'application/json';
     if (cookie) h.Cookie = cookie;
     const payload = body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body);
     const res = await worker.fetch(new Request(`${origin}${path}`, { method, headers: h, body: payload }), env);
     const set = res.headers.get('Set-Cookie');
     if (set) cookie = set.split(';')[0];
-    return { status: res.status, body: (await res.json()) as Record<string, any> };
+    const text = await res.text();
+    const isJson = (res.headers.get('Content-Type') ?? '').includes('application/json');
+    return { status: res.status, body: (isJson ? JSON.parse(text) : {}) as Record<string, any>, text, headers: res.headers };
   };
 }
+
+export const DEVICE = '0b5e3a8e-6a43-4c7e-9a51-2f4f1c9d7e01';
+export const deviceHeaders = (id = DEVICE, ip = '203.0.113.7') => ({ 'X-ChargeOne-Device': id, 'CF-Connecting-IP': ip });

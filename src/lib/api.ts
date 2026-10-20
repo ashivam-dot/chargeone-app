@@ -1,6 +1,8 @@
 import type { Coord } from '../planner/geometry.ts';
 import type { Plan, PlanId, UsageCounts } from '../shared/plans.ts';
 import type { ReportKind, StationStatus } from '../shared/status.ts';
+import type { FeedbackRequest, RouteAlternativeWire, RouteRequest, TrialInfo } from '../shared/contracts.ts';
+import { apiFetch, type ApiResponse } from './transport.ts';
 
 export class ApiError extends Error {
   constructor(
@@ -13,31 +15,28 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(path, {
-      method,
-      credentials: 'same-origin',
-      // Status must reflect a report the driver just made, not a cached copy.
-      cache: 'no-store',
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-  } catch {
-    throw new ApiError(0, 'offline', "You're offline. Check your connection and try again.", {});
-  }
+export const OFFLINE = new ApiError(0, 'offline', "You're offline. Check your connection and try again.", {});
+
+export async function errorFrom(res: ApiResponse): Promise<ApiError> {
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    const { error, message, ...extra } = data;
-    throw new ApiError(
-      res.status,
-      typeof error === 'string' ? error : 'error',
-      typeof message === 'string' ? message : 'Something went wrong. Please try again.',
-      extra,
-    );
+  const { error, message, ...extra } = data;
+  return new ApiError(
+    res.status,
+    typeof error === 'string' ? error : 'error',
+    typeof message === 'string' ? message : 'Something went wrong. Please try again.',
+    extra,
+  );
+}
+
+async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+  let res: ApiResponse;
+  try {
+    res = await apiFetch(path, { method, body });
+  } catch {
+    throw OFFLINE;
   }
-  return data as T;
+  if (!res.ok) throw await errorFrom(res);
+  return (await res.json().catch(() => ({}))) as T;
 }
 
 export interface Config {
@@ -53,6 +52,12 @@ export interface Me {
   entitlement: { plan: PlanId; activeUntil: string | null; status: string; source: string } | null;
   usage: UsageCounts | null;
   limits: Plan;
+  /** 'basic' when signed out. */
+  tier: 'basic' | PlanId;
+  /** Signed-in only. */
+  trial: TrialInfo | null;
+  /** Signed out only: Basic trip plans used today on this device. */
+  basicToday: number | null;
 }
 
 export interface LatLng {
@@ -66,6 +71,8 @@ export interface RouteResponse {
   route: { coords: Coord[]; distanceKm: number; durationMin: number; hasElevation: boolean };
   plan: PlanId;
   usage: UsageCounts;
+  /** Present when alternatives were asked for and the plan includes route compare. */
+  alternatives?: RouteAlternativeWire[];
 }
 
 export interface Report {
@@ -93,7 +100,10 @@ export const api = {
   reports: (stationId: string) => request<{ reports: Report[] }>('GET', `/api/stations/${encodeURIComponent(stationId)}/reports`),
   checkin: (body: { stationId: string; kind: ReportKind; kw?: number; vehicle?: string; note?: string; position: LatLng; accuracy: number }) =>
     request<{ id: number }>('POST', '/api/checkins', body),
-  route: (from: LatLng, to: LatLng, tripId?: string) => request<RouteResponse>('POST', '/api/route', { from, to, tripId }),
+  route: (from: LatLng, to: LatLng, tripId?: string, alternatives = false) =>
+    request<RouteResponse>('POST', '/api/route', { from, to, tripId, alternatives } satisfies RouteRequest),
+  startTrial: (vehicleModelId: string) => request<Me>('POST', '/api/trial/start', { vehicleModelId }),
+  feedback: (body: FeedbackRequest) => request<{ ok: true }>('POST', '/api/feedback', body),
   checkout: (plan: PlanId) => request<Checkout>('POST', '/api/billing/checkout', { plan }),
   confirm: (payload: Record<string, string>) => request<{ plan: PlanId; refundDue?: boolean }>('POST', '/api/billing/confirm', payload),
   cancel: () => request<{ activeUntil: string | null }>('POST', '/api/billing/cancel', {}),

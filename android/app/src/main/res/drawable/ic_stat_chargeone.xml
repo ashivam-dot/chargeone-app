@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar icon: Android draws it as a white silhouette, so the bolt is a cut-out (evenOdd). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="400"
+    android:viewportHeight="400">
+    <group
+        android:translateX="-56"
+        android:translateY="-56">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M256 92c-75 0-136 59-136 132 0 96 136 196 136 196s136-100 136-196c0-73-61-132-136-132z M272 150l-70 96h46l-16 78 70-98h-46z" />
+    </group>
+</vector>

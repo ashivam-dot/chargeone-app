@@ -3,6 +3,7 @@ import {
   AttributionControl,
   GeolocateControl,
   Map as MapLibreMap,
+  Marker,
   setWorkerUrl,
   type ExpressionSpecification,
   type GeoJSONSource,
@@ -47,6 +48,11 @@ interface Props {
   /** Pixels of map covered by the open panel. */
   insets: { bottom: number; left: number };
   route: Coord[] | null;
+  /** Other road routes for the same trip, drawn faint under the chosen one. */
+  altRoutes?: Coord[][];
+  /** The car's live position in drive mode; the camera follows it, tilted, when `follow` is set. */
+  car?: { lng: number; lat: number; headingDeg: number | null } | null;
+  follow?: boolean;
   stops: StopMarker[];
   places: PlaceMarker[];
   selectedPlace: number | null;
@@ -59,6 +65,7 @@ setWorkerUrl(workerUrl);
 
 const SOURCE = 'stations';
 const ROUTE = 'route';
+const ALT_ROUTES = 'route-alts';
 const STOPS = 'stops';
 const PLACES = 'places';
 const FOOD_COLOUR = '#f97316';
@@ -89,6 +96,13 @@ function stationsGeoJson(stations: Station[], statuses: Map<string, StationStatu
       geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
       properties: { id: s.id, dc: s.speed === 'dc', live: liveState(statuses.get(s.id), now) },
     })),
+  };
+}
+
+function altRoutesGeoJson(routes: Coord[][] | undefined): FeatureCollection<LineString> {
+  return {
+    type: 'FeatureCollection',
+    features: (routes ?? []).filter((r) => r.length > 1).map((r) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: r.map((c) => [c[0], c[1]]) }, properties: {} })),
   };
 }
 
@@ -124,31 +138,55 @@ function placesGeoJson(places: PlaceMarker[]): FeatureCollection<Point> {
 interface LayerData {
   stations: FeatureCollection;
   route: FeatureCollection;
+  altRoutes: FeatureCollection;
   stops: FeatureCollection;
   places: FeatureCollection;
 }
 
 function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null, selectedPlace: number | null, dark: boolean): void {
   if (map.getSource(SOURCE)) return;
-  const halo = dark ? '#0b1220' : '#ffffff';
+  const halo = dark ? '#05070b' : '#ffffff';
   map.addSource(SOURCE, { type: 'geojson', data: data.stations, cluster: true, clusterRadius: 46, clusterMaxZoom: 11 });
-  map.addSource(ROUTE, { type: 'geojson', data: data.route });
+  map.addSource(ROUTE, { type: 'geojson', data: data.route, lineMetrics: true });
+  map.addSource(ALT_ROUTES, { type: 'geojson', data: data.altRoutes });
   map.addSource(STOPS, { type: 'geojson', data: data.stops });
   map.addSource(PLACES, { type: 'geojson', data: data.places });
 
+  map.addLayer({
+    id: 'route-alts',
+    type: 'line',
+    source: ALT_ROUTES,
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-color': dark ? '#64748b' : '#94a3b8',
+      'line-opacity': 0.75,
+      'line-width': ['interpolate', ['linear'], ['zoom'], 5, 3, 14, 6],
+      'line-dasharray': [1.5, 1.5],
+    },
+  });
+  map.addLayer({
+    id: 'route-glow',
+    type: 'line',
+    source: ROUTE,
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': '#22d3ee', 'line-opacity': dark ? 0.35 : 0.2, 'line-blur': 8, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 12, 14, 22] },
+  });
   map.addLayer({
     id: 'route-casing',
     type: 'line',
     source: ROUTE,
     layout: { 'line-join': 'round', 'line-cap': 'round' },
-    paint: { 'line-color': dark ? '#0b1220' : '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 6, 14, 12] },
+    paint: { 'line-color': halo, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 6, 14, 12] },
   });
   map.addLayer({
     id: 'route-line',
     type: 'line',
     source: ROUTE,
     layout: { 'line-join': 'round', 'line-cap': 'round' },
-    paint: { 'line-color': '#14b8a6', 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 3.5, 14, 7] },
+    paint: {
+      'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#22d3ee', 1, '#34d399'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 5, 3.5, 14, 7],
+    },
   });
   map.addLayer({
     id: 'place-selected',
@@ -169,7 +207,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     paint: {
       'circle-color': ['match', ['get', 'cat'], 'food', FOOD_COLOUR, STAY_COLOUR],
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 3.5, 12, 5.5, 16, 8],
-      'circle-stroke-color': ['case', ['get', 'onsite'], '#14b8a6', halo],
+      'circle-stroke-color': ['case', ['get', 'onsite'], '#22d3ee', halo],
       'circle-stroke-width': ['case', ['get', 'onsite'], 2.5, 1.5],
     },
   });
@@ -199,9 +237,9 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     source: SOURCE,
     filter: ['has', 'point_count'],
     paint: {
-      'circle-color': dark ? '#134e4a' : '#0f766e',
+      'circle-color': dark ? '#0b2a33' : '#0e7490',
       'circle-opacity': 0.92,
-      'circle-stroke-color': dark ? '#5eead4' : '#ffffff',
+      'circle-stroke-color': dark ? '#22d3ee' : '#ffffff',
       'circle-stroke-width': 2,
       'circle-radius': ['step', ['get', 'point_count'], 15, 10, 19, 50, 24, 200, 30],
     },
@@ -245,7 +283,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     layout: { 'circle-sort-key': ['case', ['get', 'overnight'], 1, 0] },
     paint: {
       'circle-radius': 13,
-      'circle-color': ['case', ['get', 'overnight'], STAY_COLOUR, '#14b8a6'],
+      'circle-color': ['case', ['get', 'overnight'], STAY_COLOUR, '#22d3ee'],
       'circle-stroke-color': halo,
       'circle-stroke-width': 3,
     },
@@ -263,7 +301,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
       'text-ignore-placement': true,
       'symbol-sort-key': ['case', ['get', 'overnight'], 0, 1],
     },
-    paint: { 'text-color': ['case', ['get', 'overnight'], '#ffffff', '#04201d'] },
+    paint: { 'text-color': ['case', ['get', 'overnight'], '#ffffff', '#021014'] },
   });
 }
 
@@ -276,7 +314,8 @@ function applyTripMode(map: MapLibreMap, on: boolean): void {
 }
 
 export function MapView(props: Props) {
-  const { stations, statuses, selectedId, flyTarget, dark, attribution, insets, route, stops, places, selectedPlace } = props;
+  const { stations, statuses, selectedId, flyTarget, dark, attribution, insets, route, altRoutes, car, follow, stops, places, selectedPlace } = props;
+  const carMarker = useRef<Marker | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const styleUrl = useRef(dark ? DARK_STYLE : LIGHT_STYLE);
@@ -295,7 +334,7 @@ export function MapView(props: Props) {
       // A portrait phone is narrow: keep the padding small so all of India, including Ladakh and Arunachal, fits as large as possible.
       fitBoundsOptions: { padding: container.current.clientWidth < 600 ? 6 : 24 },
       attributionControl: false,
-      maxPitch: 0,
+      maxPitch: 60,
       dragRotate: false,
     });
     map.touchZoomRotate.disableRotation();
@@ -310,7 +349,13 @@ export function MapView(props: Props) {
       englishLabels(map);
       addLayers(
         map,
-        { stations: stationsGeoJson(l.stations, l.statuses), route: routeGeoJson(l.route), stops: stopsGeoJson(l.stops), places: placesGeoJson(l.places) },
+        {
+          stations: stationsGeoJson(l.stations, l.statuses),
+          route: routeGeoJson(l.route),
+          altRoutes: altRoutesGeoJson(l.altRoutes),
+          stops: stopsGeoJson(l.stops),
+          places: placesGeoJson(l.places),
+        },
         l.selectedId,
         l.selectedPlace,
         l.dark,
@@ -374,6 +419,35 @@ export function MapView(props: Props) {
     void source?.setData(routeGeoJson(route));
     if (mapRef.current) applyTripMode(mapRef.current, Boolean(route));
   }, [route]);
+
+  useEffect(() => {
+    const source = mapRef.current?.getSource(ALT_ROUTES) as GeoJSONSource | undefined;
+    void source?.setData(altRoutesGeoJson(altRoutes));
+  }, [altRoutes]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!car) {
+      carMarker.current?.remove();
+      carMarker.current = null;
+      return;
+    }
+    if (!carMarker.current) {
+      const el = document.createElement('div');
+      el.className = 'car-marker';
+      el.innerHTML = '<span class="car-marker__pulse"></span><span class="car-marker__arrow"></span>';
+      carMarker.current = new Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat([car.lng, car.lat]).addTo(map);
+    }
+    carMarker.current.setLngLat([car.lng, car.lat]);
+    carMarker.current.setRotation(car.headingDeg ?? 0);
+    if (follow) map.easeTo({ center: [car.lng, car.lat], bearing: car.headingDeg ?? map.getBearing(), pitch: 55, zoom: Math.max(map.getZoom(), 13.5), duration: 900, essential: true });
+  }, [car?.lng, car?.lat, car?.headingDeg, follow]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && !follow && (map.getPitch() > 0 || map.getBearing() !== 0)) map.easeTo({ pitch: 0, bearing: 0, duration: 700 });
+  }, [follow]);
 
   useEffect(() => {
     const source = mapRef.current?.getSource(STOPS) as GeoJSONSource | undefined;

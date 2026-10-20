@@ -19,13 +19,40 @@
       "migrations_dir": "worker/migrations"
     }
   ],
+  // Workers AI for the trip copilot. `wrangler dev` runs it on the Cloudflare account it is logged into.
+  "ai": { "binding": "AI", "remote": true },
   "vars": {
     "ENVIRONMENT": "production",
     "GOOGLE_CLIENT_ID": "",
     "RAZORPAY_KEY_ID": "",
     "RAZORPAY_PLAN_MONTHLY": "",
-    "RAZORPAY_PLAN_YEARLY": ""
-  }
+    "RAZORPAY_PLAN_YEARLY": "",
+    "AGENT_MODEL": "@cf/google/gemma-4-26b-a4b-it",
+    "AGENT_FALLBACK_MODEL": "@cf/zai-org/glm-4.7-flash"
+  },
   // Secrets (set with `npx wrangler secret put <NAME>`, never committed):
   // SESSION_SECRET, ORS_API_KEY, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET
+  "env": {
+    // CI: `wrangler dev --env ci` without a Cloudflare login, so no AI binding (the copilot answers 503).
+    // Bindings and vars aren't inherited by environments, so they are repeated here.
+    "ci": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "chargeone",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "worker/migrations"
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT": "development",
+        "GOOGLE_CLIENT_ID": "",
+        "RAZORPAY_KEY_ID": "",
+        "RAZORPAY_PLAN_MONTHLY": "",
+        "RAZORPAY_PLAN_YEARLY": "",
+        "AGENT_MODEL": "@cf/google/gemma-4-26b-a4b-it",
+        "AGENT_FALLBACK_MODEL": "@cf/zai-org/glm-4.7-flash"
+      }
+    }
+  }
 }

@@ -1,7 +1,7 @@
 import { Check, EyeOff, Lock, Minus, RotateCcw, Route, ShieldCheck, Smartphone, Sparkles } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { ApiError, api, loadScript, type Config, type Me } from '../lib/api.ts';
-import { COMPARE, FREE_TRIP_KM, PLANS, PLAN_ROWS, YEARLY_SAVING_PCT, cheapestWith, formatRupees, isPlus, type Perk, type Plan, type PlanId } from '../shared/plans.ts';
+import { BASIC, COMPARE, FREE_TRIP_KM, PLANS, PLAN_ROWS, TRIAL_DAYS, YEARLY_SAVING_PCT, cheapestWith, formatRupees, isPlus, type Perk, type Plan, type PlanId } from '../shared/plans.ts';
 import { Sheet } from './Sheet.tsx';
 
 /** Why the plans screen opened: the server refused a trip, or the user tapped a locked feature. */
@@ -14,6 +14,7 @@ interface Props {
   onClose: () => void;
   onRequireSignIn: () => void;
   onActivated: () => void;
+  onStartTrial?: () => void;
 }
 
 interface RazorpayResponse {
@@ -95,7 +96,7 @@ function Cell({ value }: { value: boolean | string }) {
   return <span>{value}</span>;
 }
 
-export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivated }: Props) {
+export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivated, onStartTrial }: Props) {
   const [busy, setBusy] = useState<PlanId | null>(null);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [yearly, setYearly] = useState(false);
@@ -157,8 +158,10 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
     }
   };
 
-  const hasPlus = isPlus(current);
+  const onTrial = me?.entitlement?.source === 'trial';
+  const hasPlus = isPlus(current) && !onTrial;
   const onPass = current === 'trip_pass';
+  const trialOffer = !onTrial && !isPlus(current) && (me?.trial?.eligible ?? !me?.user);
   // A new Trip Pass starts a fresh 7 days and 10 trips, which only helps once this one's trips are used.
   const renewPass = onPass && reason?.kind === 'trip';
   const passFits = !hasPlus && (reason?.kind === 'trip' || (reason?.kind === 'perk' && Boolean(PLANS.trip_pass[reason.perk])));
@@ -168,6 +171,8 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
     if (busy === p.id) return { text: 'Opening payment…', disabled: true };
     if (featured && hasPlus) return { text: current === p.id ? 'Your plan' : 'You have Plus', disabled: true };
     if (!featured && hasPlus) return { text: 'Included in your Plus', disabled: true };
+    if (!featured && onTrial) return { text: 'Included in your Plus trial', disabled: true };
+    if (featured && onTrial) return { text: `Keep ${p.name} after the trial`, disabled: busy !== null };
     if (!featured && onPass) return renewPass ? { text: 'Start a new Trip Pass', disabled: busy !== null } : { text: 'Your plan', disabled: true };
     return { text: `Get ${p.name}`, disabled: busy !== null };
   };
@@ -245,6 +250,18 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
         <p class="plans__lead">The charger map, live status, food and stays are free for everyone. Pay only when you drive out of town.</p>
       )}
 
+      {trialOffer && onStartTrial && (
+        <button class="trial-offer" onClick={onStartTrial} data-testid="plans-trial">
+          <span class="trial-offer__icon" aria-hidden="true">
+            <Sparkles size={20} />
+          </span>
+          <span class="trial-offer__text">
+            <strong>Try Plus free for {TRIAL_DAYS} days</strong>
+            <span>No card, no payment. Ends by itself. One free week per person and phone.</span>
+          </span>
+        </button>
+      )}
+
       <ul class="plans">
         {card(PLANS[plusId], true)}
         {card(PLANS.trip_pass, false)}
@@ -273,6 +290,7 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
               <th scope="col">
                 <span class="visually-hidden">Feature</span>
               </th>
+              <th scope="col">Basic</th>
               <th scope="col">Free</th>
               <th scope="col">Trip Pass</th>
               <th scope="col" class="compare__plus">
@@ -284,6 +302,9 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
             {COMPARE.map((r) => (
               <tr key={r.label}>
                 <th scope="row">{r.label}</th>
+                <td>
+                  <Cell value={r.value(BASIC)} />
+                </td>
                 <td>
                   <Cell value={r.value(PLANS.free)} />
                 </td>
@@ -297,6 +318,7 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
             ))}
             <tr class="compare__price">
               <th scope="row">Price</th>
+              <td>₹0, no sign-in</td>
               <td>₹0</td>
               <td>{formatRupees(PLANS.trip_pass.pricePaise)} once</td>
               <td class="compare__plus">

@@ -1,0 +1,72 @@
+name: iOS
+
+# Manual only: macOS runners use ten times the Actions minutes of Linux ones.
+on:
+  workflow_dispatch:
+    inputs:
+      api_origin:
+        description: API origin baked into the build (defaults to the API_ORIGIN repository variable)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  simulator:
+    name: Simulator build, screenshots and video
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the web app
+        env:
+          CAPACITOR: '1'
+          VITE_API_ORIGIN: ${{ inputs.api_origin || vars.API_ORIGIN || 'https://chargeone.in' }}
+          VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+          VITE_GOOGLE_IOS_CLIENT_ID: ${{ vars.GOOGLE_IOS_CLIENT_ID }}
+        run: npx vite build
+
+      - name: Sync the iOS project
+        env:
+          CAP_DEBUG: '1'
+        run: npx cap sync ios
+
+      - name: Build for the iOS Simulator (unsigned)
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          set -o pipefail
+          xcodebuild -version
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/ios \
+            ARCHS=arm64 \
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION="$(node -p "require('./package.json').version")" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            build | xcbeautify
+
+      - name: Run in the simulator
+        run: python3 scripts/native-ios-run.py --app build/ios/Build/Products/Debug-iphonesimulator/App.app --out native-artifacts
+
+      - name: Upload screenshots, video and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-native-artifacts
+          path: native-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14

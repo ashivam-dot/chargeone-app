@@ -1,5 +1,7 @@
 import { FREE_TRIP_KM, MAX_REPLANS_PER_TRIP, PLANS, REPLAN_WINDOW_HOURS, decideTrip } from '../src/shared/plans.ts';
+import type { RouteAlternativeWire } from '../src/shared/contracts.ts';
 import type { Coord } from '../src/planner/geometry.ts';
+import { alternativeRoutes } from './alternatives.ts';
 import type { User } from './auth.ts';
 import { currentPlan, quotaWindows, usageCounts } from './entitlements.ts';
 import { isDev, type Env } from './env.ts';
@@ -20,19 +22,20 @@ export interface RouteResult {
   hasElevation: boolean;
 }
 
-async function routeWithOrs(apiKey: string, from: LatLng, to: LatLng): Promise<RouteResult> {
+/** Computes a road route through the points in order (start, any via points, destination). */
+export type RouteFn = (points: LatLng[], signal?: AbortSignal) => Promise<RouteResult>;
+
+async function routeWithOrs(apiKey: string, points: LatLng[], signal?: AbortSignal): Promise<RouteResult> {
   const res = await fetch(ORS_URL, {
     method: 'POST',
     headers: { Authorization: apiKey, 'Content-Type': 'application/json', Accept: 'application/geo+json' },
     body: JSON.stringify({
-      coordinates: [
-        [from.lng, from.lat],
-        [to.lng, to.lat],
-      ],
+      coordinates: points.map((p) => [p.lng, p.lat]),
       elevation: true,
       instructions: false,
       preference: 'fastest',
     }),
+    signal,
   });
   if (res.status === 404 || res.status === 400) {
     throw new HttpError(422, 'no_route', 'No road route found between these places.');
@@ -52,9 +55,9 @@ async function routeWithOrs(apiKey: string, from: LatLng, to: LatLng): Promise<R
 }
 
 /** The public OSRM demo server is for development only (its usage policy forbids production use). */
-async function routeWithOsrmDemo(from: LatLng, to: LatLng): Promise<RouteResult> {
-  const url = `${OSRM_DEMO_URL}/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
-  const res = await fetch(url, { headers: { 'User-Agent': 'ChargeOne-dev/0.1' } });
+async function routeWithOsrmDemo(points: LatLng[], signal?: AbortSignal): Promise<RouteResult> {
+  const url = `${OSRM_DEMO_URL}/${points.map((p) => `${p.lng},${p.lat}`).join(';')}?overview=full&geometries=geojson`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'ChargeOne-dev/0.1' }, signal });
   if (!res.ok) throw new HttpError(502, 'routing_unavailable', 'Route service is busy. Please try again shortly.');
   const data = (await res.json()) as {
     code: string;
@@ -65,10 +68,13 @@ async function routeWithOsrmDemo(from: LatLng, to: LatLng): Promise<RouteResult>
   return { coords: r.geometry.coordinates, distanceKm: r.distance / 1000, durationMin: r.duration / 60, hasElevation: false };
 }
 
-async function computeRoute(env: Env, from: LatLng, to: LatLng): Promise<RouteResult> {
-  if (env.ORS_API_KEY) return routeWithOrs(env.ORS_API_KEY, from, to);
-  if (isDev(env)) return routeWithOsrmDemo(from, to);
-  throw new HttpError(503, 'not_configured', 'Trip planning is not configured yet.');
+export function router(env: Env): RouteFn {
+  const key = env.ORS_API_KEY;
+  if (key) return (points, signal) => routeWithOrs(key, points, signal);
+  if (isDev(env)) return routeWithOsrmDemo;
+  return async () => {
+    throw new HttpError(503, 'not_configured', 'Trip planning is not configured yet.');
+  };
 }
 
 /** Rounds coordinates to ~1 m and drops consecutive duplicates to keep responses small. */
@@ -93,6 +99,7 @@ export async function planRoute(req: Request, env: Env, user: User) {
   const from = latLngInIndia(body, 'from');
   const to = latLngInIndia(body, 'to');
   const tripId = str(body, 'tripId', { max: 36, pattern: TRIP_ID, optional: true });
+  if (body.alternatives !== undefined && typeof body.alternatives !== 'boolean') throw new HttpError(400, 'invalid', 'Invalid alternatives.');
   await enforceRateLimit(env.DB, `route:${user.id}`, 20, 3600);
 
   const now = new Date();
@@ -125,7 +132,8 @@ export async function planRoute(req: Request, env: Env, user: User) {
   const early = decideTrip(planId, straightKm, usage, isReplan(straightKm), true);
   if (!early.allowed) throw new HttpError(402, early.reason, early.message, { plan: planId, usage });
 
-  const route = await computeRoute(env, from, to);
+  const routeFn = router(env);
+  const route = await routeFn([from, to]);
   const decision = decideTrip(planId, route.distanceKm, usage, isReplan(route.distanceKm));
   if (!decision.allowed) {
     throw new HttpError(402, decision.reason, decision.message, { plan: planId, usage, distanceKm: Math.round(route.distanceKm) });
@@ -159,12 +167,16 @@ export async function planRoute(req: Request, env: Env, user: User) {
     }
   }
 
-  const after = await usageCounts(env, user.id, planId, now);
+  const [after, alts] = await Promise.all([
+    usageCounts(env, user.id, planId, now),
+    body.alternatives === true && PLANS[planId].routeCompare ? alternativeRoutes(env, from, to, route, routeFn) : null,
+  ]);
   return {
     tripId: id,
     counted: decision.counts,
     route: { ...route, coords: compactCoords(route.coords) },
     plan: planId,
     usage: after,
+    ...(alts ? { alternatives: alts.map((a) => ({ ...a, coords: compactCoords(a.coords) })) satisfies RouteAlternativeWire[] } : {}),
   };
 }

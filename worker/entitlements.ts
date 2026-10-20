@@ -70,14 +70,21 @@ export interface Grant {
  * reopens a cancelled or completed subscription and never revives a refunded one, so late or
  * repeated webhooks and replayed confirms are harmless. Options, checked in the same statement:
  * `unlessPaymentId` skips the grant if that payment was already processed (run it in the same
- * batch as the payment insert); `notOverPlus` skips it while the user has active Plus.
+ * batch as the payment insert); `notOverPlus` skips it while the user has active Plus (a running
+ * trial included); `requireTrial` grants only if a trial row ending at `activeUntil` exists (run it
+ * in the same batch as the trial insert).
  */
-export function grantStatement(env: Env, g: Grant, opts: { unlessPaymentId?: string; notOverPlus?: boolean } = {}): D1PreparedStatement {
+export function grantStatement(
+  env: Env,
+  g: Grant,
+  opts: { unlessPaymentId?: string; notOverPlus?: boolean; requireTrial?: boolean } = {},
+): D1PreparedStatement {
   const guards = ['1'];
   if (opts.unlessPaymentId) guards.push('NOT EXISTS (SELECT 1 FROM payments WHERE id = ?9)');
   if (opts.notOverPlus) {
     guards.push("NOT EXISTS (SELECT 1 FROM entitlements WHERE user_id = ?1 AND plan IN ('plus_monthly', 'plus_yearly') AND active_until > ?8)");
   }
+  if (opts.requireTrial) guards.push('EXISTS (SELECT 1 FROM trials WHERE user_id = ?1 AND ends_at = ?3)');
   const same = 'entitlements.external_id IS excluded.external_id';
   const stmt = env.DB.prepare(
     `INSERT INTO entitlements (user_id, plan, active_until, period_start, source, external_id, status, updated_at)

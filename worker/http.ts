@@ -1,3 +1,4 @@
+import { DEVICE_HEADER, DEVICE_ID } from '../src/shared/contracts.ts';
 import { toHex } from './crypto.ts';
 
 export class HttpError extends Error {
@@ -108,10 +109,26 @@ export function clientIp(req: Request): string {
   return req.headers.get('CF-Connecting-IP') ?? 'unknown';
 }
 
+async function shortHash(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return toHex(new Uint8Array(digest)).slice(0, 24);
+}
+
 /** A short hash of the client IP, so rate-limit rows never store addresses. */
 export async function clientKey(req: Request): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`chargeone:${clientIp(req)}`));
-  return toHex(new Uint8Array(digest)).slice(0, 24);
+  return shortHash(`chargeone:${clientIp(req)}`);
+}
+
+/** A short hash of the app's install id, or null when the header is missing or malformed. */
+export async function deviceKey(req: Request): Promise<string | null> {
+  const id = req.headers.get(DEVICE_HEADER)?.toLowerCase();
+  return id && DEVICE_ID.test(id) ? shortHash(`chargeone-device:${id}`) : null;
+}
+
+export async function requireDevice(req: Request): Promise<string> {
+  const key = await deviceKey(req);
+  if (!key) throw new HttpError(400, 'device_required', 'Please update the app and try again.');
+  return key;
 }
 
 /** Fixed-window counter stored in D1. Returns false when the limit is exceeded. */
@@ -134,4 +151,41 @@ export async function enforceRateLimit(db: D1Database, key: string, limit: numbe
   if (!(await rateLimit(db, key, limit, windowSec))) {
     throw new HttpError(429, 'rate_limited', 'Too many requests. Please wait a moment.');
   }
+}
+
+/** Start of today in India (UTC+5:30), in epoch seconds: the window for per-day allowances. */
+export function indianDayStart(now = new Date()): number {
+  const IST_OFFSET_SEC = 330 * 60;
+  const istSec = Math.floor(now.getTime() / 1000) + IST_OFFSET_SEC;
+  return istSec - (istSec % 86400) - IST_OFFSET_SEC;
+}
+
+/** Uses so far in a window kept by claimSlot. */
+export async function slotCount(db: D1Database, key: string, windowStart: number): Promise<number> {
+  const row = await db.prepare('SELECT count FROM rate_limits WHERE key = ?1 AND window_start = ?2').bind(key, windowStart).first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+/**
+ * Counts one use in the window, unless the window is already at the limit; the check and the
+ * increment are one statement. Returns the new count, or null when the limit was reached.
+ */
+export async function claimSlot(db: D1Database, key: string, limit: number, windowStart: number): Promise<number | null> {
+  const row = await db
+    .prepare(
+      `INSERT INTO rate_limits (key, window_start, count) VALUES (?1, ?2, 1)
+       ON CONFLICT(key) DO UPDATE SET
+         count = CASE WHEN rate_limits.window_start = ?2 THEN rate_limits.count + 1 ELSE 1 END,
+         window_start = ?2
+       WHERE rate_limits.window_start <> ?2 OR rate_limits.count < ?3
+       RETURNING count`,
+    )
+    .bind(key, windowStart, limit)
+    .first<{ count: number }>();
+  return row ? row.count : null;
+}
+
+/** Gives back a use taken by claimSlot when a later step refused the request. */
+export async function releaseSlot(db: D1Database, key: string, windowStart: number): Promise<void> {
+  await db.prepare('UPDATE rate_limits SET count = count - 1 WHERE key = ?1 AND window_start = ?2 AND count > 0').bind(key, windowStart).run();
 }

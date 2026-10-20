@@ -22,8 +22,17 @@ export interface Plan {
   backups: boolean;
   /** Trips can be split into days with an overnight charger and hotel. */
   multiDay: boolean;
-  /** The trip screen warns when a stop on the route is reported broken. */
-  liveAlerts: boolean;
+  /** Up to three road routes are planned and compared side by side. */
+  routeCompare: boolean;
+  /**
+   * Live drive mode: the battery is tracked while driving, and the app warns (and offers an earlier
+   * charger) when it is falling faster than planned or a stop on the route is reported broken.
+   */
+  liveDrive: boolean;
+  /** Live battery, range and health from the car, through phone tracking or an OBD-II adapter. */
+  carConnect: boolean;
+  /** The AI trip copilot and speak-to-plan in Hindi or English. */
+  copilot: boolean;
   /** Trips that can be saved on the phone and reopened without using a trip. */
   savedTrips: number;
 }
@@ -45,7 +54,10 @@ export const PLANS: Record<PlanId, Plan> = {
     freeReplans: false,
     backups: false,
     multiDay: false,
-    liveAlerts: false,
+    routeCompare: false,
+    liveDrive: false,
+    carConnect: false,
+    copilot: false,
     savedTrips: 0,
   },
   trip_pass: {
@@ -62,7 +74,10 @@ export const PLANS: Record<PlanId, Plan> = {
     freeReplans: true,
     backups: true,
     multiDay: true,
-    liveAlerts: false,
+    routeCompare: true,
+    liveDrive: false,
+    carConnect: false,
+    copilot: false,
     savedTrips: 0,
   },
   plus_monthly: {
@@ -79,7 +94,10 @@ export const PLANS: Record<PlanId, Plan> = {
     freeReplans: true,
     backups: true,
     multiDay: true,
-    liveAlerts: true,
+    routeCompare: true,
+    liveDrive: true,
+    carConnect: true,
+    copilot: true,
     savedTrips: 10,
   },
   plus_yearly: {
@@ -96,7 +114,10 @@ export const PLANS: Record<PlanId, Plan> = {
     freeReplans: true,
     backups: true,
     multiDay: true,
-    liveAlerts: true,
+    routeCompare: true,
+    liveDrive: true,
+    carConnect: true,
+    copilot: true,
     savedTrips: 10,
   },
 };
@@ -108,16 +129,35 @@ export const isPlus = (id: PlanId): boolean => id === 'plus_monthly' || id === '
 /** Percentage saved by paying yearly instead of 12 monthly payments. */
 export const YEARLY_SAVING_PCT = Math.floor((1 - PLANS.plus_yearly.pricePaise / (PLANS.plus_monthly.pricePaise * 12)) * 100);
 
+/**
+ * Basic: the app without signing in. Its trips are counted per device and network on the server,
+ * since there is no account to count them against.
+ */
+export const BASIC = {
+  ...PLANS.free,
+  id: 'basic',
+  name: 'Basic',
+  tagline: 'No sign-in needed',
+  shortTripsPerDay: 1,
+  reports: false,
+} as const;
+
+/** Anything the comparison can describe: Basic or a real plan. */
+export type Tier = typeof BASIC | (Plan & { reports?: true });
+
+/** Plus free for this many days, once per account and device, after the driver adds their car. */
+export const TRIAL_DAYS = 7;
+
 export interface CompareRow {
   label: string;
   /** true / false for included or not, or a short value such as "Up to 100 km". */
-  value: (p: Plan) => boolean | string;
+  value: (p: Tier) => boolean | string;
 }
 
 /** What each plan includes, in the order the plans screen lists it. The first rows are in every plan. */
 export const COMPARE: CompareRow[] = [
-  { label: 'Live charger map and driver reports', value: () => true },
-  { label: 'Food and hotels near every charger', value: () => true },
+  { label: 'Live charger map, food and hotels', value: () => true },
+  { label: 'Charging stops with battery, time and cost', value: () => true },
   { label: 'Trip length', value: (p) => (p.maxTripKm === null ? 'Any distance' : `Up to ${p.maxTripKm} km`) },
   {
     label: 'Trip plans',
@@ -126,11 +166,14 @@ export const COMPARE: CompareRow[] = [
         ? `${p.shortTripsPerDay} a day`
         : `${p.longTripQuota} long trips ${p.longTripWindow === 'period' ? `in ${p.periodDays} days` : 'a month'}`,
   },
-  { label: 'Charging stops with battery, time and cost', value: () => true },
+  { label: 'Report charger status for other drivers', value: (p) => p.reports !== false },
+  { label: 'Compare up to 3 routes', value: (p) => p.routeCompare },
   { label: 'Backup chargers for your stops', value: (p) => p.backups },
   { label: 'Multi-day trips with a hotel and overnight charging', value: (p) => p.multiDay },
   { label: 'Free re-plans from where you are, within 24 h', value: (p) => p.freeReplans },
-  { label: 'In-app alert if a stop on your open trip breaks', value: (p) => p.liveAlerts },
+  { label: 'Live drive mode: alerts when battery drops fast or a stop breaks', value: (p) => p.liveDrive },
+  { label: 'Connect your car: live battery, range and health', value: (p) => p.carConnect },
+  { label: 'AI trip copilot and speak-to-plan in Hindi or English', value: (p) => p.copilot },
   { label: 'Saved trips that open without signal', value: (p) => (p.savedTrips > 0 ? `${p.savedTrips} trips` : false) },
 ];
 
@@ -139,7 +182,7 @@ export const PLAN_ROWS = COMPARE.slice(2);
 /** Plan card rows after trip length and quota, for screens that show usage separately. */
 export const FEATURE_ROWS = PLAN_ROWS.slice(2);
 
-export type Perk = 'backups' | 'multiDay' | 'freeReplans' | 'liveAlerts' | 'savedTrips';
+export type Perk = 'backups' | 'multiDay' | 'freeReplans' | 'routeCompare' | 'liveDrive' | 'carConnect' | 'copilot' | 'savedTrips';
 
 /** The cheapest paid plan that includes a perk, for "Unlock with …" labels. */
 export function cheapestWith(perk: Perk): Plan {

@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  WRANGLER_SEND_METRICS: 'false'
+
+jobs:
+  test:
+    name: Typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npx vitest run
+      - run: npm run build
+
+  e2e-web:
+    name: Web end-to-end (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Look for playwright.config.ts
+        id: cfg
+        run: |
+          if [ -f playwright.config.ts ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::playwright.config.ts not found; skipping web end-to-end tests."
+          fi
+
+      - uses: actions/setup-node@v7
+        if: steps.cfg.outputs.present == 'true'
+        with:
+          node-version: 24
+          cache: npm
+
+      - if: steps.cfg.outputs.present == 'true'
+        run: npm ci
+
+      - name: Install Playwright browsers
+        if: steps.cfg.outputs.present == 'true'
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Build the site and prepare the local database
+        if: steps.cfg.outputs.present == 'true'
+        run: |
+          npm run build
+          npm run setup:dev
+
+      - name: Start the API (wrangler dev --env ci)
+        if: steps.cfg.outputs.present == 'true'
+        run: |
+          nohup npx wrangler dev --env ci --port 8787 --ip 127.0.0.1 > wrangler.log 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -sf http://127.0.0.1:8787/api/health > /dev/null; then echo "API is up"; exit 0; fi
+            sleep 2
+          done
+          echo "::error::wrangler dev did not answer /api/health"
+          cat wrangler.log
+          exit 1
+
+      - name: Run Playwright
+        if: steps.cfg.outputs.present == 'true'
+        env:
+          BASE_URL: http://localhost:8787
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: always() && steps.cfg.outputs.present == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+            wrangler.log
+          if-no-files-found: ignore
+          retention-days: 14
