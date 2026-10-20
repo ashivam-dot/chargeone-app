@@ -97,10 +97,29 @@ async function cancelSubscriptions(env: Env, checkouts: Array<Pick<Checkout, 'id
   }
 }
 
-function parsePlan(body: Record<string, unknown>): PlanId {
+export function parsePlan(body: Record<string, unknown>): PlanId {
   const plan = str(body, 'plan', { max: 20 }) as PlanId;
   if (!PAID_PLANS.includes(plan)) throw new HttpError(400, 'invalid', 'Unknown plan.');
   return plan;
+}
+
+/** Prepaid Plus (UPI, no auto-renewal) can be paid for again this close to its end. */
+export const PREPAID_RENEW_WINDOW_MS = 7 * DAY_MS;
+
+/**
+ * Refuses a purchase the user doesn't need: a pass during a Plus trial, or anything while Plus is
+ * paid for. With `prepaid`, Plus bought the same way may be extended in its last week.
+ */
+export async function assertCanBuy(env: Env, user: User, plan: PlanId, now: Date, prepaid = false): Promise<void> {
+  const e = await getEntitlement(env, user.id);
+  const onTrial = e?.source === 'trial' && isPlus(effectivePlan(e, now));
+  if (onTrial && plan === 'trip_pass') throw new HttpError(409, 'trial_includes', 'Your Plus trial already includes this.');
+  const renewing =
+    prepaid && isPlus(plan) && e?.source === 'upi' && e.status === 'active' && e.activeUntil !== null && new Date(e.activeUntil).getTime() - now.getTime() < PREPAID_RENEW_WINDOW_MS;
+  if (!onTrial && !renewing && isPlus(effectivePlan(e, now))) {
+    const until = e?.activeUntil ? new Date(e.activeUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '';
+    throw new HttpError(409, 'already_subscribed', `You already have Plus${until ? ` until ${until}` : ''}.`);
+  }
 }
 
 export async function createCheckout(req: Request, env: Env, user: User) {
@@ -110,13 +129,7 @@ export async function createCheckout(req: Request, env: Env, user: User) {
   await enforceRateLimit(env.DB, `checkout:${user.id}`, 10, 3600);
 
   const now = new Date();
-  const e = await getEntitlement(env, user.id);
-  const onTrial = e?.source === 'trial' && isPlus(effectivePlan(e, now));
-  if (onTrial && plan === 'trip_pass') throw new HttpError(409, 'trial_includes', 'Your Plus trial already includes this.');
-  if (!onTrial && isPlus(effectivePlan(e, now))) {
-    const until = e?.activeUntil ? new Date(e.activeUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '';
-    throw new HttpError(409, 'already_subscribed', `You already have Plus${until ? ` until ${until}` : ''}.`);
-  }
+  await assertCanBuy(env, user, plan, now);
 
   const notes = { user_id: user.id, plan };
   const insert = (id: string, kind: Checkout['kind']) =>

@@ -42,6 +42,8 @@ async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown):
 export interface Config {
   googleClientId: string | null;
   paymentsEnabled: boolean;
+  /** Which ways to pay the server is set up for. Older servers don't send it. */
+  payments?: { razorpay: boolean; upi: boolean; play: boolean };
   devLogin: boolean;
   plans: Plan[];
 }
@@ -108,7 +110,24 @@ export const api = {
   confirm: (payload: Record<string, string>) => request<{ plan: PlanId; refundDue?: boolean }>('POST', '/api/billing/confirm', payload),
   cancel: () => request<{ activeUntil: string | null }>('POST', '/api/billing/cancel', {}),
   devGrant: (plan: PlanId) => request<Me>('POST', '/api/dev/grant', { plan }),
+  upiStart: (plan: PlanId) => request<UpiPayment>('POST', '/api/billing/upi', { plan }),
+  upiClaim: (ref: string, utr: string) => request<{ status: string; provisional: boolean }>('POST', '/api/billing/upi/claim', { ref, utr }),
+  storeAccount: () => request<{ appAccountToken: string }>('GET', '/api/billing/store-account'),
+  playVerify: (productId: string, purchaseToken: string) =>
+    request<{ plan: PlanId; activeUntil: string | null; granted?: boolean }>('POST', '/api/billing/play/verify', { productId, purchaseToken }),
+  playSync: () => request<{ synced: number }>('POST', '/api/billing/play/sync', {}),
 };
+
+export interface UpiPayment {
+  ref: string;
+  plan: PlanId;
+  amountPaise: number;
+  payee: string;
+  payeeName: string;
+  note: string;
+  uri: string;
+  status: string;
+}
 
 /** Loads a third-party script once, only when a feature needs it. */
 const scripts = new Map<string, Promise<void>>();

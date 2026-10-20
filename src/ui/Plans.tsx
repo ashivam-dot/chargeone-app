@@ -1,6 +1,8 @@
 import { Check, EyeOff, Lock, Minus, RotateCcw, Route, ShieldCheck, Smartphone, Sparkles } from 'lucide-preact';
 import { useState } from 'preact/hooks';
-import { ApiError, api, loadScript, type Config, type Me } from '../lib/api.ts';
+import { ApiError, api, loadScript, type Config, type Me, type UpiPayment } from '../lib/api.ts';
+import { PLATFORM } from '../native/bridge.ts';
+import { UpiPay } from './UpiPay.tsx';
 import { BASIC, COMPARE, FREE_TRIP_KM, PLANS, PLAN_ROWS, TRIAL_DAYS, YEARLY_SAVING_PCT, cheapestWith, formatRupees, isPlus, type Perk, type Plan, type PlanId } from '../shared/plans.ts';
 import { Sheet } from './Sheet.tsx';
 
@@ -42,32 +44,73 @@ const PRICE_UNIT: Record<PlanId, string> = {
   plus_yearly: '/year',
 };
 
-const PRICE_NOTE: Record<PlanId, string> = {
-  free: '',
-  trip_pass: 'Valid 7 days · no renewal',
-  plus_monthly: 'Renews monthly · cancel anytime',
-  plus_yearly: `About ${formatRupees(Math.round(PLANS.plus_yearly.pricePaise / 12 / 100) * 100)} a month · cancel anytime`,
-};
+/**
+ * How this copy of the app takes payment. Google Play requires Play Billing for plans sold in the
+ * Android app; the website takes UPI straight to ChargeOne's account (or Razorpay if set up).
+ */
+type Method = 'dev' | 'play' | 'upi' | 'razorpay' | 'none';
 
-const TRUST: Array<[typeof ShieldCheck, string]> = [
-  [ShieldCheck, 'Secure checkout by Razorpay'],
-  [Smartphone, 'UPI, cards and net banking'],
-  [RotateCcw, 'Cancel anytime in Account'],
-  [EyeOff, 'No ads. We never sell your data'],
-];
+export function paymentMethod(config: Config | null): Method {
+  if (config?.devLogin && !config.paymentsEnabled) return 'dev';
+  const p = config?.payments;
+  if (PLATFORM === 'android') return p?.play ? 'play' : 'none';
+  if (PLATFORM === 'ios') return 'none';
+  if (p?.upi) return 'upi';
+  if (p ? p.razorpay : config?.paymentsEnabled) return 'razorpay';
+  return 'none';
+}
 
-const FAQ: Array<[string, string]> = [
-  [
-    'What counts as a long trip?',
-    `Any trip over ${FREE_TRIP_KM} km. Shorter trips don't use it: up to ${PLANS.trip_pass.shortTripsPerDay} a day on Trip Pass and ${PLANS.plus_monthly.shortTripsPerDay} on Plus.`,
-  ],
-  ['What happens when my plan ends?', "You're back on Free. The charger map, live status, food and stays stay free for everyone."],
-  [
-    'Can I cancel Plus?',
-    'Yes, any time in Account. You keep Plus until the end of the period you paid for. Trip Pass is a one-time payment and never renews.',
-  ],
-  ['Is paying here safe?', "Payment happens entirely in Razorpay's secure checkout. ChargeOne never sees your card, UPI or bank details."],
-];
+const prepaid = (m: Method) => m === 'upi';
+const monthlyEquivalent = formatRupees(Math.round(PLANS.plus_yearly.pricePaise / 12 / 100) * 100);
+
+function priceNote(id: PlanId, m: Method): string {
+  if (id === 'trip_pass') return 'Valid 7 days · no renewal';
+  if (id === 'plus_monthly') return prepaid(m) ? '30 days · no auto-renewal' : 'Renews monthly · cancel anytime';
+  if (id === 'plus_yearly') return `About ${monthlyEquivalent} a month · ${prepaid(m) ? 'no auto-renewal' : 'cancel anytime'}`;
+  return '';
+}
+
+function trust(m: Method): Array<[typeof ShieldCheck, string]> {
+  const first: Record<Method, [typeof ShieldCheck, string]> = {
+    upi: [ShieldCheck, 'Pay from your own UPI app'],
+    play: [ShieldCheck, 'Billed securely by Google Play'],
+    razorpay: [ShieldCheck, 'Secure checkout by Razorpay'],
+    dev: [ShieldCheck, 'Test mode, no real payment'],
+    none: [ShieldCheck, 'Secure payment'],
+  };
+  return [
+    first[m],
+    [Smartphone, m === 'upi' ? 'GPay, PhonePe, Paytm, BHIM or any bank app' : 'UPI, cards and more'],
+    [RotateCcw, prepaid(m) ? 'Nothing renews by itself' : 'Cancel anytime'],
+    [EyeOff, 'No ads. We never sell your data'],
+  ];
+}
+
+function faq(m: Method): Array<[string, string]> {
+  return [
+    [
+      'What counts as a long trip?',
+      `Any trip over ${FREE_TRIP_KM} km. Shorter trips don't use it: up to ${PLANS.trip_pass.shortTripsPerDay} a day on Trip Pass and ${PLANS.plus_monthly.shortTripsPerDay} on Plus.`,
+    ],
+    ['What happens when my plan ends?', "You're back on Free. The charger map, live status, food and stays stay free for everyone."],
+    prepaid(m)
+      ? ['Does Plus renew by itself?', 'No. Plus bought with UPI lasts the days you paid for. In its last week you can pay again and the new days are added on top.']
+      : [
+          'Can I cancel Plus?',
+          m === 'play'
+            ? 'Yes, any time in Google Play subscriptions. You keep Plus until the end of the period you paid for.'
+            : 'Yes, any time in Account. You keep Plus until the end of the period you paid for. Trip Pass is a one-time payment and never renews.',
+        ],
+    [
+      'Is paying here safe?',
+      m === 'upi'
+        ? 'You pay in your own UPI app with your UPI PIN. ChargeOne never sees your PIN, card or bank details.'
+        : m === 'play'
+          ? 'Google Play handles the payment. ChargeOne never sees your card, UPI or bank details.'
+          : "Payment happens entirely in Razorpay's secure checkout. ChargeOne never sees your card, UPI or bank details.",
+    ],
+  ];
+}
 
 const PLUS_SUMMARY = `${PLANS.plus_monthly.longTripQuota} long trips a month, any distance`;
 
@@ -100,8 +143,10 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
   const [busy, setBusy] = useState<PlanId | null>(null);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [yearly, setYearly] = useState(false);
+  const [upi, setUpi] = useState<UpiPayment | null>(null);
   const current = me?.plan ?? 'free';
   const plusId: PlanId = yearly ? 'plus_yearly' : 'plus_monthly';
+  const method = paymentMethod(config);
 
   const buy = async (plan: PlanId) => {
     if (!me?.user) {
@@ -111,9 +156,26 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
     setBusy(plan);
     setMessage(null);
     try {
-      if (config?.devLogin && !config.paymentsEnabled) {
+      if (method === 'dev') {
         await api.devGrant(plan);
         setMessage({ kind: 'ok', text: `Test mode: ${PLANS[plan].name} activated without payment.` });
+        onActivated();
+        return;
+      }
+      if (method === 'none') {
+        setMessage({ kind: 'error', text: PLATFORM === 'ios' ? "Plans can't be bought in the iPhone app yet." : 'Payments are not set up yet.' });
+        return;
+      }
+      if (method === 'upi') {
+        setUpi(await api.upiStart(plan));
+        return;
+      }
+      if (method === 'play' && plan !== 'free') {
+        const { appAccountToken } = await api.storeAccount();
+        const { buyOnPlay } = await import('../native/playBilling.ts');
+        const purchase = await buyOnPlay(plan, appAccountToken);
+        const r = await api.playVerify(purchase.productId, purchase.purchaseToken);
+        setMessage({ kind: 'ok', text: `${PLANS[r.plan === 'free' ? plan : r.plan].name} is active. Happy driving!` });
         onActivated();
         return;
       }
@@ -147,7 +209,8 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
       );
       onActivated();
     } catch (e) {
-      if (e instanceof Error && e.message === 'dismissed') setMessage(null);
+      const cancelled = e instanceof Error && (e.message === 'dismissed' || /cancel/i.test(e.message));
+      if (cancelled) setMessage(null);
       else if (e instanceof ApiError && e.status === 401) onRequireSignIn();
       else if (e instanceof ApiError && e.code === 'payment_pending') {
         setMessage({ kind: 'error', text: e.message });
@@ -209,7 +272,7 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
             </button>
           </div>
         )}
-        <p class="plan__note">{PRICE_NOTE[p.id]}</p>
+        <p class="plan__note">{priceNote(p.id, method)}</p>
         <ul class="perks">
           {PLAN_ROWS.map((r) => (
             <PerkItem key={r.label} label={r.label} value={r.value(p)} />
@@ -233,6 +296,27 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
       ? `Trip Pass includes them for ${pass} for ${PLANS.trip_pass.periodDays} days. Plus includes them with ${PLUS_SUMMARY}.`
       : `Plus is ${formatRupees(PLANS.plus_monthly.pricePaise)} a month or ${formatRupees(PLANS.plus_yearly.pricePaise)} a year.`;
   const title = !reason ? 'Choose your plan' : reason.kind === 'trip' ? 'Unlock this trip' : `Unlock ${reason.label.toLowerCase()}`;
+
+  if (upi) {
+    return (
+      <Sheet title="Pay with UPI" onClose={onClose} modal>
+        <UpiPay
+          payment={upi}
+          onBack={() => setUpi(null)}
+          onDone={(provisional) => {
+            setUpi(null);
+            setMessage({
+              kind: 'ok',
+              text: provisional
+                ? `Thanks! ${PLANS[upi.plan].name} is on now. We'll confirm your payment within a few hours.`
+                : `Thanks! We'll switch on ${PLANS[upi.plan].name} as soon as we've matched your payment, usually within a few hours.`,
+            });
+            onActivated();
+          }}
+        />
+      </Sheet>
+    );
+  }
 
   return (
     <Sheet title={title} onClose={onClose} modal>
@@ -274,7 +358,7 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
       )}
 
       <ul class="trust">
-        {TRUST.map(([Icon, text]) => (
+        {trust(method).map(([Icon, text]) => (
           <li key={text}>
             <Icon size={16} aria-hidden="true" />
             {text}
@@ -331,7 +415,7 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
 
       <h3>Questions</h3>
       <div class="faq">
-        {FAQ.map(([q, a]) => (
+        {faq(method).map(([q, a]) => (
           <details key={q}>
             <summary>{q}</summary>
             <p>{a}</p>
@@ -340,7 +424,9 @@ export function Plans({ config, me, reason, onClose, onRequireSignIn, onActivate
       </div>
 
       <p class="small muted">
-        Plus renews automatically until you cancel; cancelling keeps access until the end of the paid period.
+        {prepaid(method)
+          ? 'Plans paid with UPI last the days you paid for and never renew by themselves.'
+          : 'Plus renews automatically until you cancel; cancelling keeps access until the end of the paid period.'}
       </p>
     </Sheet>
   );

@@ -8,6 +8,7 @@ import { loadPlaces } from './lib/places.ts';
 import { clearSavedTrips } from './lib/savedTrips.ts';
 import { isObject, loadJson, removeJson, saveJson } from './lib/storage.ts';
 import { MapView, type FlyTarget, type PlaceMarker, type StopMarker } from './map/MapView.tsx';
+import { PLATFORM } from './native/bridge.ts';
 import { BACK_EVENT, haptic, initNativeShell, onAppResume } from './native/platform.ts';
 import { PLANS, isPlus, type PlanId } from './shared/plans.ts';
 import { liveState, type StationStatus } from './shared/status.ts';
@@ -172,7 +173,14 @@ export function App() {
       });
     }
     api.config().then(setConfig).catch(() => undefined);
-    api.me().then(setMe).catch(() => undefined);
+    api
+      .me()
+      .then((m) => {
+        setMe(m);
+        // Play renewals and cancellations reach the server when the Android app opens.
+        if (PLATFORM === 'android' && m.entitlement?.source === 'play') api.playSync().then(() => api.me().then(setMe)).catch(() => undefined);
+      })
+      .catch(() => undefined);
   }, []);
 
   function ensurePlaces(): Promise<PlacesData | null> {

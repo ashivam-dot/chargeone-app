@@ -122,7 +122,15 @@ export function YouScreen(p: Props) {
               {onTrial && me?.trial?.endsAt
                 ? `Free until ${dateFmt(me.trial.endsAt)}. No payment, ends by itself.`
                 : e?.activeUntil && me?.plan !== 'free'
-                  ? `${e.status === 'cancelled' ? 'Cancelled, access until' : me?.plan === 'trip_pass' ? 'Valid until' : 'Renews around'} ${dateFmt(e.activeUntil)}`
+                  ? `${
+                      e.status === 'pending'
+                        ? 'Checking your UPI payment. Access until'
+                        : e.status === 'cancelled'
+                          ? 'Cancelled, access until'
+                          : me?.plan === 'trip_pass' || e.source === 'upi'
+                            ? 'Valid until'
+                            : 'Renews around'
+                    } ${dateFmt(e.activeUntil)}`
                   : plan
                     ? plan.tagline
                     : `${BASIC.shortTripsPerDay} trip plan a day, up to ${BASIC.maxTripKm} km`}
@@ -175,6 +183,14 @@ export function YouScreen(p: Props) {
             }}
           >
             {busy === 'cancel' ? 'Cancelling…' : 'Cancel subscription'}
+          </button>
+        )}
+        {e?.source === 'play' && me !== null && isPlus(me.plan) && (
+          <button
+            class="link"
+            onClick={() => void import('@capgo/native-purchases').then(({ NativePurchases }) => NativePurchases.manageSubscriptions())}
+          >
+            Manage or cancel in Google Play
           </button>
         )}
       </section>

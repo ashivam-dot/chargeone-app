@@ -17,8 +17,10 @@ import { isDev, type Env } from './env.ts';
 import { createFeedback } from './feedback.ts';
 import { HttpError, clientKey, deviceKey, enforceRateLimit, errorResponse, json, readJson, requireSameOrigin, str } from './http.ts';
 import { STATION_ID, createCheckin, recentStatuses, stationReports } from './reports.ts';
+import { playEnabled, storeAccountToken, syncPlayPurchases, verifyPlayPurchase } from './play.ts';
 import { planRoute } from './routing.ts';
 import { startTrial, trialInfo } from './trial.ts';
+import { claimUpiPayment, createUpiPayment, decideUpiPayment, listUpiPayments, requireAdmin, upiEnabled } from './upi.ts';
 
 type Handler = (req: Request, env: Env, params: Record<string, string>) => Promise<Response>;
 
@@ -83,7 +85,8 @@ route('GET', '/api/config', async (_req, env) =>
   json(
     {
       googleClientId: env.GOOGLE_CLIENT_ID || null,
-      paymentsEnabled: Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET),
+      paymentsEnabled: Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET) || upiEnabled(env) || playEnabled(env),
+      payments: { razorpay: Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET), upi: upiEnabled(env), play: playEnabled(env) },
       devLogin: isDev(env),
       plans: PAID_PLANS.map((id) => PLANS[id]),
     },
@@ -191,6 +194,35 @@ route('POST', '/api/billing/checkout', async (req, env) => json(await createChec
 route('POST', '/api/billing/confirm', async (req, env) => json(await confirmCheckout(req, env, await requireUser(req, env))));
 route('POST', '/api/billing/cancel', async (req, env) => json(await cancelSubscription(env, await requireUser(req, env))));
 route('POST', '/api/billing/razorpay/webhook', async (req, env) => json(await handleWebhook(req, env)), true);
+
+route('POST', '/api/billing/upi', async (req, env) => json(await createUpiPayment(req, env, await requireUser(req, env))));
+route('POST', '/api/billing/upi/claim', async (req, env) => json(await claimUpiPayment(req, env, await requireUser(req, env))));
+route('GET', '/api/billing/store-account', async (req, env) => {
+  const user = await requireUser(req, env);
+  return json({ appAccountToken: await storeAccountToken(env, user.id) });
+});
+route('POST', '/api/billing/play/verify', async (req, env) => json(await verifyPlayPurchase(req, env, await requireUser(req, env))));
+route('POST', '/api/billing/play/sync', async (req, env) => json(await syncPlayPurchases(env, await requireUser(req, env))));
+
+route(
+  'GET',
+  '/api/admin/upi',
+  async (req, env) => {
+    await requireAdmin(req, env);
+    return json(await listUpiPayments(env, new URL(req.url).searchParams.get('status') ?? 'claimed'));
+  },
+  true,
+);
+route(
+  'POST',
+  '/api/admin/upi/:ref/:decision',
+  async (req, env, params) => {
+    await requireAdmin(req, env);
+    if (params.decision !== 'confirm' && params.decision !== 'reject') throw new HttpError(404, 'not_found', 'Not found.');
+    return json(await decideUpiPayment(env, params.ref, params.decision));
+  },
+  true,
+);
 
 route('POST', '/api/dev/grant', async (req, env) => {
   if (!isDev(env)) throw new HttpError(404, 'not_found', 'Not found.');
