@@ -1,0 +1,43 @@
+{
+  "name": "chargeone-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "wrangler dev --port 8787",
+    "setup:dev": "node scripts/setup-dev.ts && wrangler d1 migrations apply chargeone --local",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
+    "import:data": "node scripts/import-data.ts",
+    "icons": "node scripts/make-icons.ts",
+    "smoke:api": "node scripts/api-smoke.ts",
+    "smoke:ui": "node scripts/ui-smoke.ts",
+    "deploy": "npm run build && wrangler d1 migrations apply chargeone --remote && wrangler deploy"
+  },
+  "dependencies": {
+    "maplibre-gl": "^6.14.0",
+    "preact": "^11.0.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261016.1",
+    "@preact/preset-vite": "^2.10.6",
+    "@types/geojson": "^7946.0.16",
+    "@types/node": "^26.6.5",
+    "playwright": "^1.64.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.0.5",
+    "wrangler": "^4.151.1"
+  },
+  "allowScripts": {
+    "workerd@1.20261012.1": true,
+    "esbuild@0.28.2": true
+  }
+}

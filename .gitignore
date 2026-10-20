@@ -1,0 +1,10 @@
+node_modules/
+dist/
+data-cache/
+.wrangler/
+.dev.vars*
+.env*
+test-results/
+screenshots/
+*.log
+.DS_Store

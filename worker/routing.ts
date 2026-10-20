@@ -1,0 +1,147 @@
+import { MAX_REPLANS_PER_TRIP, REPLAN_WINDOW_HOURS, decideTrip } from '../src/shared/plans.ts';
+import type { Coord } from '../src/planner/geometry.ts';
+import type { User } from './auth.ts';
+import { currentPlan, usageCounts } from './entitlements.ts';
+import { isDev, type Env } from './env.ts';
+import { HttpError, enforceRateLimit, latLngInIndia, readJson, str, type LatLng } from './http.ts';
+import { distanceMetres } from './stations.ts';
+
+const ORS_URL = 'https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson';
+const OSRM_DEMO_URL = 'https://router.project-osrm.org/route/v1/driving';
+const SAME_DESTINATION_M = 2000;
+
+export interface RouteResult {
+  coords: Coord[];
+  distanceKm: number;
+  durationMin: number;
+  hasElevation: boolean;
+}
+
+async function routeWithOrs(apiKey: string, from: LatLng, to: LatLng): Promise<RouteResult> {
+  const res = await fetch(ORS_URL, {
+    method: 'POST',
+    headers: { Authorization: apiKey, 'Content-Type': 'application/json', Accept: 'application/geo+json' },
+    body: JSON.stringify({
+      coordinates: [
+        [from.lng, from.lat],
+        [to.lng, to.lat],
+      ],
+      elevation: true,
+      instructions: false,
+      preference: 'fastest',
+    }),
+  });
+  if (res.status === 404 || res.status === 400) {
+    throw new HttpError(422, 'no_route', 'No road route found between these places.');
+  }
+  if (!res.ok) throw new HttpError(502, 'routing_unavailable', 'Route service is busy. Please try again shortly.');
+  const data = (await res.json()) as {
+    features?: Array<{ geometry: { coordinates: Coord[] }; properties: { summary: { distance?: number; duration?: number } } }>;
+  };
+  const f = data.features?.[0];
+  if (!f) throw new HttpError(422, 'no_route', 'No road route found between these places.');
+  return {
+    coords: f.geometry.coordinates,
+    distanceKm: (f.properties.summary.distance ?? 0) / 1000,
+    durationMin: (f.properties.summary.duration ?? 0) / 60,
+    hasElevation: f.geometry.coordinates[0]?.length === 3,
+  };
+}
+
+/** The public OSRM demo server is for development only (its usage policy forbids production use). */
+async function routeWithOsrmDemo(from: LatLng, to: LatLng): Promise<RouteResult> {
+  const url = `${OSRM_DEMO_URL}/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'ChargeOne-dev/0.1' } });
+  if (!res.ok) throw new HttpError(502, 'routing_unavailable', 'Route service is busy. Please try again shortly.');
+  const data = (await res.json()) as {
+    code: string;
+    routes?: Array<{ distance: number; duration: number; geometry: { coordinates: Coord[] } }>;
+  };
+  const r = data.routes?.[0];
+  if (data.code !== 'Ok' || !r) throw new HttpError(422, 'no_route', 'No road route found between these places.');
+  return { coords: r.geometry.coordinates, distanceKm: r.distance / 1000, durationMin: r.duration / 60, hasElevation: false };
+}
+
+async function computeRoute(env: Env, from: LatLng, to: LatLng): Promise<RouteResult> {
+  if (env.ORS_API_KEY) return routeWithOrs(env.ORS_API_KEY, from, to);
+  if (isDev(env)) return routeWithOsrmDemo(from, to);
+  throw new HttpError(503, 'not_configured', 'Trip planning is not configured yet.');
+}
+
+/** Rounds coordinates to ~1 m and drops consecutive duplicates to keep responses small. */
+export function compactCoords(coords: Coord[]): Coord[] {
+  const out: Coord[] = [];
+  let prev = '';
+  for (const c of coords) {
+    const r: Coord = c.length === 3
+      ? [Math.round(c[0] * 1e5) / 1e5, Math.round(c[1] * 1e5) / 1e5, Math.round(c[2])]
+      : [Math.round(c[0] * 1e5) / 1e5, Math.round(c[1] * 1e5) / 1e5];
+    const key = `${r[0]},${r[1]}`;
+    if (key !== prev) out.push(r);
+    prev = key;
+  }
+  return out;
+}
+
+const TRIP_ID = /^[0-9a-f-]{36}$/;
+
+export async function planRoute(req: Request, env: Env, user: User) {
+  const body = await readJson(req, 2048);
+  const from = latLngInIndia(body, 'from');
+  const to = latLngInIndia(body, 'to');
+  const tripId = str(body, 'tripId', { max: 36, pattern: TRIP_ID, optional: true });
+  await enforceRateLimit(env.DB, `route:${user.id}`, 20, 3600);
+
+  const now = new Date();
+  const planId = await currentPlan(env, user.id, now);
+
+  let replanOf: { id: string; replans: number } | null = null;
+  if (tripId) {
+    const since = new Date(now.getTime() - REPLAN_WINDOW_HOURS * 3600_000).toISOString();
+    const trip = await env.DB.prepare(
+      'SELECT id, to_lat, to_lng, replans FROM trips WHERE id = ?1 AND user_id = ?2 AND created_at >= ?3',
+    )
+      .bind(tripId, user.id, since)
+      .first<{ id: string; to_lat: number; to_lng: number; replans: number }>();
+    if (trip && trip.replans < MAX_REPLANS_PER_TRIP && distanceMetres(to, { lat: trip.to_lat, lng: trip.to_lng }) <= SAME_DESTINATION_M) {
+      replanOf = { id: trip.id, replans: trip.replans };
+    }
+  }
+
+  const straightKm = distanceMetres(from, to) / 1000;
+  if (straightKm < 0.5) throw new HttpError(400, 'too_short', 'Start and destination are the same place.');
+  const usage = await usageCounts(env, user.id, planId, now);
+  // A road is never shorter than the straight line, so this refuses obviously-too-long trips
+  // without spending a routing call.
+  const early = decideTrip(planId, straightKm, usage, replanOf !== null);
+  if (!early.allowed) throw new HttpError(402, early.reason, early.message, { plan: planId, usage });
+
+  const route = await computeRoute(env, from, to);
+  const decision = decideTrip(planId, route.distanceKm, usage, replanOf !== null);
+  if (!decision.allowed) {
+    throw new HttpError(402, decision.reason, decision.message, { plan: planId, usage, distanceKm: Math.round(route.distanceKm) });
+  }
+
+  let id: string;
+  if (replanOf) {
+    id = replanOf.id;
+    await env.DB.prepare('UPDATE trips SET replans = replans + 1 WHERE id = ?1').bind(id).run();
+  } else {
+    id = crypto.randomUUID();
+    await env.DB.prepare(
+      'INSERT INTO trips (id, user_id, counts, distance_km, to_lat, to_lng, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)',
+    )
+      // Only the destination area (~1 km) is kept, which is enough to recognise a re-plan.
+      .bind(id, user.id, decision.counts, route.distanceKm, Math.round(to.lat * 100) / 100, Math.round(to.lng * 100) / 100, now.toISOString())
+      .run();
+  }
+
+  const after = await usageCounts(env, user.id, planId, now);
+  return {
+    tripId: id,
+    counted: decision.counts,
+    route: { ...route, coords: compactCoords(route.coords) },
+    plan: planId,
+    usage: after,
+  };
+}

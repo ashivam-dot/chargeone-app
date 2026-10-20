@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chargeone",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "chargeone",
+      // Replace with the id printed by `npx wrangler d1 create chargeone` before the first deploy.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "worker/migrations"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "GOOGLE_CLIENT_ID": "",
+    "RAZORPAY_KEY_ID": "",
+    "RAZORPAY_PLAN_MONTHLY": "",
+    "RAZORPAY_PLAN_YEARLY": ""
+  }
+  // Secrets (set with `npx wrangler secret put <NAME>`, never committed):
+  // SESSION_SECRET, ORS_API_KEY, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET
+}
