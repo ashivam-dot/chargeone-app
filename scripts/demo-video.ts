@@ -24,6 +24,8 @@ const COIMBATORE = { latitude: 11.0168, longitude: 76.9558, accuracy: 15 };
 
 interface CardSpec {
   lines: string[];
+  /** Shows the first line large, as the hook. */
+  hook?: boolean;
   items?: Array<[string, string]>;
 }
 
@@ -39,20 +41,28 @@ const overlay = () => {
     'style',
     `#demo-cap{position:fixed;left:12px;right:12px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:99999;
       pointer-events:none;background:rgba(5,7,11,.86);backdrop-filter:blur(14px);color:#fff;
-      font:600 15px/1.35 'Inter Variable',system-ui,sans-serif;padding:11px 14px;border-radius:16px;
+      font:600 15px/1.35 'Geist Variable',system-ui,sans-serif;padding:11px 14px;border-radius:16px;
       border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 30px rgba(0,0,0,.45);transition:opacity .3s;opacity:0}
+    #demo-cap.top{top:calc(14px + env(safe-area-inset-top));bottom:auto}
     #demo-cap small{display:block;font-weight:500;font-size:12.5px;color:#67e8f9;margin-top:3px}
     .demo-tap{position:fixed;z-index:99999;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
       border:3px solid #22d3ee;background:rgba(34,211,238,.22);pointer-events:none;animation:demo-tap .7s ease-out forwards}
     @keyframes demo-tap{from{transform:scale(.4);opacity:1}to{transform:scale(1.5);opacity:0}}
     #demo-card{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;justify-content:center;
-      align-items:center;text-align:center;padding:32px;color:#fff;font-family:'Inter Variable',system-ui,sans-serif;
+      align-items:center;text-align:center;padding:32px;color:#fff;font-family:'Geist Variable',system-ui,sans-serif;
       background:radial-gradient(120% 70% at 50% 0%,rgba(34,211,238,.22),transparent 60%),
-        radial-gradient(90% 60% at 50% 100%,rgba(139,92,246,.22),transparent 60%),#05070b;transition:opacity .5s}
-    #demo-card h1{font:700 44px/1 'Space Grotesk Variable',system-ui,sans-serif;margin:0 0 14px;letter-spacing:-1px}
-    #demo-card h1 span{background:linear-gradient(90deg,#22d3ee,#34d399);-webkit-background-clip:text;color:transparent}
-    #demo-card p{font-size:17px;color:#cbd5e1;margin:4px 0;line-height:1.45}
+        radial-gradient(90% 60% at 50% 100%,rgba(139,92,246,.22),transparent 60%),#05070b;
+      background-size:100% 160%;animation:demo-drift 6s ease-in-out infinite alternate;transition:opacity .5s}
+    @keyframes demo-drift{from{background-position:0 0}to{background-position:0 100%}}
+    #demo-card h1{font:700 42px/1 'Unbounded Variable',system-ui,sans-serif;margin:0 0 14px;letter-spacing:-1px}
+    #demo-card h1 span{background:linear-gradient(90deg,#22d3ee,#34d399,#22d3ee);background-size:200% 100%;
+      -webkit-background-clip:text;color:transparent;animation:demo-shine 3s linear infinite}
+    @keyframes demo-shine{to{background-position:-200% 0}}
+    #demo-card p{font-size:17px;color:#cbd5e1;margin:4px 0;line-height:1.45;animation:demo-in .6s both}
     #demo-card ul{list-style:none;padding:0;margin:24px 0 0;font-size:15.5px;line-height:1.95;color:#e2e8f0}
+    #demo-card li{animation:demo-in .6s both}
+    @keyframes demo-in{from{opacity:0;transform:translateY(12px)}}
+    #demo-card .hook{font:700 25px/1.25 'Unbounded Variable',system-ui,sans-serif;color:#fff;margin-top:18px}
     #demo-card b{color:#67e8f9}`,
   );
   const install = () => {
@@ -65,8 +75,9 @@ const overlay = () => {
   else install();
 
   (window as any).__demo = {
-    caption(title: string, sub: string) {
+    caption(title: string, sub: string, top = false) {
       const cap = document.getElementById('demo-cap')!;
+      cap.classList.toggle('top', top);
       cap.replaceChildren();
       if (title) {
         cap.append(title);
@@ -88,14 +99,20 @@ const overlay = () => {
       const h1 = el('h1', 'Charge');
       h1.append(el('span', 'One'));
       card.append(h1);
-      for (const line of spec.lines) card.append(el('p', line));
+      spec.lines.forEach((line, i) => {
+        const p = el('p', line, spec.hook && i === 0 ? 'hook' : '');
+        p.style.animationDelay = `${0.3 + i * 0.6}s`;
+        card.append(p);
+      });
       if (spec.items) {
         const ul = el('ul');
-        for (const [label, text] of spec.items) {
+        spec.items.forEach(([label, text], i) => {
           const li = el('li');
           li.append(el('b', label), ` · ${text}`);
+          // One line every ~1.4 s keeps the card moving for as long as the narration over it.
+          li.style.animationDelay = `${0.8 + i * 1.4}s`;
           ul.append(li);
-        }
+        });
         card.append(ul);
       }
       document.body.appendChild(card);
@@ -110,7 +127,34 @@ const overlay = () => {
   };
 };
 
-const browser = await chromium.launch({ args: ['--force-device-scale-factor=2'] });
+/** A Tata Power charger 0.8 km from the demo location, so its page shows the operator-app button. */
+const STATION = { id: 'osm-n9204495608', lat: 9999, lng: 9999 };
+{
+  const all = JSON.parse(readFileSync(new URL('../public/data/stations.json', import.meta.url), 'utf8')) as {
+    stations: Array<{ id: string; lat: number; lng: number }>;
+  };
+  const s = all.stations.find((x) => x.id === STATION.id);
+  if (!s) throw new Error(`${STATION.id} is not in stations.json`);
+  Object.assign(STATION, { lat: s.lat, lng: s.lng });
+}
+
+/** Signs in a second dev account and reports "charged here" at a charger, through the same API the app uses. */
+async function seedReport(stationId: string, lat: number, lng: number): Promise<void> {
+  const headers: Record<string, string> = { Origin: BASE, 'Content-Type': 'application/json', 'X-ChargeOne-Device': crypto.randomUUID() };
+  const login = await fetch(`${BASE}/api/auth/dev`, { method: 'POST', headers, body: JSON.stringify({ email: `reporter${Date.now()}@local.test` }) });
+  if (!login.ok) throw new Error(`dev sign-in for the report: ${login.status}`);
+  headers.Cookie = (login.headers.get('Set-Cookie') ?? '').split(';')[0];
+  const r = await fetch(`${BASE}/api/checkins`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ stationId, kind: 'worked', position: { lat, lng }, accuracy: 8 }),
+  });
+  if (!r.ok) throw new Error(`check-in: ${r.status} ${await r.text()}`);
+}
+
+// Full Chromium's headless mode renders WebGL on the GPU (about 60 fps on an M3); the default headless shell
+// falls back to SwiftShader at 2-3 fps, too slow for the 3D map and car. Needs `npx playwright install chromium`.
+const browser = await chromium.launch({ channel: 'chromium', args: ['--force-device-scale-factor=2', '--ignore-gpu-blocklist'] });
 const context = await browser.newContext({
   ...devices['Pixel 7'],
   deviceScaleFactor: 2,
@@ -126,11 +170,12 @@ const errors: string[] = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 
 const cdp = await context.newCDPSession(page);
-const frames: Array<{ file: string; t: number }> = [];
+const frames: Array<{ file: string; t: number; received: number }> = [];
 cdp.on('Page.screencastFrame', ({ data, metadata, sessionId }) => {
+  const received = Date.now() / 1000;
   const file = `${frameDir}${String(frames.length).padStart(5, '0')}.jpg`;
   writeFileSync(file, Buffer.from(data, 'base64'));
-  frames.push({ file, t: metadata.timestamp ?? Date.now() / 1000 });
+  frames.push({ file, t: metadata.timestamp ?? received, received });
   cdp.send('Page.screencastFrameAck', { sessionId }).catch(() => undefined);
 });
 
@@ -145,10 +190,14 @@ function warp(t: number): number {
 }
 
 function writeConcatList(endT: number): void {
+  // Chrome sometimes stamps a frame earlier than the one before it. Clamping that gap alone would add the
+  // backward jump to the total (11 s over a 3-minute take), so the times themselves are kept monotonic,
+  // and durations keep full precision (1 ms rounding of 1/60 s stretched the video 2%).
+  for (let i = 1; i < frames.length; i++) frames[i].t = Math.max(frames[i].t, frames[i - 1].t);
   const lines: string[] = [];
   frames.forEach((f, i) => {
-    const next = frames[i + 1]?.t ?? endT;
-    lines.push(`file '${f.file}'`, `duration ${Math.max(0.001, warp(next) - warp(f.t)).toFixed(3)}`);
+    const next = Math.max(frames[i + 1]?.t ?? endT, f.t);
+    lines.push(`file '${f.file}'`, `duration ${Math.max(1e-6, warp(next) - warp(f.t)).toFixed(6)}`);
   });
   // The concat demuxer ignores the last duration unless the final file is repeated.
   if (frames.length) lines.push(`file '${frames.at(-1)!.file}'`);
@@ -156,8 +205,10 @@ function writeConcatList(endT: number): void {
 }
 
 const wait = (ms: number) => page.waitForTimeout(ms);
+/** Captions sit at the top while onboarding, whose buttons fill the bottom of the screen. */
+let captionTop = false;
 async function say(title: string, sub = ''): Promise<void> {
-  await page.evaluate(([t, s]) => (window as any).__demo.caption(t, s), [title, sub]);
+  await page.evaluate(([t, s, top]) => (window as any).__demo.caption(t, s, top), [title, sub, captionTop] as const);
 }
 
 const cues: Array<{ id: string; t: number }> = [];
@@ -200,56 +251,129 @@ async function ready(p: Page, selector: string, timeout = 30000): Promise<void> 
   await p.locator(selector).first().waitFor({ state: 'visible', timeout });
 }
 const id = (testId: string) => page.getByTestId(testId);
+/** Spins the 3D car by dragging across it, the way a driver would. */
+async function dragCar(dx: number): Promise<void> {
+  const box = await page.getByTestId('car-3d').boundingBox();
+  if (!box) return;
+  const [x, y] = [box.x + box.width / 2, box.y + box.height * 0.6];
+  await page.evaluate(([px, py]) => (window as any).__demo.tap(px, py), [x, y]);
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 24; i++) {
+    await page.mouse.move(x + (dx * i) / 24, y);
+    await wait(30);
+  }
+  await page.mouse.up();
+  await wait(1200);
+}
+/** Turns the map with MapLibre's keyboard shortcut (Shift + arrow, 15° a step). */
+async function rotate(steps: number, key: 'ArrowLeft' | 'ArrowRight'): Promise<void> {
+  await page.locator('.maplibregl-canvas').focus();
+  for (let i = 0; i < steps; i++) {
+    await page.keyboard.press(`Shift+${key}`);
+    await wait(650);
+  }
+}
 const appReady = () => id('app-ready').waitFor({ state: 'attached', timeout: 30000 });
 
 try {
   const missing = narration.lines.map((l) => l.id).filter((l) => !(l in voice));
   if (missing.length) throw new Error(`Run demo-voice.py first; missing audio: ${missing.join(', ')}`);
 
+  // A driver's report at the charger shown later, made through the real check-in API by another dev account.
+  await seedReport(STATION.id, STATION.lat, STATION.lng);
+
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
-  await page.evaluate(() => localStorage.clear());
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  await page.goto(`${BASE}/?intro`, { waitUntil: 'domcontentloaded' });
   await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 92, maxWidth: 824, maxHeight: 1830, everyNthFrame: 1 });
 
-  // 1. Title and onboarding.
-  await card({ lines: ["India's road trip co-pilot for electric cars."] }, 300);
+  // 1. Hook card, then the car picker with the 3D car.
+  await card({ hook: true, lines: ['Road trips in an EV, planned in seconds.', "India's charging co-pilot"] }, 300);
   await narrate('intro', '');
   await ready(page, '[data-testid="onboard-start"]');
-  await settle(200);
+  await settle(100);
   await hideCard();
-  await narrate('welcome', 'First launch: no sign-in needed');
-  await settle(300);
+  captionTop = true;
   await tap(id('onboard-start'));
-  await narrate('pickcar', 'Pick your car', 'Real battery size and highway range');
-  await wait(900);
+  await narrate('pickcar', 'Pick your car', '3D model in your colour · real battery and range');
+  await ready(page, '[data-testid="car-view"]');
+  await wait(700);
   const models = page.getByRole('listbox', { name: 'Model' }).getByRole('option');
-  const ownModel = (await page.getByRole('listbox', { name: 'Model' }).locator('[aria-selected="true"]').textContent())?.trim() ?? '';
   await tap(page.getByRole('tab', { name: 'Mahindra' }));
   await wait(500);
-  await tap(models.first());
-  await wait(1300);
+  await tap(models.filter({ hasText: 'XEV 9S (79' }).first());
+  await wait(1100);
   await tap(page.getByRole('radio', { name: 'Flame Red' }));
-  await wait(1300);
+  await wait(1200);
+  await dragCar(-260);
   await tap(page.getByRole('tab', { name: 'Tata' }));
   await wait(400);
-  if (ownModel) await tap(models.filter({ hasText: ownModel }).first());
+  await tap(models.filter({ hasText: 'Nexon EV 45' }).first());
   await wait(900);
   await tap(page.getByRole('radio', { name: 'Electric Teal' }));
-  await settle(400);
+  await settle(300);
   await tap(id('onboard-car'));
   await narrate('trialoffer', 'A free week of Plus for your car', 'Or keep Basic: free, no sign-in');
-  await settle(400);
+  await settle(300);
   await tap(id('onboard-basic'));
   await appReady();
+  captionTop = false;
+  await say('');
+
+  // 2. Globe fly-in (it played behind onboarding, so open the map again with ?intro), 3D tilt over the
+  //    Western Ghats, then a charger.
+  await page.goto(`${BASE}/?intro`, { waitUntil: 'domcontentloaded' });
+  await appReady();
   await ready(page, '.maplibregl-canvas');
-  await narrate('map', 'Every charger, every company', 'Live status from drivers');
-  await wait(1600);
+  await narrate('globe', 'From a 3D globe to your road');
+  await settle(400);
   const locate = page.locator('.maplibregl-ctrl-geolocate');
   if (await locate.count()) await tap(locate);
-  await settle(1800);
+  await wait(2200);
+  await page.locator('.maplibregl-canvas').focus();
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press('Minus');
+    await wait(450);
+  }
+  await narrate('map3d', 'Tilt into 3D', 'Terrain, hills and glowing working chargers');
+  await tap(id('map-3d'));
+  await wait(1600);
+  await rotate(6, 'ArrowLeft');
+  await settle(300);
+  await tap(id('map-3d'));
+  await wait(600);
 
-  // 2. Sign in (development sign-in, standing in for Google) and start the trial.
+  await page.goto(`${BASE}/?s=${STATION.id}`, { waitUntil: 'domcontentloaded' });
+  await appReady();
+  await page.getByTestId('live-status').filter({ hasText: 'Available' }).waitFor({ timeout: 20000 });
+  await wait(400);
+  await narrate('station', 'Available or occupied, from drivers', 'Demo report · opens the operator’s own app');
+  await point(id('live-status'));
+  await wait(1400);
+  const sheet = page.locator('.sheet__body').first();
+  if (await sheet.count()) {
+    const box = await sheet.boundingBox();
+    if (box) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    for (let i = 0; i < 8; i++) {
+      await page.mouse.wheel(0, 40);
+      await wait(120);
+    }
+  }
+  await wait(600);
+  await point(id('operator-app'));
+  await wait(1200);
+  for (let i = 0; i < 8; i++) {
+    await page.mouse.wheel(0, -40);
+    await wait(120);
+  }
+  await settle(300);
+
+  // 3. Sign in (development sign-in, standing in for Google) and start the trial.
   await page.evaluate(async () => {
     const r = await fetch('/api/auth/dev', {
       method: 'POST',
@@ -259,66 +383,58 @@ try {
     });
     if (!r.ok) throw new Error(`dev sign-in ${r.status}`);
   });
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   await appReady();
-  await wait(600);
+  await wait(400);
   await tap(id('tab-you'));
   await ready(page, '[data-testid="you-trial"]');
   await narrate('trialstart', 'Start the 7-day Plus trial', 'Demo account · development sign-in');
-  await wait(1800);
+  await wait(1200);
   await tap(id('you-trial'));
-  await settle(1200);
+  await settle(500);
 
-  // 3. Live car.
+  // 4. Live 3D car.
   await tap(id('tab-car'));
   await ready(page, '[data-testid="car-demo"]');
   await narrate('car', 'Connect your car', 'Demo car · simulated · clearly labelled');
-  await wait(1200);
+  await wait(900);
   await tap(id('car-demo'));
   await ready(page, '[data-testid="battery-confirm"]');
-  await wait(700);
+  await wait(600);
   await tap(id('battery-confirm'));
-  await settle(600);
-  await narrate('cartiles', 'Live telemetry', 'Speed · power · Wh/km · battery temp · health');
-  await wait(1500);
-  await page.mouse.wheel(0, 380);
-  await settle(600);
+  await wait(2600);
+  await dragCar(220);
+  await settle(300);
   await narrate('carhonest', 'Honest about car data', 'Phone GPS today · Bluetooth OBD-II in beta');
-  await wait(2200);
-  await page.mouse.wheel(0, 900);
+  await wait(1600);
+  await page.mouse.wheel(0, 420);
+  await wait(2600);
+  await page.mouse.wheel(0, 700);
   await settle(300);
   await page.mouse.wheel(0, -2000);
-  await wait(500);
+  await wait(400);
   await tap(id('car-disconnect'));
-  await wait(500);
+  await wait(400);
 
-  // 4. Copilot: a question, then a Hindi trip request.
+  // 5. Copilot: a Hindi trip request, answered in Hindi.
   await tap(id('tab-copilot'));
   await ready(page, '[data-testid="copilot-input"]');
-  await narrate('copilot', 'Trip co-pilot · Plus', 'Answers about charging, routes and your car');
-  await wait(600);
-  await type(id('copilot-input'), 'Is it better to charge to 80% or 100% before a highway trip?', 22);
-  await tap(id('copilot-send'), 250);
-  await page.waitForSelector('.bubble--assistant', { timeout: 15000 });
-  await page.waitForFunction(() => !document.querySelector('.bubble.is-pending'), null, { timeout: 60000 });
-  await settle(2600);
-  await narrate('hindi', 'Speak to plan, in Hindi or English');
-  await wait(800);
+  await narrate('copilot', 'Trip co-pilot · Plus', 'Ask by voice, in Hindi or English');
+  await wait(700);
   await tap(id('lang-hi'));
-  await settle(200);
+  await settle(100);
   await narrate('hindi_user', '"कोयंबटूर से चेन्नई जाना है, बैटरी 60% है"', 'Voice request, typed here for the recording');
   await type(id('copilot-input'), 'कोयंबटूर से चेन्नई जाना है, बैटरी 60 प्रतिशत है', 30);
-  await settle(200);
+  await settle(100);
   await tap(id('copilot-send'), 250);
-  await narrate('hindi_reply', '"कोयंबटूर से चेन्नई का प्लान बना रहा हूँ, बैटरी 60%"', 'ChargeOne replies in Hindi and plans the trip');
+  await narrate('hindi_reply', '"कोयंबटूर से चेन्नई का प्लान बना रही हूँ, बैटरी 60%"', 'Replies in a natural HD voice');
 
-  // 5. Route comparison.
+  // 6. Route comparison, each route drawn in.
   await ready(page, '[data-testid="route-0"]', 60000);
-  await wait(1200);
-  await narrate('routes', 'Compare every route', 'What each one is good for');
+  await wait(900);
+  await narrate('routes', 'Compare every route', 'Drawn in, with what each one is good for');
   await point(id('route-0'));
-  await wait(1800);
-  // The narration names the fastest route, then the one with more fast chargers, then any unsafe one.
+  await wait(1600);
   for (const i of [2, 1]) {
     const route = id(`route-${i}`);
     if (!(await route.count())) continue;
@@ -326,45 +442,30 @@ try {
     await wait(2300);
   }
   await tap(id('route-0'));
-  await settle(800);
+  await settle(600);
 
-  // 6. Live drive with a range-drop alert.
+  // 7. Live drive in 3D with a range-drop alert.
   await tap(id('start-drive'));
   await ready(page, '[data-testid="drive-demo"]');
-  await wait(600);
+  await wait(500);
   await tap(id('drive-demo'));
   await ready(page, '[data-testid="drive-hud"]');
-  await narrate('drive', 'Live drive mode', 'Demo car · simulated drive');
+  await narrate('drive', 'Live drive mode, in 3D', 'Demo car · simulated drive');
   await settle();
-  await say('Live drive mode', `Time-lapse · video ${TIME_LAPSE}× faster`);
+  await say('Live drive mode, in 3D', `Time-lapse · video ${TIME_LAPSE}× faster`);
   const lapse = { from: Date.now() / 1000, to: Infinity };
   timeLapses.push(lapse);
-  await ready(page, '[data-testid="drive-alert"]', 150000);
+  await ready(page, '[data-testid="drive-alert"]', 200000);
   lapse.to = Date.now() / 1000;
-  await wait(500);
+  await wait(400);
   await narrate('alert', 'Battery dropping faster than planned', 'Charge earlier, before it becomes a problem');
-  await settle(300);
+  await settle(200);
   const switchStop = id('alert-switch');
   await tap((await switchStop.count()) ? switchStop : id('alert-keep'));
   await narrate('switch', 'Switched to the earlier charger');
-  await settle(1500);
+  await settle(900);
   await tap(id('drive-end'));
-  await wait(800);
-
-  // 7. Feedback.
-  const end = id('drive-end');
-  if (await end.count()) await tap(end);
-  await tap(id('tab-you'));
-  await tap(id('you-feedback'));
-  await ready(page, '.feedback__face');
-  await narrate('feedback', 'Tell us how it went');
-  await tap(page.locator('.feedback__face').nth(4));
-  await wait(400);
-  await tap(page.getByRole('radio', { name: 'Idea' }));
-  await type(page.locator('.feedback__text'), 'Loved the early charge alert on the highway!', 26);
-  await wait(300);
-  await tap(id('feedback-send'));
-  await settle(1200);
+  await wait(500);
 
   // 8. Plans card.
   await say('');
@@ -387,10 +488,23 @@ try {
   // final card lasts until now.
   const endT = Date.now() / 1000;
   await cdp.send('Page.stopScreencast');
+  // Narration cues use this process's clock. Chrome's frame timestamps can run on another clock (GPU headless
+  // was seconds off), so move them onto ours by the typical receive delay, or use arrival times if they wander.
+  const lags = frames.map((f) => f.received - f.t).sort((a, b) => a - b);
+  const pick = (q: number) => lags[Math.min(lags.length - 1, Math.floor(q * lags.length))] ?? 0;
+  const [p10, median, p90] = [pick(0.1), pick(0.5), pick(0.9)];
+  const steady = p90 - p10 < 0.15;
+  writeFileSync(`${rawDir}frame-times.json`, JSON.stringify(frames.map((f) => [f.t, f.received])));
+  for (const f of frames) f.t = steady ? f.t + median : f.received;
+  console.log(`Frame clock: receive delay ${median.toFixed(3)} s (p10 ${p10.toFixed(3)}, p90 ${p90.toFixed(3)}); using ${steady ? 'shifted frame timestamps' : 'arrival times'}.`);
   writeConcatList(endT);
   const t0 = frames[0]?.t ?? endT;
   writeFileSync(`${rawDir}cues.json`, JSON.stringify(cues.map((c) => ({ id: c.id, at: Number((warp(c.t) - t0).toFixed(3)) })), null, 1));
   console.log(`Recorded ${frames.length} frames: ${(endT - t0).toFixed(1)} s, ${(warp(endT) - t0).toFixed(1)} s of video, ${cues.length} narration cues.`);
+  const listed = [...readFileSync(`${rawDir}frames.txt`, 'utf8').matchAll(/^duration ([\d.]+)$/gm)].reduce((s, m) => s + Number(m[1]), 0);
+  if (Math.abs(listed - (warp(endT) - t0)) > 0.2) {
+    throw new Error(`frame list lasts ${listed.toFixed(2)} s but the take is ${(warp(endT) - t0).toFixed(2)} s; narration would drift`);
+  }
   if (errors.length) console.log(`Page errors:\n${[...new Set(errors)].join('\n')}`);
 } catch (e) {
   console.log('Demo failed:', e instanceof Error ? e.message.split('\n')[0] : e);

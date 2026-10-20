@@ -16,13 +16,13 @@ const SCREEN = { x: 1262, y: 40, w: 450, h: 1000, radius: 46 };
 const BEZEL = 13;
 
 const CHAPTERS: Array<{ title: string; sub: string; from: string }> = [
-  { title: 'Your car, first', sub: 'Pick a model and paint · Plus free for 7 days', from: 'pickcar' },
-  { title: 'Chargers you can trust', sub: 'Many networks on one map · driver reports', from: 'map' },
-  { title: 'Connected car', sub: 'Live battery, range and health · phone GPS or OBD-II beta', from: 'car' },
-  { title: 'AI trip co-pilot', sub: 'Ask anything · plan by voice in Hindi or English', from: 'copilot' },
-  { title: 'Compare routes', sub: 'Up to 3 routes, each explained', from: 'routes' },
+  { title: 'Your car, in 3D', sub: 'Pick a model and paint · Plus free for 7 days', from: 'pickcar' },
+  { title: 'A 3D map of India', sub: 'Globe, terrain and glowing chargers', from: 'globe' },
+  { title: 'Available or occupied', sub: 'Driver reports · opens the operator’s app', from: 'station' },
+  { title: 'Connected car', sub: 'Live battery and power · phone GPS or OBD-II beta', from: 'car' },
+  { title: 'AI trip co-pilot', sub: 'Plan by voice in Hindi or English · HD voice', from: 'copilot' },
+  { title: 'Compare routes', sub: 'Up to 3 routes, drawn in and explained', from: 'routes' },
   { title: 'Live drive alerts', sub: 'Battery dropping fast? Charge earlier', from: 'drive' },
-  { title: 'Your feedback', sub: 'Rate every trip, share ideas', from: 'feedback' },
 ];
 
 function page(active: number | null): string {
@@ -31,8 +31,8 @@ function page(active: number | null): string {
       <span><b>${c.title}</b><small>${c.sub}</small></span></li>`,
   ).join('');
   return `<!doctype html><html><head><style>
-  @font-face{font-family:Inter;src:url(${fonts}inter/files/inter-latin-wght-normal.woff2) format('woff2');font-weight:100 900}
-  @font-face{font-family:Grotesk;src:url(${fonts}space-grotesk/files/space-grotesk-latin-wght-normal.woff2) format('woff2');font-weight:300 700}
+  @font-face{font-family:Inter;src:url(${fonts}geist/files/geist-latin-wght-normal.woff2) format('woff2');font-weight:100 900}
+  @font-face{font-family:Grotesk;src:url(${fonts}unbounded/files/unbounded-latin-wght-normal.woff2) format('woff2');font-weight:200 900}
   *{box-sizing:border-box;margin:0;padding:0}
   body{width:1920px;height:1080px;overflow:hidden;color:#e6edf6;font-family:Inter,sans-serif;
     background:radial-gradient(900px 700px at 8% 0%,rgba(34,211,238,.20),transparent 60%),

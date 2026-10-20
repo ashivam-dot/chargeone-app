@@ -13,6 +13,7 @@ Environment:
   PORT           default 8080
   THREADS        ONNX threads per request (default 2)
   VOICE_EN, VOICE_HI   speaker ids 0-9; 0-4 are higher voices, 5-9 lower (default 1)
+  STEPS          denoising steps, 5-12 (default 8)
 
 Run it (any free 2-4 core CPU box, e.g. Oracle Cloud's Always Free Ampere A1; about 1.5 GB of RAM):
   python3 fetch_model.py                  # downloads the model and checks its sha256
@@ -41,6 +42,9 @@ LANGS = {'en', 'hi'}
 TOKEN = os.environ.get('VOICE_TOKEN', '')
 MODEL_DIR = os.environ.get('MODEL_DIR', os.path.join(os.path.dirname(__file__), 'models', 'supertonic-3'))
 SPEAKER = {'en': int(os.environ.get('VOICE_EN', '1')), 'hi': int(os.environ.get('VOICE_HI', '1'))}
+# Denoising steps: more is clearer (Hindi especially) and slower. On a 4-thread laptop CPU, 5 steps ran at
+# about 0.2x real time and 10 at 0.2-0.6x (Hindi slowest); lower it on a slow box.
+STEPS = int(os.environ.get('STEPS', '8'))
 
 
 def load_tts() -> sherpa_onnx.OfflineTts:
@@ -85,7 +89,7 @@ class Voice:
         g = sherpa_onnx.GenerationConfig()
         g.sid = SPEAKER[lang]
         g.speed = 1.0
-        g.num_steps = 5
+        g.num_steps = STEPS
         g.extra = {'lang': lang}
         t0 = time.time()
         with self.lock:

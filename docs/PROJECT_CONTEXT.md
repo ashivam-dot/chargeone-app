@@ -15,9 +15,10 @@ voice), feedback. Web (PWA) first, Android (Google Play first) and iOS (later) t
 - Task folder: `/Users/ashivam/Desktop/Side-Income/ev-charging-super-app-plan-2026-10-20/`
   - `chargeone-app/`: the git repo, private GitHub `ashivam-dot/chargeone-app` (branch `main`).
   - `PLAN.md`, `ZERO-BUDGET-PLAN.md`: original business and zero-budget plans.
-  - `demo/`: `ChargeOne-demo.mp4` (portrait, 165 s), `ChargeOne-demo-16x9.mp4`, `ChargeOne-poster-16x9.png`.
-    Also in the private release `demo-2026-10-20` on the repo.
-- Last commits: `c123617` (review fixes), `38aa9bb` (honest compare, planner fix, demo), `55a12c7` (big feature drop).
+  - `demo/`: promo videos. The 2026-10-21 remake (3D map, 3D car, HD voice) is in the release
+    `demo-2026-10-21`; the first cut is in `demo-2026-10-20`.
+  - `research/`: ui-styles.md, indian-tts.md, car-models.md, charger-apps.md (2026-10-21 upgrade research).
+- Last commits: the 2026-10-21 upgrade (see "State"), `7cf1b3d` (UPI + Play Billing), `c123617` (review fixes).
 
 ## Accounts and hard limits
 
@@ -31,15 +32,30 @@ voice), feedback. Web (PWA) first, Android (Google Play first) and iOS (later) t
 
 ## Stack
 
-Vite 8, Preact 11, TypeScript 7, MapLibre, Cloudflare Workers (D1 `chargeone`, Workers AI),
+Vite 8, Preact 11, TypeScript 7, MapLibre 6.14 (globe, Mapterhorn terrain, 3D buildings), three.js 0.186
+(lazy `Car3D` chunk, budget exception 175 KB), Cloudflare Workers (D1 `chargeone`, Workers AI),
 Capacitor 8.5.3, Playwright 1.64, vitest 5. Node >= 23.6 runs `.ts` scripts directly.
+
+Design (2026-10-21): "Liquid Glass + bento + spatial". `src/design.css` (glass tokens, fonts Geist / Geist
+Mono / Unbounded / Noto Sans Devanagari), `src/ui/glass.ts` (SVG refraction on fast Blink only, specular
+follows the pointer), `src/map/futuristic.ts` (globe, sky, relief, hillshade, 3D buildings, route draw-in,
+`Tilt3dControl`, one-time globe intro; `?intro` forces it). Reduced motion and reduced transparency respected.
 
 - `src/`: app. `src/planner/` (trip planner, `journey.ts`, `routeCompare.ts`), `src/drive/driveEngine.ts`,
   `src/vehicle/` (demo car, phone GPS tracker, OBD-II over BLE, energy model), `src/voice/`
   (Hindi/English intent parser, speech, phrases), `src/lib/agentClient.ts`, `src/native/` (Capacitor helpers),
   `src/ui/` (tab shell: Explore, Trip, Car, Copilot, You).
+  `src/ui/car/` (`CarStage` picks `Car3D` when WebGL works, else the 2D `CarHero`; `models3d.ts`: Quaternius
+  CC0 SUV/sedan/hatch GLBs in `public/models/`, tinted; `EXACT` list empty until licensed exact models exist),
+  `src/shared/operatorApps.ts` (62 operators: Android package, iOS id, website; packages also in the manifest
+  `<queries>`), `src/native/operatorApp.ts` (open if installed, else store), `src/voice/normalize.ts`.
 - `worker/`: API. `agent.ts` (copilot on `@cf/google/gemma-4-26b-a4b-it`, fallback model), `trial.ts`,
-  `basic.ts` (guest tier), `alternatives.ts`, `feedback.ts`, `billing.ts` (Razorpay), `migrations/0001..0003`.
+  `basic.ts` (guest tier), `alternatives.ts`, `feedback.ts`, `billing.ts` (Razorpay), `upi.ts`, `play.ts`,
+  `voice.ts` (`POST /api/voice/tts`: HD voice proxy, edge cache 30 days, 300 new sentences per device a day),
+  `migrations/0001..`.
+- `voice-server/`: self-hosted HD voice (Supertonic 3 int8 on sherpa-onnx 1.13.8, CPU only). `fetch_model.py`
+  (sha256-pinned), `server.py` (bearer token, en/hi, MP3), `Dockerfile`. Worker secrets `VOICE_TTS_URL`,
+  `VOICE_TTS_TOKEN` (24+ chars) switch it on; unset, the app uses the phone's voice (Indian/neural preferred).
 - `android/`, `ios/`: generated Capacitor projects. `.github/workflows/`: `ci.yml`, `android.yml`, `ios.yml`.
 - Data: `public/data/stations.json` (527 stations, only 28 tagged DC), rebuilt with
   `node scripts/import-data.ts --from-cache`.
@@ -60,21 +76,33 @@ Capacitor 8.5.3, Playwright 1.64, vitest 5. Node >= 23.6 runs `.ts` scripts dire
 npm run setup:dev            # local D1 + migrations
 npm run dev:api              # wrangler dev on 8787 (serves the built app too)
 npm run build                # typecheck, build, prerender, bundle budget (380 KB start-up)
-npm test                     # 410 unit tests (app + worker)
-npx playwright test          # 70 e2e; needs `npm run build` and `npm run dev:api` running first
+npm test                     # 458 unit tests (app + worker)
+npx playwright test          # 47 e2e (pixel-7 + desktop); needs `npm run build` and `npm run dev:api` first
+node scripts/ui-shots.ts <dir> [--car] [--trip]   # screenshots of every screen for a visual check
 npm run smoke:api -- http://127.0.0.1:8787
 npm run deploy               # build, remote migrations, wrangler deploy (not done yet)
 ```
 
 Demo pipeline (only when re-recording): `scripts/demo-narration.json` -> `scripts/demo-voice.py`
-(Kokoro TTS, needs a temporary venv and espeak data path under 160 chars) -> `scripts/demo-video.ts`
-(Chrome screencast, 5x time-lapse) -> `scripts/demo-landscape.ts` -> `scripts/demo-mix.py`.
-Delete `demo/raw`, the venv and `~/.cache/huggingface/hub` afterwards.
+(Supertonic 3 via voice-server; a temporary venv with `voice-server/requirements.txt` and `MODEL_DIR`)
+-> `scripts/demo-video.ts` (full Chromium headless on the GPU: `npx playwright install chromium`; the
+headless shell's SwiftShader gives 2-3 fps) -> `scripts/demo-landscape.ts` -> `scripts/demo-mix.py`
+(fails if the picture is still for 5 s or more; `--self-test`). Delete `demo/raw` and the venv afterwards.
 
 ## State on 2026-10-21
 
-Done and verified: all features above; 410 unit + 70 e2e pass; review findings fixed; README updated
-(features, plan table, Play Store and App Store checklist, honest limits); demo videos made.
+Done and verified: all features above; 458 unit + 47 e2e pass; README updated; demo videos made.
+
+2026-10-21 upgrade (owner asked for a futuristic map, real 3D cars, Razorpay "replica", reverse-engineered car
+and charger connectors, live availability, operator-app redirect, an Indian human voice, a promo video):
+- Built: 3D globe/terrain map and Liquid Glass UI; 3D car (generic body per type, labelled "Generic SUV/sedan/
+  hatchback body in your colour"); Available / Occupied / Not working labels; operator-app button; HD voice
+  path; UPI direct + Play Billing (no Razorpay clone: RBI payment-aggregator rules and Play policy); XEV 9S.
+- Declined, with reasons given to the owner: reverse engineering car-maker, charger or Sarvam apps; claiming
+  operator-live status (only driver reports exist); exact car models without a licence.
+- Voice quality: English narration transcribes at 90-100% with Whisper small. Hindi can't be scored that
+  way (the recogniser drops Devanagari marks even for Apple's Lekha); translated to English, Supertonic Hindi
+  comes through better than Lekha. Owner should still listen (`hd-voice-*.mp3` in release `demo-2026-10-21`).
 
 Blocked or waiting on the owner:
 1. GitHub Actions fail in 3 s: account billing. Fix billing, then `gh run rerun <id> --repo ashivam-dot/chargeone-app`.
@@ -84,6 +112,12 @@ Blocked or waiting on the owner:
    deploy (`npm run deploy`), Razorpay live keys, release keystore as GitHub secrets.
 4. iOS speech recognition: `@capacitor-community/speech-recognition` has no Swift package; consider
    `@capgo/capacitor-speech-recognition`.
+5. HD voice: run `voice-server/` on a free CPU box (Oracle Always Free A1) behind HTTPS, then
+   `wrangler secret put VOICE_TTS_URL` and `VOICE_TTS_TOKEN`.
+6. UPI: `UPI_VPA`, `UPI_PAYEE_NAME`, `ADMIN_TOKEN`; Play: service account + products (see README).
+7. Exact 3D cars: download licensed models (Ioniq 5, Punch on Sketchfab, CC BY) into `public/models/cars/`
+   and add them to `EXACT` in `models3d.ts` with credit.
+8. Live operator status: only through partner feeds (OCPI from operators, Delhi EV portal); needs agreements.
 
 Known limits (keep honest in copy): no car-maker APIs exist, so "car connection" = phone GPS, demo car,
 OBD-II BLE beta (many Indian EVs don't expose battery % on OBD). Station data is sparse for DC speeds.

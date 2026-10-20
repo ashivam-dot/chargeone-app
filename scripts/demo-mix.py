@@ -3,12 +3,15 @@ portrait, for Reels and Shorts). When demo-landscape.ts has rendered the stage, 
 ../demo/ChargeOne-demo-16x9.mp4 (1920x1080, for YouTube and the Play Store promo video).
 
 Usage: python3 scripts/demo-mix.py   (after demo-voice.py, demo-video.ts and optionally demo-landscape.ts)
+Fails when the picture stays still for MAX_STILL_S or longer. `--self-test` checks that gate.
 """
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 DEMO = Path(__file__).resolve().parent.parent.parent / "demo"
@@ -54,8 +57,45 @@ def main() -> int:
     subprocess.run(args, check=True)
     speech = sum(durations[c["id"]] for c in cues)
     print(f"Wrote {OUT} with {len(cues)} narration lines ({speech:.0f} s of speech)")
+    problems = pace_problems(OUT)
+    if problems:
+        print("The video holds still too long:\n  " + "\n  ".join(problems))
+        return 1
     if (STAGE / "stage.json").exists():
         landscape()
+    return 0
+
+
+# The picture must change at least every few seconds (owner's rule for every video): no still longer than this.
+MAX_STILL_S = 5.0
+
+
+def stills(path: Path, min_s: float = MAX_STILL_S) -> list[tuple[float, float]]:
+    """(start, seconds) of every stretch of at least min_s where the picture does not change."""
+    out = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-nostats", "-i", str(path), "-vf", f"freezedetect=n=0.002:d={min_s}", "-map", "0:v", "-f", "null", "-"],
+        check=True, capture_output=True, text=True,
+    ).stderr
+    starts = [float(m) for m in re.findall(r"freeze_start: ([\d.]+)", out)]
+    lengths = [float(m) for m in re.findall(r"freeze_duration: ([\d.]+)", out)]
+    if len(lengths) < len(starts):
+        lengths.append(seconds(path) - starts[-1])
+    return list(zip(starts, lengths))
+
+
+def pace_problems(path: Path) -> list[str]:
+    return [f"{length:.1f} s still from {start:.1f} s" for start, length in stills(path)]
+
+
+def self_test() -> int:
+    """The gate catches a still picture and passes a moving one."""
+    with tempfile.TemporaryDirectory() as tmp:
+        still, moving = Path(tmp) / "still.mp4", Path(tmp) / "moving.mp4"
+        for src, out in (("color=c=0x05070b:s=320x240:d=7", still), ("testsrc2=s=320x240:d=7", moving)):
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", src, "-pix_fmt", "yuv420p", str(out)], check=True)
+        assert pace_problems(still), "a 7 s still picture passed the gate"
+        assert not pace_problems(moving), f"a moving picture failed the gate: {pace_problems(moving)}"
+    print("pace gate self-test passed")
     return 0
 
 
@@ -99,4 +139,4 @@ def landscape() -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(self_test() if "--self-test" in sys.argv else main())
