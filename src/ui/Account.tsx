@@ -1,6 +1,7 @@
+import { Check, Minus, Sparkles } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { api, type Me } from '../lib/api.ts';
-import { PLANS } from '../shared/plans.ts';
+import { PLANS, PLAN_ROWS } from '../shared/plans.ts';
 import type { MyVehicle } from '../shared/vehicles.ts';
 import { Sheet } from './Sheet.tsx';
 
@@ -15,6 +16,23 @@ interface Props {
   onPlans: () => void;
   onGarage: () => void;
   onAbout: () => void;
+}
+
+function Meter({ label, used, of }: { label: string; used: number; of: number }) {
+  const pct = Math.min(100, Math.round((used / Math.max(1, of)) * 100));
+  return (
+    <div class="meter">
+      <div class="meter__label">
+        <span>{label}</span>
+        <strong>
+          {used} of {of}
+        </strong>
+      </div>
+      <div class="meter__track" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={of} aria-valuenow={used}>
+        <div class={`meter__bar${pct >= 100 ? ' meter__bar--full' : ''}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
 }
 
 const dateFmt = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -47,13 +65,16 @@ export function Account({ me, vehicle, dark, onToggleDark, onClose, onChanged, o
         <span class="muted">{me.user?.email}</span>
       </p>
 
-      <div class="card">
+      <div class={`card plan-card${me.plan === 'free' ? '' : ' plan-card--paid'}`}>
         <div class="row">
-          <div>
-            <span class="muted small">Plan</span>
-            <strong class="block">{plan.name}</strong>
+          <div class="plan-card__info">
+            <span class="muted small">Your plan</span>
+            <strong class="plan-card__name">
+              {me.plan !== 'free' && <Sparkles size={16} aria-hidden="true" />} {plan.name}
+            </strong>
+            <span class="small muted">{plan.tagline}</span>
           </div>
-          <button class="btn" onClick={onPlans}>
+          <button class={`btn${me.plan === 'free' ? ' btn--primary' : ''}`} onClick={onPlans}>
             {me.plan === 'free' ? 'Upgrade' : 'Plans'}
           </button>
         </div>
@@ -63,11 +84,27 @@ export function Account({ me, vehicle, dark, onToggleDark, onClose, onChanged, o
           </p>
         )}
         {me.usage && (
-          <p class="small">
-            Today: {me.usage.shortToday} of {plan.shortTripsPerDay} short trips
-            {plan.longTripQuota > 0 && ` · Long trips: ${me.usage.longInWindow} of ${plan.longTripQuota}`}
-          </p>
+          <div class="meters">
+            <Meter label="Short trips today" used={me.usage.shortToday} of={plan.shortTripsPerDay} />
+            {plan.longTripQuota > 0 && (
+              <Meter label={plan.longTripWindow === 'period' ? 'Long trips on this pass' : 'Long trips this month'} used={me.usage.longInWindow} of={plan.longTripQuota} />
+            )}
+          </div>
         )}
+        <ul class="perks perks--compact">
+          {PLAN_ROWS.slice(2).map((r) => {
+            const v = r.value(plan);
+            return (
+              <li key={r.label} class={`perk${v === false ? ' perk--no' : ''}`}>
+                {v === false ? <Minus size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
+                <span>
+                  {r.label}
+                  {v === false && <span class="visually-hidden"> (not included)</span>}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
         {subscribed && (
           <button
             class="link danger"

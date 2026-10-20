@@ -11,14 +11,21 @@ plans paid through Razorpay.
 - **Stays with charging:** hotels, guest houses and resorts within 3 km of each charger, with the ones that have a charger on site first. "Check prices" opens a Booking.com search for that hotel. Each place has its own sheet listing the chargers within walking distance.
 - **Multi-day trips:** set how long you want to drive per day. The planner ends each day at a charger with hotels nearby (an on-site charger first), charges you to 100% overnight, and shows the stays, dinner options and a separate Google Maps link for each day. It also suggests stays with charging at your destination.
 - **Search-friendly pages:** every charger and city gets a static page with its connectors, nearby food and stays, structured data (schema.org), a sitemap and robots.txt, built from the same data at deploy time.
-- **Plans:**
+- **Plans:** one table in `src/shared/plans.ts` (`COMPARE`) drives the plan cards, the comparison table, the account card and every in-app lock, so they can't disagree.
 
-  | Plan | Price | What you get |
-  |---|---|---|
-  | Free | ₹0 | Map, live status, trips up to 100 km (3 a day) |
-  | Trip Pass | ₹49 | 10 long trips within 7 days |
-  | Plus | ₹149 a month | 30 long trips per rolling 30 days, live re-planning |
-  | Plus Yearly | ₹999 a year | Same as Plus |
+  | | Free ₹0 | Trip Pass ₹49 once (7 days) | Plus ₹149/month or ₹999/year |
+  |---|---|---|---|
+  | Charger map, live status, food and hotels | ✓ | ✓ | ✓ |
+  | Trip length | up to 100 km | any | any |
+  | Trip plans | 3 a day | 10 long trips | 30 long trips a month |
+  | Backup chargers for your stops | | ✓ | ✓ |
+  | Multi-day trips with hotel and overnight charging | | ✓ | ✓ |
+  | Free re-plans from where you are (server-enforced) | | ✓ | ✓ |
+  | Alerts when a stop on your route breaks | | | ✓ |
+  | Saved trips that open without signal | | | 10 |
+
+  Locked features appear in place with the plan that unlocks them (for example "2 backup chargers found for this stop · Trip Pass"). Trip length, quotas and free re-plans are enforced by the server; backups, multi-day, alerts and saved trips are computed on the phone, so they're gated in the app. Every stop's current live status stays visible on every plan, because it's safety information.
+- **Trust, shown not claimed:** the first visit opens a welcome sheet with real numbers from the data (chargers mapped, operators, driver reports this week, data date) and where status comes from. The plans screen lists the Razorpay checkout, cancel-anytime terms and short FAQs. There are no testimonials, user counts or countdowns, because the app doesn't have real ones yet.
 
 ## Launch checklist (₹0 to start)
 
@@ -90,10 +97,21 @@ For front-end work with hot reload, run `npm run dev` alongside `npm run dev:api
 
 | Command | What it checks |
 |---|---|
-| `npm test` | 116 unit and integration tests: data import, food and stay places, filters, plans and quotas, the trip and multi-day planner, SEO pages, sessions, Google token verification, Razorpay signatures, and the full payment flows on a real SQL database |
+| `npm test` | 122 unit and integration tests: data import, food and stay places, filters, plans, perks and quotas, the trip and multi-day planner, SEO pages, sessions, Google token verification, Razorpay signatures, and the full payment flows on a real SQL database |
 | `npm run smoke:api` | 28 checks against the running local server: sign-in, cross-site blocking, geofenced check-ins, live status, the 100 km free limit, quotas, re-plans, and account deletion |
-| `npm run smoke:ui` | Headless phone-sized browser: map, deep link, sign-in, check-in, car choice, paywall, paid trip with stops, food and stays near a charger, place sheet, multi-day trip with overnight hotels, SEO pages, dark mode. Screenshots go to `screenshots/` |
+| `npm run smoke:ui` | Headless phone-sized browser (53 checks): welcome sheet, map, deep link, sign-in, check-in, car choice, locked multi-day on Free, paywall cards and comparison, Plus unlocking alerts and saved trips, food and stays near a charger, place sheet, multi-day trip with overnight hotels, account usage, SEO pages, dark mode. Screenshots go to `screenshots/` |
 | `npm run typecheck` | Strict TypeScript for the app and the Worker |
+
+## Demo video
+
+A narrated, captioned phone walkthrough, recorded against `npm run dev:api`:
+
+1. Edit the spoken lines in `scripts/demo-narration.json`. Write numbers and symbols the way they should be said ("forty-nine rupees", "Booking dot com").
+2. `<python with kokoro and soundfile>/bin/python scripts/demo-voice.py` speaks each line with Kokoro-82M (Apache-2.0, runs offline) into `../demo/raw/voice/`. Kokoro's English text processing needs spaCy's `en_core_web_sm`; install it into a throwaway folder and add that folder to `PYTHONPATH` rather than changing a shared environment.
+3. `node scripts/demo-video.ts` records the screen. Each scene waits for its line to finish, and the start time of every line is saved to `../demo/raw/cues.json`.
+4. `python3 scripts/demo-mix.py` places each line at its cue, normalises loudness and writes `../demo/ChargeOne-demo.mp4`. It refuses to run if two lines overlap.
+
+Delete `../demo/raw` afterwards; it's several hundred MB of frames.
 
 ## Security
 

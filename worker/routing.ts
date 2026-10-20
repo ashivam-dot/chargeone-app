@@ -122,7 +122,7 @@ export async function planRoute(req: Request, env: Env, user: User) {
   const usage = await usageCounts(env, user.id, planId, now);
   // A road is never shorter than the straight line, so this refuses obviously-too-long trips
   // without spending a routing call.
-  const early = decideTrip(planId, straightKm, usage, isReplan(straightKm));
+  const early = decideTrip(planId, straightKm, usage, isReplan(straightKm), true);
   if (!early.allowed) throw new HttpError(402, early.reason, early.message, { plan: planId, usage });
 
   const route = await computeRoute(env, from, to);

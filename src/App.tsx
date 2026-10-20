@@ -19,6 +19,7 @@ import { Plans } from './ui/Plans.tsx';
 import { SignIn } from './ui/SignIn.tsx';
 import { StationSheet } from './ui/StationSheet.tsx';
 import { TripPlanner, type TripView } from './ui/TripPlanner.tsx';
+import { Welcome } from './ui/Welcome.tsx';
 
 type Overlay = 'plans' | 'signin' | 'account' | 'about' | 'garage' | null;
 
@@ -56,6 +57,11 @@ export function App() {
   const [vehicle, setVehicle] = useState<MyVehicle | null>(() => loadJson<MyVehicle | null>('vehicle', null, (v): v is MyVehicle | null => v === null || isVehicle(v)));
   const [dark, setDark] = useState(() => loadJson('dark', window.matchMedia('(prefers-color-scheme: dark)').matches, isBool));
   const [online, setOnline] = useState(navigator.onLine);
+  // First visit only, and not when a shared link opens a charger or place.
+  const [welcome, setWelcome] = useState(() => {
+    const q = new URLSearchParams(location.search);
+    return !loadJson('welcomed', false, isBool) && !q.has('s') && !q.has('p');
+  });
   const [viewport, setViewport] = useState(readViewport);
 
   useEffect(() => {
@@ -239,6 +245,11 @@ export function App() {
     setDark(!dark);
     saveJson('dark', !dark);
   };
+  const closeWelcome = () => {
+    setWelcome(false);
+    saveJson('welcomed', true);
+  };
+  const paid = me !== null && me.plan !== 'free';
 
   return (
     <div class="app">
@@ -276,10 +287,15 @@ export function App() {
           />
         </div>
         <button
-          class="avatar"
+          class={`avatar${paid ? ' avatar--paid' : ''}`}
           onClick={() => setOverlay(me?.user ? 'account' : 'signin')}
           aria-label={me?.user ? 'Account' : 'Sign in'}
         >
+          {paid && (
+            <span class="avatar__badge" aria-hidden="true">
+              {me?.plan === 'trip_pass' ? 'PASS' : 'PLUS'}
+            </span>
+          )}
           {me?.user ? (me.user.name ?? me.user.email).slice(0, 1).toUpperCase() : (
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
               <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2" />
@@ -324,6 +340,7 @@ export function App() {
               setPaywallReason(reason);
               setOverlay('plans');
             }}
+            onPlans={() => setOverlay('plans')}
             onShow={showTrip}
             onSelectStation={select}
             onOpenPlace={openPlace}
@@ -413,6 +430,17 @@ export function App() {
         />
       )}
       {overlay === 'about' && <About dataset={dataset} onClose={() => setOverlay(null)} />}
+      {welcome && dataset && overlay === null && !sheetOpen && (
+        <Welcome
+          dataset={dataset}
+          statuses={statuses}
+          onExplore={closeWelcome}
+          onPlanTrip={() => {
+            closeWelcome();
+            openTrip(null);
+          }}
+        />
+      )}
     </div>
   );
 }

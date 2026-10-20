@@ -503,9 +503,25 @@ describe('quota enforcement is on the server', () => {
     const far = await api('POST', '/api/route', { from: { lat: 13.0827, lng: 80.2707 }, to, tripId: first.body.tripId });
     expect(far.status).toBe(402);
 
-    // A genuine re-plan from closer by is free.
+    // A genuine re-plan from closer by is allowed; on the free plan it counts as a new short trip.
     km = 12;
     const near = await api('POST', '/api/route', { from: { lat: 12.92, lng: 77.62 }, to, tripId: first.body.tripId });
-    expect(near.body.counted).toBe('replan');
+    expect(near.body.counted).toBe('short');
+  });
+
+  it('keeps re-plans free on a paid plan', async () => {
+    const { api } = setup();
+    let km = 300;
+    vi.stubGlobal('fetch', async () =>
+      Response.json({ code: 'Ok', routes: [{ distance: km * 1000, duration: 14400, geometry: { coordinates: [[77.6, 12.97], [76.27, 9.93]] } }] }),
+    );
+    await api('POST', '/api/auth/dev', { email: 'pass@local.test' });
+    await api('POST', '/api/dev/grant', { plan: 'trip_pass' });
+    const to = { lat: 9.9312, lng: 76.2673 };
+    const first = await api('POST', '/api/route', { from: { lat: 12.9756, lng: 77.6066 }, to });
+    expect(first.body.counted).toBe('long');
+    km = 290;
+    const again = await api('POST', '/api/route', { from: { lat: 12.9, lng: 77.5 }, to, tripId: first.body.tripId });
+    expect(again.body.counted).toBe('replan');
   });
 });

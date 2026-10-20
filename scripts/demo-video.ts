@@ -1,6 +1,7 @@
-// Records a captioned walkthrough of the app on `wrangler dev` (development mode) as a phone-sized video.
-// Usage: node scripts/demo-video.ts [baseUrl]
-//   → ../demo/raw/frames/*.jpg plus ../demo/raw/frames.txt, an ffmpeg concat list with real frame timings.
+// Records a narrated, captioned walkthrough of the app on `wrangler dev` (development mode) as a phone-sized video.
+// Usage: <kokoro python> scripts/demo-voice.py, then node scripts/demo-video.ts [baseUrl], then python3 scripts/demo-mix.py
+//   → ../demo/raw/frames/*.jpg, ../demo/raw/frames.txt (an ffmpeg concat list with real frame timings) and
+//     ../demo/raw/cues.json (when each narration line starts, in seconds from the first frame).
 // Chrome's screencast is used instead of Playwright's recorder because it captures at device resolution.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { chromium, devices, type Locator, type Page } from 'playwright';
@@ -9,6 +10,10 @@ const BASE = process.argv[2] ?? 'http://127.0.0.1:8787';
 const rawDir = new URL('../../demo/raw/', import.meta.url).pathname;
 const frameDir = `${rawDir}frames/`;
 mkdirSync(frameDir, { recursive: true });
+/** Seconds of speech per narration line, written by demo-voice.py. */
+const voice = JSON.parse(readFileSync(`${rawDir}voice/durations.json`, 'utf8')) as Record<string, number>;
+const narration = JSON.parse(readFileSync(new URL('./demo-narration.json', import.meta.url), 'utf8')) as { lines: Array<{ id: string }> };
+const LINE_GAP_MS = 450;
 
 const dataset = JSON.parse(readFileSync(new URL('../public/data/stations.json', import.meta.url), 'utf8'));
 const station = dataset.stations.find((s: any) => s.lat > 12.8 && s.lat < 13.2 && s.lng > 77.4 && s.lng < 77.8) ?? dataset.stations[0];
@@ -137,10 +142,31 @@ async function say(title: string, sub = '', ms = 0): Promise<void> {
   await page.evaluate(([t, s]) => (window as any).__demo.caption(t, s), [title, sub]);
   if (ms) await wait(ms);
 }
-async function tap(target: Locator, pause = 500): Promise<void> {
+
+const cues: Array<{ id: string; t: number }> = [];
+let speakingUntil = 0;
+/** Waits for the line being spoken to finish. */
+async function settle(extraMs = 0): Promise<void> {
+  const left = speakingUntil - Date.now();
+  if (left > 0) await wait(left);
+  if (extraMs) await wait(extraMs);
+}
+/** Starts a narration line with its caption once the previous line has finished. The scene carries on while it plays. */
+async function narrate(id: string, title: string, sub = ''): Promise<void> {
+  if (!(id in voice)) throw new Error(`No narration audio for "${id}"`);
+  await settle();
+  await say(title, sub);
+  cues.push({ id, t: Date.now() / 1000 });
+  speakingUntil = Date.now() + voice[id] * 1000 + LINE_GAP_MS;
+}
+
+async function point(target: Locator): Promise<void> {
   await target.scrollIntoViewIfNeeded();
   const box = await target.boundingBox();
   if (box) await page.evaluate(([x, y]) => (window as any).__demo.tap(x, y), [box.x + box.width / 2, box.y + box.height / 2]);
+}
+async function tap(target: Locator, pause = 500): Promise<void> {
+  await point(target);
   await wait(pause);
   await target.click();
 }
@@ -155,72 +181,85 @@ async function ready(p: Page, selector: string): Promise<void> {
 const stationSheet = `section[aria-label="${station.name.replace(/"/g, '\\"')}"]`;
 
 try {
+  const missing = narration.lines.map((l) => l.id).filter((id) => !(id in voice));
+  if (missing.length) throw new Error(`Run demo-voice.py first; missing audio: ${missing.join(', ')}`);
+
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
-  await page.evaluate(() => localStorage.clear());
-  await card(
-    {
-      lines: ['One app for your EV road trip.', 'Chargers that work, food while you charge, hotels for the night.'],
-    },
-    300,
-  );
+  await card({ lines: ['Plan any EV road trip in India.', 'Chargers that work, food while you charge, a hotel for the night.'] }, 300);
+  await narrate('intro', '');
   await ready(page, '.maplibregl-canvas');
-  await wait(4000);
+  await settle(300);
   await hideCard();
-  await wait(1500);
+
+  // ---- First visit: where the data comes from ----
+  await ready(page, 'section[aria-label="Welcome to ChargeOne"]');
+  await narrate('welcome', 'Honest data, shown up front', 'Real chargers from open map data · status from drivers at the charger');
+  await wait(2500);
+  await point(page.locator('.welcome__stats li').first());
+  await wait(2500);
+  await point(page.locator('.welcome__points li').nth(1));
+  await settle();
+  await tap(page.getByRole('button', { name: 'Explore the charger map' }));
+  await wait(800);
 
   // ---- Map ----
-  await say('Every public charger in India', `${dataset.stations.length} chargers from every company, on one map`, 3500);
-  await say('Colours show live status', 'Green = worked recently · Amber = in use · Red = problem reported', 3500);
+  await narrate('map', 'Every charger on one map', 'Green = worked recently · Amber = in use · Red = problem reported');
+  await settle();
+  await narrate('filter', 'Filter in one tap', 'DC fast, connector (CCS2, Type 2, Bharat DC), 24×7, operator');
   await tap(page.getByRole('button', { name: /DC fast/ }));
-  await say('Filter in one tap', 'DC fast, connector (CCS2, Type 2, Bharat DC), 24×7, operator', 2800);
-  await tap(page.getByRole('button', { name: /DC fast/ }));
-  await wait(600);
+  await settle();
+  await tap(page.getByRole('button', { name: /DC fast/ }), 200);
 
   // ---- Food & stays on the map ----
   await page.goto(`${BASE}/?s=${station.id}`, { waitUntil: 'domcontentloaded' });
   await ready(page, stationSheet);
-  await wait(1500);
-  await tap(page.getByRole('button', { name: 'Close' }).first());
-  await say('New: food and stays on the map', 'Restaurants, cafés, dhabas and hotels around every charger', 1500);
+  await wait(1200);
+  await tap(page.getByRole('button', { name: 'Close' }).first(), 200);
+  await narrate('foodstays', 'Food and hotels on the map', 'Orange = food · Purple = hotels · Teal ring = charger on site');
   await tap(page.getByRole('button', { name: 'Food', exact: true }));
   await wait(1200);
   await tap(page.getByRole('button', { name: 'Stays', exact: true }));
-  await say('Orange = food · Purple = stays', 'Hotels with a charger on site get a teal ring', 4000);
-  await tap(page.getByRole('button', { name: 'Food', exact: true }), 200);
-  await tap(page.getByRole('button', { name: 'Stays', exact: true }), 200);
-  await wait(500);
+  await settle();
+  await tap(page.getByRole('button', { name: 'Food', exact: true }), 150);
+  await tap(page.getByRole('button', { name: 'Stays', exact: true }), 150);
 
   // ---- Charger sheet ----
   await page.goto(`${BASE}/?s=${station.id}`, { waitUntil: 'domcontentloaded' });
   await ready(page, stationSheet);
-  await say('Tap a charger to see everything', 'When it last worked, at what speed, and what drivers reported', 3800);
+  await narrate('station', 'Tap a charger to see everything', 'When it last worked, at what speed, and what drivers reported');
+  await wait(1500);
+  await point(page.locator('.live').first());
+  await settle();
   const sheetBody = page.locator('.sheet__body').first();
   await page.locator('section.nearby').evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   await ready(page, 'section.nearby .poi');
-  await say('While you charge: food nearby', 'Walking time, cuisine, pure-veg badge, hours, call and directions', 4500);
-  await sheetBody.evaluate((node) => node.scrollBy({ top: 260, behavior: 'smooth' }));
-  await wait(1800);
+  await narrate('nearbyfood', 'While you charge: food nearby', 'Walking time, cuisine, pure-veg badge, hours, call and directions');
+  await wait(2500);
+  await sheetBody.evaluate((node) => node.scrollBy({ top: 240, behavior: 'smooth' }));
+  await settle();
   await page.locator('section.nearby').evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  await wait(700);
+  await wait(500);
   await tap(page.locator('.segmented button', { hasText: 'Stays' }));
-  await say('Stays within 3 km', 'Hotels with a charger on site come first', 3500);
-  const priceLink = page.locator('a.chip-link--accent').first();
-  const priceBox = await priceLink.boundingBox();
-  if (priceBox) await page.evaluate(([x, y]) => (window as any).__demo.tap(x, y), [priceBox.x + priceBox.width / 2, priceBox.y + priceBox.height / 2]);
-  await say('"Check prices" opens Booking.com', 'Live prices and booking for that exact hotel', 3500);
+  await narrate('stays', 'Hotels within 3 km', 'Charger on site first · "Check prices" opens Booking.com');
+  await wait(3500);
+  await point(page.locator('a.chip-link--accent').first());
+  await settle();
   await tap(page.locator('button.poi__name').first());
   await ready(page, 'section[aria-label="Chargers nearby"]');
-  await say('Every hotel and restaurant has its own page', 'With the chargers within walking distance and their live status', 4500);
-  await tap(page.getByRole('button', { name: 'Close' }).first());
-  await wait(600);
+  await narrate('place', 'Every hotel and restaurant has a page', 'With the chargers within walking distance and their live status');
+  await wait(2500);
+  await page.locator('section[aria-label="Chargers nearby"]').evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  await settle();
+  await tap(page.getByRole('button', { name: 'Close' }).first(), 200);
 
   // ---- Report status ----
   await page.goto(`${BASE}/?s=${station.id}`, { waitUntil: 'domcontentloaded' });
   await ready(page, stationSheet);
   await tap(page.getByRole('button', { name: 'Charged fine' }));
   await ready(page, 'section[aria-label="Sign in"]');
-  await say('One-tap sign in with Google', 'Test sign-in shown here; the live app uses Google', 2500);
+  await narrate('signin', 'One-tap sign in with Google', 'Test sign-in shown here; the live app uses Google');
+  await settle();
   await tap(page.getByRole('button', { name: /Test sign-in/ }));
   await page.locator('section[aria-label="Sign in"]').waitFor({ state: 'detached', timeout: 10000 });
   // A fresh account, so the walkthrough always starts on the free plan.
@@ -229,133 +268,196 @@ try {
   }, `demo-${Date.now()}@local.test`);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await ready(page, stationSheet);
-  await say('Drivers at the charger report its status', 'Location-checked, so reports come from people really there', 2500);
+  await narrate('report', 'Drivers at the charger report its status', 'Location-checked, so reports come from people really there');
   await page.locator('#kw-input').pressSequentially('45', { delay: 160 });
   await wait(400);
   await tap(page.getByRole('button', { name: 'Charged fine' }));
   await ready(page, 'text=Thanks! Other drivers can see this now.');
-  await say('Everyone sees it instantly', '"Last charged fine just now at 45 kW"', 3500);
-  await tap(page.getByRole('button', { name: 'Close' }).first());
-  await wait(600);
+  await settle();
+  await narrate('reported', 'Everyone sees it instantly', '"Last charged fine just now at 45 kW"');
+  await point(page.locator('.live').first());
+  await settle();
+  await tap(page.getByRole('button', { name: 'Close' }).first(), 200);
 
-  // ---- Multi-day trip ----
-  await say('Plan a road trip', 'Bengaluru → Kochi, about 500 km', 1500);
+  // ---- Trip: free plan ----
+  await narrate('trip', 'Plan a road trip', 'Bengaluru → Kochi, about 500 km');
   await tap(page.getByRole('button', { name: 'Plan a trip' }));
   await ready(page, 'section[aria-label="Plan a trip"]');
+  await settle();
   await tap(page.getByRole('button', { name: 'Choose your car' }));
-  await wait(700);
+  await wait(500);
   await page.selectOption('section[aria-label="Your car"] select', 'tata-nexon-ev-45');
-  await say('Choose your car', 'Real-world range for popular Indian EVs, or enter your own', 2200);
+  await narrate('car', 'Choose your car', 'Real-world range for popular Indian EVs, or enter your own');
+  await settle();
   await tap(page.getByRole('button', { name: 'Save car' }));
   await ready(page, 'text=Tata Nexon EV 45');
+  await narrate('lock', 'Multi-day trips: Trip Pass and Plus', 'Locked features show the plan that unlocks them');
+  await wait(1200);
+  await point(page.locator('.perk-lock').first());
+  await wait(1800);
+  await point(page.locator('.perk-lock__plan').first());
 
   await page.context().setGeolocation({ latitude: 12.9756, longitude: 77.6066, accuracy: 20 });
   await tap(page.getByPlaceholder('Start: city, area or charger'));
   await tap(page.getByRole('option', { name: /Use my location/ }));
-  await wait(700);
+  await wait(600);
   const dest = page.getByPlaceholder('Where to?');
   await tap(dest, 300);
-  await dest.pressSequentially('Kochi', { delay: 150 });
+  await dest.pressSequentially('Kochi', { delay: 140 });
   const option = page.locator('.place__list [role="option"]').filter({ hasText: /Kochi/ }).first();
   await option.waitFor({ timeout: 20000 });
-  await wait(800);
-  await tap(option);
   await wait(600);
-  await page.locator('.inline-select select').selectOption('6');
-  await say('Drive up to 6 hours a day', 'The planner finds where to spend the night', 3200);
+  await tap(option);
+  await settle();
 
   await tap(page.getByRole('button', { name: 'Plan my trip' }));
-  await ready(page, 'section[aria-label="Plans"]');
-  await say('Free covers trips up to 100 km', 'Longer trips need a pocket-friendly plan', 3000);
-  await page.locator('section[aria-label="Plans"] .sheet__body').first().evaluate((node) => node.scrollTo({ top: 260, behavior: 'smooth' }));
-  await say('Plans from ₹49', 'Trip Pass ₹49 / 7 days · Plus ₹149 / month · Yearly ₹999', 3800);
+  const paywall = 'section[aria-label="Unlock this trip"]';
+  await ready(page, paywall);
+  const paywallBody = page.locator(`${paywall} .sheet__body`).first();
+  await narrate('paywall', 'Free covers trips up to 100 km', 'For this trip, see exactly what each plan gives you');
+  await settle();
+
+  // ---- Plans ----
+  await paywallBody.evaluate((node) => node.scrollTo({ top: 150, behavior: 'smooth' }));
+  await narrate('plus', 'Plus · ₹149 a month', 'Every trip, backups, multi-day hotels, live alerts, saved trips');
+  await wait(3500);
+  await paywallBody.evaluate((node) => node.scrollTo({ top: 330, behavior: 'smooth' }));
+  await settle();
+  await tap(page.locator(`${paywall} .segmented button`, { hasText: 'Yearly' }));
+  await narrate('yearly', 'Or ₹999 a year', 'Save 44%, about ₹83 a month');
+  await settle(300);
+  await tap(page.locator(`${paywall} .segmented button`, { hasText: 'Monthly' }), 300);
+  await page.locator('li[aria-label="Trip Pass"]').evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  await narrate('pass', 'Trip Pass · ₹49 once', 'One road trip: backups and multi-day, no alerts or saved trips');
+  await wait(3000);
+  await point(page.locator('li[aria-label="Trip Pass"] .perk--no').first());
+  await settle();
+  await page.locator(`${paywall} .compare`).evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  await narrate('compare', 'Every plan, side by side', 'Razorpay checkout · UPI and cards · cancel anytime');
+  await wait(4500);
+  await page.locator(`${paywall} .trust`).evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  await settle();
+  await paywallBody.evaluate((node) => node.scrollTo({ top: 0, behavior: 'smooth' }));
+  await wait(700);
+  await narrate('activated', 'Choose Plus', 'Test mode here; the live app pays by UPI or card via Razorpay');
   await tap(page.getByRole('button', { name: 'Get Plus', exact: true }));
   await ready(page, 'text=/Plus activated without payment/');
-  await say('Plus activated', 'Test mode here; the live app pays by UPI or card via Razorpay', 2600);
-  await tap(page.locator('section[aria-label="Plans"]').getByRole('button', { name: 'Close' }));
-  await wait(500);
+  await page.locator(`${paywall} .notice--ok`).evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  await settle();
+  await tap(page.locator(paywall).getByRole('button', { name: 'Close' }));
+  await wait(400);
 
+  // ---- Trip: Plus ----
+  await ready(page, '.inline-select select');
+  await narrate('daily', 'Multi-day trips unlocked', 'Drive up to 6 hours a day; the planner finds where to stay');
+  await point(page.locator('.inline-select select'));
+  await page.locator('.inline-select select').selectOption('6');
+  await settle();
   await tap(page.getByRole('button', { name: 'Plan my trip' }));
   await ready(page, '.day__head');
-  await wait(1000);
+  await wait(600);
   const verdict = (await page.locator('.verdict strong').textContent())?.trim() ?? 'Trip planned';
-  await say(verdict, 'Charging stops, overnight stay and arrival battery, all worked out', 4500);
+  await narrate('verdict', verdict, 'Charging stops, overnight stay and arrival battery, all worked out');
+  await settle();
+  await narrate('alerts', 'Plus: alerts are on', 'A stop reported broken shows here with a one-tap re-plan');
+  await point(page.locator('.perk-on').first());
+  await settle();
   await tap(page.getByRole('button', { name: 'Collapse panel to see the map' }));
-  await say('Your route on the map', 'Numbered charging stops · N1 = overnight stop · purple = hotels', 4500);
+  await narrate('routemap', 'Your route on the map', 'Numbered charging stops · N1 = overnight stop · purple = hotels');
+  await settle();
   await tap(page.getByRole('button', { name: 'Expand panel' }));
-  await wait(700);
+  await wait(600);
 
   const tripBody = page.locator('.sheet__body').first();
+  const backups = page.locator('.backups').first();
+  if (await backups.count()) {
+    await backups.evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    await narrate('backups', 'A backup for every stop', 'If the charger is busy or down, the next one is ready');
+    await wait(900);
+    await point(page.locator('.backup').first());
+    await settle();
+  }
   const stopFood = page.locator('.timeline__stop:not(.timeline__stop--night) .stop-places summary').first();
   if (await stopFood.count()) {
     await stopFood.evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-    await wait(900);
+    await wait(700);
     await tap(stopFood);
-    await say('Food at every charging stop', 'See what is open within a short walk while the car charges', 4200);
+    await narrate('stopfood', 'Food at every charging stop', 'What is open within a short walk while the car charges');
+    await settle();
   }
   await page.locator('.overnight').first().evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  await wait(900);
-  await say('Night 1: charger + hotel', 'Arrive, plug in, 100% by morning. Hotels with a charger on site first', 5000);
+  await wait(700);
+  await narrate('overnight', 'Night 1: charger + hotel', 'Arrive, plug in, 100% by morning · charger-on-site hotels first');
+  await settle();
   await tripBody.evaluate((node) => node.scrollBy({ top: 330, behavior: 'smooth' }));
-  await say('Book in one tap', 'Directions, call, reviews, or check prices on Booking.com', 4000);
+  await narrate('book', 'Book in one tap', 'Directions, call, reviews, or check prices on Booking.com');
+  await settle();
   const day2 = page.locator('.day__head').nth(1);
   if (await day2.count()) {
     await day2.evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-    await say('Day 2 starts at 100%', 'Each day gets its own Google Maps navigation', 4000);
+    await narrate('day2', 'Day 2 starts at 100%', 'Each day gets its own Google Maps navigation');
+    await settle();
   }
   const destStays = page.locator('.dest-stays');
   if (await destStays.count()) {
     await destStays.evaluate((node) => node.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-    await say('Staying at your destination?', 'Hotels near Kochi with charging on site or a short walk away', 4500);
+    await narrate('dest', 'Staying at your destination?', 'Hotels near Kochi with charging on site or a short walk away');
+    await settle();
   }
   await tripBody.evaluate((node) => node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' }));
-  await say('If a stop is reported broken on the way…', 'the app alerts you and re-plans from where you are, free', 4000);
-  await tap(page.getByRole('button', { name: 'Close' }).first());
-  await wait(600);
+  await wait(700);
+  await narrate('save', 'Plus: save trips for no-signal areas', 'Saved trips open on your phone without signal');
+  await tap(page.getByRole('button', { name: 'Save trip for no-signal areas' }));
+  await settle();
+  await tap(page.getByRole('button', { name: 'Close' }).first(), 200);
 
   // ---- Search pages ----
   await say('');
   await page.goto(`${BASE}/ev-charging/`, { waitUntil: 'domcontentloaded' });
-  await say('A page for every city and charger', 'Built for Google search: connectors, food and stays nearby', 3500);
+  await narrate('seo', 'A page for every city and charger', 'Built for Google search: connectors, food and stays nearby');
+  await wait(1800);
   await tap(page.locator('.cities a').filter({ hasText: 'Bengaluru' }).first());
   await page.locator('h1').waitFor();
-  await say('EV charging stations in Bengaluru', 'People searching Google find ChargeOne first', 3500);
-  await tap(page.locator('.links a').first());
-  await page.locator('h1').waitFor();
-  await say('Each charger page links into the live app', 'Structured data, sitemap and fast static pages', 3000);
-  await page.evaluate(() => window.scrollTo({ top: 520, behavior: 'smooth' }));
-  await wait(2500);
+  await settle();
 
-  // ---- Wrap-up ----
+  // ---- Account ----
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   await ready(page, '.maplibregl-canvas');
+  await wait(800);
   await tap(page.getByRole('button', { name: 'Account' }));
   await ready(page, 'section[aria-label="Account"]');
-  await say('Your account', 'Plan, trips left, cancel anytime, delete your data in one tap', 3000);
-  await tap(page.getByRole('button', { name: /Appearance/ }));
-  await wait(400);
-  await tap(page.getByRole('button', { name: 'Close' }).first());
-  await say('Dark mode for night drives', '', 3000);
+  await narrate('account', 'Your plan at a glance', 'Trips left, what Plus includes · cancel or delete any time');
+  await wait(2500);
+  await point(page.locator('.meter').nth(1));
+  await settle();
+  await tap(page.getByRole('button', { name: /Appearance/ }), 300);
+  await tap(page.getByRole('button', { name: 'Close' }).first(), 200);
+  await narrate('dark', 'Dark mode for night drives', '');
+  await settle(800);
   await say('');
 
   await card(
     {
-      lines: ['Maps, chargers, food and hotels in one app.', 'Works on any phone, installed from the browser.'],
+      lines: ['Chargers, food and hotels for your whole road trip.', 'Start free. Upgrade only when you drive out of town.'],
       items: [
         ['Free', 'map, live status, food & stays, trips up to 100 km'],
-        ['Trip Pass ₹49', '10 long trips in 7 days'],
-        ['Plus ₹149/month', '30 long trips, multi-day plans'],
-        ['Plus Yearly ₹999', 'about ₹83 a month'],
+        ['Trip Pass ₹49', 'one road trip: backups, multi-day hotels'],
+        ['Plus ₹149/mo', 'every trip, live alerts, saved trips'],
+        ['Plus Yearly ₹999', 'save 44%'],
       ],
     },
-    6500,
+    300,
   );
+  await narrate('outro', '');
+  await settle(1500);
   // Screencast timestamps are seconds since the epoch, and a still screen sends no frames, so the
   // final card lasts until now.
   const endT = Date.now() / 1000;
   await cdp.send('Page.stopScreencast');
   writeConcatList(endT);
-  console.log(`Recorded ${frames.length} frames over ${(endT - (frames[0]?.t ?? endT)).toFixed(1)} s. ${verdict}`);
+  const t0 = frames[0]?.t ?? endT;
+  writeFileSync(`${rawDir}cues.json`, JSON.stringify(cues.map((c) => ({ id: c.id, at: Number((c.t - t0).toFixed(3)) })), null, 1));
+  console.log(`Recorded ${frames.length} frames over ${(endT - t0).toFixed(1)} s with ${cues.length} narration cues. ${verdict}`);
 } catch (e) {
   console.log('Demo failed:', e instanceof Error ? e.message.split('\n')[0] : e);
   await page.screenshot({ path: `${rawDir}error.png` }).catch(() => undefined);

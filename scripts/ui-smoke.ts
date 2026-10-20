@@ -39,6 +39,13 @@ page.on('console', (m) => {
 try {
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   check('map canvas renders', await visible(page, '.maplibregl-canvas'));
+  check('first visit shows the welcome sheet', await visible(page, 'section[aria-label="Welcome to ChargeOne"]'));
+  check('welcome shows the real charger count', await visible(page, `.welcome__stats >> text=${dataset.stations.length}`, 3000));
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${shots}00-welcome.png` });
+  await page.getByRole('button', { name: 'Explore the charger map' }).click();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  check('welcome shows only once', !(await visible(page, 'section[aria-label="Welcome to ChargeOne"]', 3000)));
   check('charger count shows', await page.getByText(`${dataset.stations.length} chargers`).waitFor({ timeout: 15000 }).then(() => true, () => false));
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${shots}01-home.png` });
@@ -94,6 +101,7 @@ try {
   await page.selectOption('section[aria-label="Your car"] select', 'tata-nexon-ev-45');
   await page.getByRole('button', { name: 'Save car' }).click();
   check('car saved', await visible(page, 'text=Tata Nexon EV 45'));
+  check('free plan shows multi-day trips as a Trip Pass feature', await visible(page, '.perk-lock:has-text("Multi-day")', 3000));
 
   await page.context().setGeolocation({ latitude: 12.9756, longitude: 77.6066, accuracy: 20 });
   await page.getByPlaceholder('Start: city, area or charger').click();
@@ -107,13 +115,21 @@ try {
   if (gotPlace) await option.click();
 
   await page.getByRole('button', { name: 'Plan my trip' }).click();
-  check('free plan shows the paywall for a 140 km trip', await visible(page, 'section[aria-label="Plans"]'));
+  const paywall = 'section[aria-label="Unlock this trip"]';
+  check('free plan shows the paywall for a 140 km trip', await visible(page, paywall));
   check('paywall explains the 100 km limit', await visible(page, 'text=/free plan covers trips up to 100 km/'));
+  check('Trip Pass card shows what it leaves out', (await page.locator('li[aria-label="Trip Pass"] .perk--no').count()) >= 2);
+  check('Plus card includes every perk', (await page.locator('li[aria-label="Plus"] .perk--no').count()) === 0);
+  await page.locator(`${paywall} .segmented button`, { hasText: 'Yearly' }).click();
+  check('yearly switch shows the yearly price', await visible(page, `${paywall} .plan__price >> text=₹999`, 3000));
+  await page.locator(`${paywall} .segmented button`, { hasText: 'Monthly' }).click();
+  check('compare table covers three plans', (await page.locator('.compare thead th').count()) === 4);
   await page.screenshot({ path: `${shots}04-paywall.png` });
 
   await page.getByRole('button', { name: 'Get Plus', exact: true }).click();
   check('test-mode Plus activates', await visible(page, 'text=/Plus activated without payment/'));
-  await page.locator('section[aria-label="Plans"]').getByRole('button', { name: 'Close' }).click();
+  await page.locator(paywall).getByRole('button', { name: 'Close' }).click();
+  check('Plus unlocks the drive-per-day setting', await visible(page, '.inline-select select', 5000));
 
   await page.locator('.slider input[type="range"]').fill('30');
   await page.getByRole('button', { name: 'Plan my trip' }).click();
@@ -124,10 +140,15 @@ try {
   check('navigation link is built', (await page.getByRole('link', { name: /Start navigation/ }).getAttribute('href'))?.startsWith('https://www.google.com/maps/dir/') ?? false);
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${shots}05-trip.png` });
+  check('Plus shows live alerts are on', await visible(page, '.perk-on', 3000));
+  check('Plus shows backup chargers, not a lock', (await page.locator('.perk-lock').count()) === 0);
   await page.locator('.sheet__body').first().evaluate((el) => el.scrollTo(0, el.scrollHeight));
   await page.screenshot({ path: `${shots}06-trip-timeline.png` });
+  await page.getByRole('button', { name: 'Save trip for no-signal areas' }).click();
+  check('trip saves on the phone', await visible(page, 'text=Saved on this phone', 3000));
 
   await page.getByRole('button', { name: 'Plan another trip' }).click();
+  check('saved trip is listed', await visible(page, 'section[aria-label="Saved trips"] .saved__open', 3000));
   await dest.fill('Kochi');
   const kochi = page.locator('.place__list [role="option"]').filter({ hasText: /Kochi/ }).first();
   if (await kochi.waitFor({ timeout: 15000 }).then(() => true, () => false)) await kochi.click();
@@ -146,6 +167,9 @@ try {
   await page.getByRole('button', { name: 'Close' }).first().click();
   await page.getByRole('button', { name: 'Account' }).click();
   check('account shows Plus', await visible(page, 'section[aria-label="Account"] >> text=Plus'));
+  check('account shows trip usage', await visible(page, '.meter', 3000));
+  check('avatar shows the Plus badge', await visible(page, '.avatar__badge:has-text("PLUS")', 3000));
+  await page.screenshot({ path: `${shots}07a-account.png` });
   await page.getByRole('button', { name: /Appearance/ }).click();
   await page.getByRole('button', { name: 'Close' }).first().click();
   await page.waitForTimeout(2500);

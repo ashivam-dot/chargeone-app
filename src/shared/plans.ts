@@ -14,7 +14,18 @@ export interface Plan {
   /** Quota window for long trips. */
   longTripWindow: 'day' | 'period' | 'month';
   shortTripsPerDay: number;
-  features: string[];
+  /** Who the plan is for, shown under its name. */
+  tagline: string;
+  /** Re-planning a counted trip is free; otherwise a re-plan counts as a new trip. */
+  freeReplans: boolean;
+  /** A backup charger is shown for every charging stop. */
+  backups: boolean;
+  /** Trips can be split into days with an overnight charger and hotel. */
+  multiDay: boolean;
+  /** The trip screen warns when a stop on the route is reported broken. */
+  liveAlerts: boolean;
+  /** Trips that can be saved on the phone and reopened without using a trip. */
+  savedTrips: number;
 }
 
 export const FREE_TRIP_KM = 100;
@@ -30,11 +41,12 @@ export const PLANS: Record<PlanId, Plan> = {
     longTripQuota: 0,
     longTripWindow: 'day',
     shortTripsPerDay: 3,
-    features: [
-      'Charger map for all of India',
-      'Recently used and reported status',
-      'Trip plans up to 100 km (3 a day)',
-    ],
+    tagline: 'For driving around town',
+    freeReplans: false,
+    backups: false,
+    multiDay: false,
+    liveAlerts: false,
+    savedTrips: 0,
   },
   trip_pass: {
     id: 'trip_pass',
@@ -46,7 +58,12 @@ export const PLANS: Record<PlanId, Plan> = {
     longTripQuota: 10,
     longTripWindow: 'period',
     shortTripsPerDay: 20,
-    features: ['10 long trips of any distance', 'Valid 7 days', 'Backup chargers at every stop', 'Re-plan on the road'],
+    tagline: 'For one road trip',
+    freeReplans: true,
+    backups: true,
+    multiDay: true,
+    liveAlerts: false,
+    savedTrips: 0,
   },
   plus_monthly: {
     id: 'plus_monthly',
@@ -58,7 +75,12 @@ export const PLANS: Record<PlanId, Plan> = {
     longTripQuota: 30,
     longTripWindow: 'month',
     shortTripsPerDay: 30,
-    features: ['30 long trips a month', 'Live re-planning when a charger fails', 'Alerts if a stop on your route is reported broken', 'Backup chargers at every stop'],
+    tagline: 'For everyone who drives out of town',
+    freeReplans: true,
+    backups: true,
+    multiDay: true,
+    liveAlerts: true,
+    savedTrips: 10,
   },
   plus_yearly: {
     id: 'plus_yearly',
@@ -70,11 +92,55 @@ export const PLANS: Record<PlanId, Plan> = {
     longTripQuota: 30,
     longTripWindow: 'month',
     shortTripsPerDay: 30,
-    features: ['Everything in Plus', 'About ₹83 a month', 'Save 44% vs monthly'],
+    tagline: 'Plus, billed once a year',
+    freeReplans: true,
+    backups: true,
+    multiDay: true,
+    liveAlerts: true,
+    savedTrips: 10,
   },
 };
 
 export const PAID_PLANS: PlanId[] = ['trip_pass', 'plus_monthly', 'plus_yearly'];
+
+export const isPlus = (id: PlanId): boolean => id === 'plus_monthly' || id === 'plus_yearly';
+
+/** Percentage saved by paying yearly instead of 12 monthly payments. */
+export const YEARLY_SAVING_PCT = Math.floor((1 - PLANS.plus_yearly.pricePaise / (PLANS.plus_monthly.pricePaise * 12)) * 100);
+
+export interface CompareRow {
+  label: string;
+  /** true / false for included or not, or a short value such as "Up to 100 km". */
+  value: (p: Plan) => boolean | string;
+}
+
+/** What each plan includes, in the order the plans screen lists it. The first rows are in every plan. */
+export const COMPARE: CompareRow[] = [
+  { label: 'Live charger map and driver reports', value: () => true },
+  { label: 'Food and hotels near every charger', value: () => true },
+  { label: 'Trip length', value: (p) => (p.maxTripKm === null ? 'Any distance' : `Up to ${p.maxTripKm} km`) },
+  {
+    label: 'Trip plans',
+    value: (p) =>
+      p.longTripQuota === 0
+        ? `${p.shortTripsPerDay} a day`
+        : `${p.longTripQuota} long trips ${p.longTripWindow === 'period' ? `in ${p.periodDays} days` : 'a month'}`,
+  },
+  { label: 'Charging stops with battery, time and cost', value: () => true },
+  { label: 'Backup chargers for your stops', value: (p) => p.backups },
+  { label: 'Multi-day trips with a hotel and overnight charging', value: (p) => p.multiDay },
+  { label: 'Free re-plans from where you are', value: (p) => p.freeReplans },
+  { label: 'Alerts when a stop on your route breaks', value: (p) => p.liveAlerts },
+  { label: 'Saved trips that open without signal', value: (p) => (p.savedTrips > 0 ? `${p.savedTrips} trips` : false) },
+];
+
+/** Rows that differ between plans: what the plan cards list. */
+export const PLAN_ROWS = COMPARE.slice(2);
+
+/** The cheapest paid plan that includes a perk, for "Unlock with …" labels. */
+export function cheapestWith(perk: 'backups' | 'multiDay' | 'freeReplans' | 'liveAlerts' | 'savedTrips'): Plan {
+  return PAID_PLANS.map((id) => PLANS[id]).find((p) => Boolean(p[perk]))!;
+}
 
 /** Re-plans of a trip already counted (for example after a charger fails) are free within this window. */
 export const REPLAN_WINDOW_HOURS = 24;
@@ -111,16 +177,19 @@ export function decideTrip(
   distanceKm: number,
   usage: UsageCounts,
   isReplan: boolean,
+  /** distanceKm is the straight line, so the road is at least that long. */
+  straightLine = false,
 ): TripDecision {
   const plan = PLANS[planId];
   if (plan.maxTripKm !== null && distanceKm > plan.maxTripKm) {
+    const km = Math.round(distanceKm);
     return {
       allowed: false,
       reason: 'too_long_for_plan',
-      message: `This trip is ${Math.round(distanceKm)} km. The free plan covers trips up to ${plan.maxTripKm} km.`,
+      message: `${straightLine ? `This trip is more than ${km} km by road` : `This trip is ${km} km`}. The free plan covers trips up to ${plan.maxTripKm} km.`,
     };
   }
-  if (isReplan) return { allowed: true, counts: 'replan' };
+  if (isReplan && plan.freeReplans) return { allowed: true, counts: 'replan' };
   if (distanceKm <= FREE_TRIP_KM) {
     if (usage.shortToday >= plan.shortTripsPerDay) {
       return {

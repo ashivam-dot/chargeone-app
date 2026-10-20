@@ -1,18 +1,21 @@
-import { BedDouble, Car, Lightbulb, Moon, Navigation, Utensils } from 'lucide-preact';
+import { BedDouble, BellRing, Bookmark, BookmarkCheck, Car, Lightbulb, Moon, Navigation, Utensils, X } from 'lucide-preact';
 import { useMemo, useState } from 'preact/hooks';
 import type { Station } from '../data/model.ts';
 import type { Place, PlacesData } from '../data/places.ts';
 import { ApiError, api, currentPosition, type Me, type RouteResponse } from '../lib/api.ts';
+import { formatDate } from '../lib/format.ts';
 import { loadPlaces } from '../lib/places.ts';
+import { loadSavedTrips, removeSavedTrip, saveTrip, type SavedTrip } from '../lib/savedTrips.ts';
 import { isObject, loadJson, saveJson } from '../lib/storage.ts';
 import type { StopMarker } from '../map/MapView.tsx';
 import type { Coord } from '../planner/geometry.ts';
 import { nearbyPlaces, planJourney, staysNearDestination, type DayPlan, type Journey } from '../planner/journey.ts';
 import { DEFAULT_OPTIONS, navigationUrl, planTrip, type DrivingStyle, type PlanOptions, type TripPlan } from '../planner/planner.ts';
-import { FREE_TRIP_KM, PLANS } from '../shared/plans.ts';
+import { FREE_TRIP_KM, PLANS, cheapestWith, type Plan } from '../shared/plans.ts';
 import { LIVE_COLOUR, LIVE_LABEL, liveState, timeAgo, type StationStatus } from '../shared/status.ts';
 import type { MyVehicle } from '../shared/vehicles.ts';
 import { PlaceList } from './NearbyPlaces.tsx';
+import { PerkLock } from './PerkLock.tsx';
 import { PlaceInput, type PickedPlace } from './PlaceInput.tsx';
 import { Sheet } from './Sheet.tsx';
 
@@ -34,6 +37,7 @@ interface Props {
   onNeedVehicle: () => void;
   onRequireSignIn: () => void;
   onPaywall: (message: string) => void;
+  onPlans: () => void;
   onShow: (view: TripView | null) => void;
   onSelectStation: (id: string) => void;
   onOpenPlace: (place: Place) => void;
@@ -46,12 +50,14 @@ interface Result {
   places: PlacesData | null;
   destStays: ReturnType<typeof staysNearDestination>;
   tip: string | null;
-  from: PickedPlace;
-  to: PickedPlace;
+  from: Point;
+  to: Point;
   plannedAt: Date;
 }
 
 type Point = { name: string; lat: number; lng: number };
+
+const MULTI_DAY_LABEL = 'Multi-day trips with a hotel and overnight charging';
 
 const DAILY_HOURS = [0, 4, 6, 8, 10, 12];
 const DEFAULT_DAILY_HOURS = 8;
@@ -120,6 +126,8 @@ export function TripPlanner(props: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  const [saved, setSaved] = useState<SavedTrip[]>(loadSavedTrips);
+  const plan = PLANS[me?.plan ?? 'free'];
 
   const setOpt = <K extends keyof PlanOptions>(key: K, value: PlanOptions[K]) => {
     const next = { ...options, [key]: value };
@@ -140,7 +148,37 @@ export function TripPlanner(props: Props) {
     }
   };
 
-  const run = async (start: PickedPlace, end: PickedPlace, tripId?: string) => {
+  const present = (car: MyVehicle, response: RouteResponse, places: PlacesData | null, start: Point, end: Point) => {
+    const input = {
+      route: { coords: response.route.coords, distanceKm: response.route.distanceKm, durationMin: response.route.durationMin },
+      stations,
+      statuses,
+      vehicle: car,
+      options,
+      now: new Date(),
+    };
+    const journey = planJourney({ ...input, dailyHours: plan.multiDay ? dailyHours : 0, places });
+    const tip = journey.days.length === 1 ? fullChargeTip(journey.days[0].plan, input) : null;
+    const destStays = staysNearDestination({ stations, places }, end);
+    setResult({ response, journey, places, destStays, tip, from: start, to: end, plannedAt: new Date() });
+    props.onShow(tripView(journey, destStays, response.route.coords));
+  };
+
+  const openSaved = async (trip: SavedTrip) => {
+    if (!vehicle) {
+      props.onNeedVehicle();
+      return;
+    }
+    setBusy('Opening saved trip…');
+    setError(null);
+    try {
+      present(vehicle, trip.response, await loadPlaces(), trip.from, trip.to);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const run = async (start: Point, end: Point, tripId?: string) => {
     if (!vehicle) {
       props.onNeedVehicle();
       return;
@@ -156,19 +194,7 @@ export function TripPlanner(props: Props) {
         api.route({ lat: start.lat, lng: start.lng }, { lat: end.lat, lng: end.lng }, tripId),
         loadPlaces(),
       ]);
-      const input = {
-        route: { coords: response.route.coords, distanceKm: response.route.distanceKm, durationMin: response.route.durationMin },
-        stations,
-        statuses,
-        vehicle,
-        options,
-        now: new Date(),
-      };
-      const journey = planJourney({ ...input, dailyHours, places });
-      const tip = journey.days.length === 1 ? fullChargeTip(journey.days[0].plan, input) : null;
-      const destStays = staysNearDestination({ stations, places }, end);
-      setResult({ response, journey, places, destStays, tip, from: start, to: end, plannedAt: new Date() });
-      props.onShow(tripView(journey, destStays, response.route.coords));
+      present(vehicle, response, places, start, end);
       props.onUsageChanged();
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) props.onRequireSignIn();
@@ -184,7 +210,7 @@ export function TripPlanner(props: Props) {
     setBusy('Finding you…');
     try {
       const pos = await currentPosition();
-      await run({ name: 'My location', lat: pos.coords.latitude, lng: pos.coords.longitude, bbox: null }, result.to, result.response.tripId);
+      await run({ name: 'My location', lat: pos.coords.latitude, lng: pos.coords.longitude }, result.to, result.response.tripId);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not get your location.');
       setBusy(null);
@@ -208,7 +234,11 @@ export function TripPlanner(props: Props) {
   }, [result, statuses]);
 
   const journey = result?.journey;
-  const free = (me?.plan ?? 'free') === 'free';
+  const free = plan.id === 'free';
+  const unlock = (text: string, perk: Parameters<typeof cheapestWith>[0]) => {
+    const p = cheapestWith(perk);
+    props.onPaywall(`${text} ${p.id === 'trip_pass' ? 'come with Trip Pass and Plus' : 'come with Plus'}.`);
+  };
 
   return (
     <Sheet title={result ? `To ${result.to.name}` : 'Plan a trip'} onClose={props.onClose}>
@@ -257,25 +287,29 @@ export function TripPlanner(props: Props) {
             <input type="range" min={5} max={100} step={5} value={options.startSocPct} onInput={(e) => setOpt('startSocPct', Number((e.target as HTMLInputElement).value))} />
           </label>
 
-          <label class="inline-select">
-            <span>
-              <Moon size={16} aria-hidden="true" /> Drive per day
-            </span>
-            <select
-              value={dailyHours}
-              onChange={(e) => {
-                const v = Number((e.target as HTMLSelectElement).value);
-                setDailyHours(v);
-                saveJson('trip-daily-hours', v);
-              }}
-            >
-              {DAILY_HOURS.map((h) => (
-                <option key={h} value={h}>
-                  {h === 0 ? 'No limit (one day)' : `Up to ${h} h, then stay overnight`}
-                </option>
-              ))}
-            </select>
-          </label>
+          {plan.multiDay ? (
+            <label class="inline-select">
+              <span>
+                <Moon size={16} aria-hidden="true" /> Drive per day
+              </span>
+              <select
+                value={dailyHours}
+                onChange={(e) => {
+                  const v = Number((e.target as HTMLSelectElement).value);
+                  setDailyHours(v);
+                  saveJson('trip-daily-hours', v);
+                }}
+              >
+                {DAILY_HOURS.map((h) => (
+                  <option key={h} value={h}>
+                    {h === 0 ? 'No limit (one day)' : `Up to ${h} h, then stay overnight`}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <PerkLock text={MULTI_DAY_LABEL} plan={cheapestWith('multiDay')} onUnlock={() => unlock(MULTI_DAY_LABEL, 'multiDay')} />
+          )}
 
           <button type="button" class="link" aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>
             {showMore ? 'Fewer options' : 'More options (reserve, AC, passengers, driving style)'}
@@ -337,8 +371,36 @@ export function TripPlanner(props: Props) {
           </button>
           {free && (
             <p class="small muted center">
-              Free plan: trips up to {FREE_TRIP_KM} km, {PLANS.free.shortTripsPerDay} a day. Longer trips with Trip Pass or Plus.
+              Free plan: trips up to {FREE_TRIP_KM} km, {PLANS.free.shortTripsPerDay} a day.{' '}
+              <button type="button" class="link link--inline" onClick={props.onPlans}>
+                Longer trips from ₹49
+              </button>
             </p>
+          )}
+
+          {plan.savedTrips > 0 && saved.length > 0 && (
+            <section class="saved" aria-label="Saved trips">
+              <h3>
+                <BookmarkCheck size={16} aria-hidden="true" /> Saved trips
+              </h3>
+              <ul>
+                {saved.map((t) => (
+                  <li key={t.id}>
+                    <button type="button" class="saved__open" disabled={busy !== null} onClick={() => void openSaved(t)}>
+                      <strong>
+                        {t.from.name} → {t.to.name}
+                      </strong>
+                      <span class="muted small">
+                        {Math.round(t.response.route.distanceKm)} km · saved {formatDate(t.savedAt)}
+                      </span>
+                    </button>
+                    <button type="button" class="icon-btn icon-btn--small" aria-label={`Remove ${t.to.name} trip`} onClick={() => setSaved(removeSavedTrip(t.id))}>
+                      <X size={16} aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
         </form>
       )}
@@ -351,6 +413,11 @@ export function TripPlanner(props: Props) {
           busy={busy}
           error={error}
           me={me}
+          plan={plan}
+          statuses={statuses}
+          saved={saved.some((t) => t.id === result.response.tripId)}
+          onSave={() => setSaved(saveTrip(result.from, result.to, result.response, plan.savedTrips))}
+          onUnlock={unlock}
           onReplan={() => void replanFromHere()}
           onClear={clear}
           onSelectStation={props.onSelectStation}
@@ -368,6 +435,11 @@ interface ResultProps {
   busy: string | null;
   error: string | null;
   me: Me | null;
+  plan: Plan;
+  statuses: Map<string, StationStatus>;
+  saved: boolean;
+  onSave: () => void;
+  onUnlock: (text: string, perk: Parameters<typeof cheapestWith>[0]) => void;
   onReplan: () => void;
   onClear: () => void;
   onSelectStation: (id: string) => void;
@@ -385,10 +457,12 @@ function verdictText(j: Journey): string {
   return j.stopCount ? `You'll make it with ${stops}` : "You'll make it without charging";
 }
 
-function JourneyResult({ result, journey, alerts, busy, error, me, onReplan, onClear, onSelectStation, onOpenPlace }: ResultProps) {
+function JourneyResult(props: ResultProps) {
+  const { result, journey, alerts, busy, error, me, plan, statuses, saved, onSave, onUnlock, onReplan, onClear, onSelectStation, onOpenPlace } = props;
   const ends = dayEnds(journey, result.from, result.to);
   const multi = journey.days.length > 1;
   const area = (stationId: string) => result.places?.area[stationId] ?? null;
+  const now = new Date();
   let stopNo = 0;
 
   return (
@@ -417,14 +491,24 @@ function JourneyResult({ result, journey, alerts, busy, error, me, onReplan, onC
         </div>
       </div>
 
-      {alerts.map((a) => (
-        <div key={a} class="notice notice--error" role="alert">
-          {a}{' '}
-          <button class="link" onClick={onReplan}>
-            Re-plan now
-          </button>
-        </div>
-      ))}
+      {plan.liveAlerts &&
+        alerts.map((a) => (
+          <div key={a} class="notice notice--error" role="alert">
+            {a}{' '}
+            <button class="link" onClick={onReplan}>
+              Re-plan now
+            </button>
+          </div>
+        ))}
+      {plan.liveAlerts && journey.stopCount > 0 && alerts.length === 0 && (
+        <p class="perk-on">
+          <BellRing size={16} aria-hidden="true" />
+          <span>
+            <strong>Alerts on.</strong> {journey.stopCount > 1 ? `If any of your ${journey.stopCount} stops is` : 'If your charging stop is'} reported broken
+            while this trip is open, you'll see it here with a one-tap re-plan.
+          </span>
+        </p>
+      )}
       {result.tip && (
         <p class="notice notice--ok">
           <Lightbulb size={16} aria-hidden="true" /> {result.tip}
@@ -481,25 +565,30 @@ function JourneyResult({ result, journey, alerts, busy, error, me, onReplan, onC
                       </div>
                       <div class="badges">
                         <span class={`badge badge--${s.confidence}`}>{CONFIDENCE_LABEL[s.confidence]}</span>
-                        <span class="badge">
-                          <span class="dot" style={{ background: LIVE_COLOUR[s.live] }} aria-hidden="true" /> {LIVE_LABEL[s.live]}
-                        </span>
+                        <LiveBadge state={liveState(statuses.get(s.station.id), now)} />
                       </div>
                       <ul class="timeline__notes">
                         {s.notes.map((n) => (
                           <li key={n}>{n}</li>
                         ))}
                       </ul>
-                      {s.backups.length > 0 && (
-                        <div class="backups">
-                          <span class="small muted">If it's busy or down:</span>
-                          {s.backups.map((b) => (
-                            <button key={b.station.id} class="backup" onClick={() => onSelectStation(b.station.id)}>
-                              {b.station.name} · km {Math.round(d.startKm + b.alongKm)} · arrive {b.arriveSocPct}% · {b.mode.toUpperCase()} {b.powerKw} kW
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      {s.backups.length > 0 &&
+                        (plan.backups ? (
+                          <div class="backups">
+                            <span class="small muted">If it's busy or down:</span>
+                            {s.backups.map((b) => (
+                              <button key={b.station.id} class="backup" onClick={() => onSelectStation(b.station.id)}>
+                                {b.station.name} · km {Math.round(d.startKm + b.alongKm)} · arrive {b.arriveSocPct}% · {b.mode.toUpperCase()} {b.powerKw} kW
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <PerkLock
+                            text={`${s.backups.length} backup charger${s.backups.length > 1 ? 's' : ''} found for this stop`}
+                            plan={cheapestWith('backups')}
+                            onUnlock={() => onUnlock('Backup chargers for your stops', 'backups')}
+                          />
+                        ))}
                       {food.length > 0 && (
                         <details class="stop-places">
                           <summary>
@@ -538,6 +627,13 @@ function JourneyResult({ result, journey, alerts, busy, error, me, onReplan, onC
         </section>
       )}
 
+      {!plan.liveAlerts && journey.stopCount > 0 && (
+        <PerkLock
+          text={`Get alerted if any of your ${journey.stopCount} stop${journey.stopCount > 1 ? 's' : ''} breaks on the way`}
+          plan={cheapestWith('liveAlerts')}
+          onUnlock={() => onUnlock('Live alerts for the stops on your route', 'liveAlerts')}
+        />
+      )}
       {error && (
         <p class="notice notice--error" role="alert">
           {error}
@@ -552,8 +648,16 @@ function JourneyResult({ result, journey, alerts, busy, error, me, onReplan, onC
         >
           {multi ? 'Start day 1 in Google Maps' : 'Start navigation in Google Maps'}
         </a>
+        {plan.savedTrips > 0 ? (
+          <button class="btn btn--block" disabled={saved} onClick={onSave}>
+            {saved ? <BookmarkCheck size={18} aria-hidden="true" /> : <Bookmark size={18} aria-hidden="true" />}
+            {saved ? 'Saved on this phone' : 'Save trip for no-signal areas'}
+          </button>
+        ) : (
+          <PerkLock text="Save this trip to open without signal" plan={cheapestWith('savedTrips')} onUnlock={() => onUnlock('Saved trips', 'savedTrips')} />
+        )}
         <button class="btn btn--block" disabled={busy !== null} onClick={onReplan}>
-          {busy ?? 'Re-plan from where I am (free)'}
+          {busy ?? (plan.freeReplans ? 'Re-plan from where I am (free)' : "Re-plan from where I am (uses one of today's trips)")}
         </button>
         <button class="btn btn--block btn--ghost" onClick={onClear}>
           Plan another trip
@@ -565,6 +669,14 @@ function JourneyResult({ result, journey, alerts, busy, error, me, onReplan, onC
         {result.response.counted === 'long' && me?.usage ? ` Long trips used: ${me.usage.longInWindow} of ${me.limits.longTripQuota}.` : ''}
       </p>
     </div>
+  );
+}
+
+function LiveBadge({ state }: { state: ReturnType<typeof liveState> }) {
+  return (
+    <span class="badge">
+      <span class="dot" style={{ background: LIVE_COLOUR[state] }} aria-hidden="true" /> {LIVE_LABEL[state]}
+    </span>
   );
 }
 

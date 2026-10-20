@@ -4,6 +4,7 @@ import {
   GeolocateControl,
   Map as MapLibreMap,
   setWorkerUrl,
+  type ExpressionSpecification,
   type GeoJSONSource,
   type MapGeoJSONFeature,
 } from 'maplibre-gl';
@@ -68,6 +69,18 @@ const CLICKABLE = Object.keys(TAP_RADIUS_PX);
 const TAP_SLOP_PX = 8;
 const LIGHT_STYLE = 'https://tiles.openfreemap.org/styles/positron';
 const DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark';
+/** On a portrait phone the whole-India box leaves half the screen on Central Asia; this one fills it with India. */
+const PHONE_BBOX: [number, number, number, number] = [69.5, 7, 92, 34];
+const ENGLISH_NAME: ExpressionSpecification = ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name:latin'], ['get', 'name']];
+
+/** The base style labels places in Latin and local script; show one English name instead. */
+function englishLabels(map: MapLibreMap): void {
+  for (const layer of map.getStyle().layers) {
+    if (layer.type !== 'symbol') continue;
+    const field = map.getLayoutProperty(layer.id, 'text-field');
+    if (field && JSON.stringify(field).includes('name')) map.setLayoutProperty(layer.id, 'text-field', ENGLISH_NAME);
+  }
+}
 
 function stationsGeoJson(stations: Station[], statuses: Map<string, StationStatus>): FeatureCollection<Point> {
   const now = new Date();
@@ -274,12 +287,13 @@ export function MapView(props: Props) {
 
   useEffect(() => {
     if (!container.current) return;
+    const box = container.current.clientWidth < 600 ? PHONE_BBOX : INDIA_BBOX;
     const map = new MapLibreMap({
       container: container.current,
       style: styleUrl.current,
       bounds: [
-        [INDIA_BBOX[0], INDIA_BBOX[1]],
-        [INDIA_BBOX[2], INDIA_BBOX[3]],
+        [box[0], box[1]],
+        [box[2], box[3]],
       ],
       fitBoundsOptions: { padding: 24 },
       attributionControl: false,
@@ -295,6 +309,7 @@ export function MapView(props: Props) {
 
     map.on('style.load', () => {
       const l = latest.current;
+      englishLabels(map);
       addLayers(
         map,
         { stations: stationsGeoJson(l.stations, l.statuses), route: routeGeoJson(l.route), stops: stopsGeoJson(l.stops), places: placesGeoJson(l.places) },
