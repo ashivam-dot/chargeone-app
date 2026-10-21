@@ -71,6 +71,77 @@ describe('ObdSource', () => {
     expect(t.closed).toBe(true);
   });
 
+  it('reads battery % from the MG BMS profile when the standard PID is missing', async () => {
+    const mg = myVehicleFromModel(VEHICLES.find((v) => v.id === 'mg-zs-ev')!);
+    const noStdSoc = [PID.speed, 0x20, 0x40];
+    const t = new FakeElm({
+      ATZ: 'ELM327 v1.5',
+      '0100': bitmapReply(0x00, noStdSoc),
+      '0120': bitmapReply(0x20, noStdSoc),
+      '0140': bitmapReply(0x40, noStdSoc),
+      '010D': '410D5A',
+      '22B046': '62B0460268',
+    });
+    const src = new ObdSource({ vehicle: mg, openTransport: async () => t });
+    const seen: Telemetry[] = [];
+    src.subscribe((r) => seen.push(r));
+    await src.connect();
+    expect(src.state).toBe('connected');
+    expect(src.socProfileLabel).toMatch(/MG BMS/);
+    expect(seen[0].socPct).toBeCloseTo(61.6, 1);
+    expect(seen[0].socMeasured).toBe(true);
+    expect(seen[0].speedKmh).toBe(90);
+    expect(t.sent('ATSH781')).toBeGreaterThan(0);
+    expect(t.sent('ATSH7DF')).toBeGreaterThan(0);
+    await src.disconnect();
+  });
+
+  it('reads battery % from the BYD BMS profile', async () => {
+    const byd = myVehicleFromModel(VEHICLES.find((v) => v.id === 'byd-atto3')!);
+    const noStdSoc = [PID.speed, 0x20, 0x40];
+    const t = new FakeElm({
+      ATZ: 'ELM327 v1.5',
+      '0100': bitmapReply(0x00, noStdSoc),
+      '0120': bitmapReply(0x20, noStdSoc),
+      '0140': bitmapReply(0x40, noStdSoc),
+      '010D': '410D00',
+      '221FFC': '621FFC2422',
+    });
+    const src = new ObdSource({ vehicle: byd, openTransport: async () => t });
+    const seen: Telemetry[] = [];
+    src.subscribe((r) => seen.push(r));
+    await src.connect();
+    expect(src.socProfileLabel).toMatch(/BYD BMS/);
+    expect(seen[0].socPct).toBeCloseTo(87.4, 1);
+    await src.disconnect();
+  });
+
+  it('rejects an implausible profile reading rather than showing a wrong battery %', async () => {
+    const mg = myVehicleFromModel(VEHICLES.find((v) => v.id === 'mg-zs-ev')!);
+    const noStdSoc = [PID.speed, 0x20, 0x40];
+    const t = new FakeElm({
+      ATZ: 'ELM327 v1.5',
+      '0100': bitmapReply(0x00, noStdSoc),
+      '0120': bitmapReply(0x20, noStdSoc),
+      '0140': bitmapReply(0x40, noStdSoc),
+      '010D': '410D5A',
+      '22B046': '62B046FFFF', // 6553.5 %, out of range
+    });
+    const src = new ObdSource({ vehicle: mg, openTransport: async () => t });
+    await expect(src.connect()).rejects.toMatchObject({ code: 'no_soc' });
+    expect(src.socProfileLabel).toBeNull();
+  });
+
+  it('does not use a maker profile when the standard PID works', async () => {
+    const mg = myVehicleFromModel(VEHICLES.find((v) => v.id === 'mg-zs-ev')!);
+    const t = adapter({ '22B046': '62B0460268' });
+    const src = new ObdSource({ vehicle: mg, openTransport: async () => t });
+    await src.connect();
+    expect(src.socProfileLabel).toBeNull();
+    expect(t.sent('22B046')).toBe(0);
+    await src.disconnect();
+  });
+
   it('identifies the car from its VIN on connect, even when it then refuses for battery %', async () => {
     const vinReply = '014\n0:4902014D4154\n1:3633353030334E\n2:4C473038363131';
     const seen: string[] = [];

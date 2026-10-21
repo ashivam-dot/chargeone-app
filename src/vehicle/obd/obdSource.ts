@@ -4,6 +4,7 @@ import { FixTracker, type FixStep } from '../track.ts';
 import type { ConnectionState, PositionFix, Telemetry, VehicleSource, WatchPosition } from '../types.ts';
 import { Listeners } from '../util.ts';
 import { Elm327, ObdError, PID, type Elm327Options, type ObdTransport } from './elm327.ts';
+import { makerFromModelId, socProfileFor, type SocProfile } from './socProfiles.ts';
 
 export interface ObdSourceOptions {
   vehicle: MyVehicle;
@@ -30,9 +31,14 @@ const CHARGING_HOLD_MS = 120_000;
 const SLOW_READ_EVERY = 10;
 const FAILURES_BEFORE_ERROR = 3;
 
+/** Two connect-time reads must land within this many % of each other before a maker profile is trusted. */
+const PROFILE_AGREE_PCT = 3;
+
 /**
- * OBD-II (beta) over an ELM327 adapter: battery % (PID 5B) and speed (PID 0D) from the car, location
- * from the phone. Battery temperature, health and power have no standard PIDs, so they stay null.
+ * OBD-II (beta) over an ELM327 adapter: battery % and speed (PID 0D) from the car, location from the
+ * phone. Battery % comes from the standard PID 5B when the car supports it, otherwise from the maker's
+ * own diagnostic identifier (socProfiles.ts) when one is known for this car and agrees with itself on
+ * connect. Battery temperature, health and power have no standard PIDs, so they stay null.
  */
 export class ObdSource implements VehicleSource {
   readonly kind = 'obd' as const;
@@ -42,6 +48,8 @@ export class ObdSource implements VehicleSource {
   private readonly now: () => number;
   private elm: Elm327 | null = null;
   private supported = new Set<number>();
+  /** Set when battery % is read from a maker profile instead of the standard PID 5B. */
+  private socProfile: SocProfile | null = null;
   private stopWatch: (() => void) | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private running = false;
@@ -90,11 +98,17 @@ export class ObdSource implements VehicleSource {
     return this.supported;
   }
 
+  /** When battery % comes from a maker's diagnostic identifier rather than the standard PID, its label. */
+  get socProfileLabel(): string | null {
+    return this.socProfile?.label ?? null;
+  }
+
   /** Opens the adapter, checks the car shares battery %, then polls every few seconds. Rejects with ObdError. */
   async connect(): Promise<void> {
     if (this.running) return;
     this.connectionState = 'connecting';
     this.error = null;
+    this.socProfile = null;
     let elm: Elm327 | null = null;
     try {
       elm = new Elm327(await this.opts.openTransport(), this.opts.elm);
@@ -103,7 +117,11 @@ export class ObdSource implements VehicleSource {
       // Identifying the car is worth it even when it won't share battery %.
       const vin = await elm.readVin().catch(() => null);
       if (vin) this.opts.onVin?.(vin);
-      if (!this.supported.has(PID.evBatteryPct)) throw new ObdError('no_soc');
+      // Standard PID 5B first; otherwise fall back to the maker's own BMS identifier when it checks out.
+      if (!this.supported.has(PID.evBatteryPct)) {
+        this.socProfile = await this.pickSocProfile(elm);
+        if (!this.socProfile) throw new ObdError('no_soc');
+      }
     } catch (err) {
       await elm?.close().catch(() => undefined);
       const obdErr = err instanceof ObdError ? err : new ObdError('unable_to_connect', err instanceof Error ? err.message : undefined);
@@ -140,7 +158,7 @@ export class ObdSource implements VehicleSource {
     const elm = this.elm;
     if (!elm) throw new ObdError('closed');
     const slow = this.polls++ % SLOW_READ_EVERY === 0;
-    const soc = await elm.readEvBatteryPct();
+    const soc = this.socProfile ? await elm.readProfileSoc(this.socProfile) : await elm.readEvBatteryPct();
     const speed = this.supported.has(PID.speed) ? await elm.readSpeedKmh() : null;
     if (slow && this.supported.has(PID.ambientTemp)) this.ambient = (await elm.readAmbientC()) ?? this.ambient;
     if (slow && this.supported.has(PID.moduleVoltage)) this.voltage = (await elm.readModuleVoltage()) ?? this.voltage;
@@ -165,6 +183,19 @@ export class ObdSource implements VehicleSource {
       }
       this.schedule();
     }, this.opts.pollMs ?? 3000);
+  }
+
+  /**
+   * The maker profile for this car, but only if it actually returns a plausible battery % twice in a
+   * row on connect. A wrong car, a locked gateway or changed firmware fails the check and we read speed only.
+   */
+  private async pickSocProfile(elm: Elm327): Promise<SocProfile | null> {
+    const profile = socProfileFor(makerFromModelId(this.opts.vehicle.modelId));
+    if (!profile) return null;
+    const a = await elm.readProfileSoc(profile).catch(() => null);
+    if (a === null) return null;
+    const b = await elm.readProfileSoc(profile).catch(() => null);
+    return b !== null && Math.abs(a - b) <= PROFILE_AGREE_PCT ? profile : null;
   }
 
   private onFix(fix: PositionFix): void {

@@ -58,6 +58,10 @@ out by zoom 3.6, terrain, 3D buildings, route draw-in, `Tilt3dControl`). No cyan
   (`POST /api/vehicle/lookup`: Deepvue, Cashfree fallback; off until secrets; consent `veh-lookup-v1`;
   3/device + 20/IP a day; owner PII stripped, VIN cut to 10 chars). OBD: `elm327.readVin()` (0902, then UDS
   22F190) -> `carLink.detected` -> "Recognised over OBD-II" / "connected car is a …" note on the Car tab.
+  Live battery %: standard PID 0x5B first; cars that skip it (MG, BYD) fall back to the maker's published
+  read-only BMS identifier via `src/vehicle/obd/socProfiles.ts` (MG `781`/`22B046`, BYD `7E7`/`221FFC`),
+  read with `Elm327.readProfileSoc`. Each profile range-gates its value and must agree on two connect
+  reads (`ObdSource.pickSocProfile`) or it's dropped to speed-only. Read-only only; no app reverse-engineering.
   `src/shared/operatorApps.ts` (62 operators: Android package, iOS id, website; packages also in the manifest
   `<queries>`), `src/native/operatorApp.ts` (open if installed, else store), `src/voice/normalize.ts`.
 - `worker/`: API. `agent.ts` (copilot on `@cf/google/gemma-4-26b-a4b-it`, fallback model), `trial.ts`,
@@ -87,7 +91,7 @@ out by zoom 3.6, terrain, 3D buildings, route draw-in, `Tilt3dControl`). No cyan
 npm run setup:dev            # local D1 + migrations
 npm run dev:api              # wrangler dev on 8787 (serves the built app too)
 npm run build                # typecheck, build, prerender, bundle budget (380 KB start-up)
-npm test                     # 512 unit tests (app + worker)
+npm test                     # 522 unit tests (app + worker)
 npx playwright test          # 70 e2e (pixel-7, small-phone-360, desktop); needs `npm run build` and `npm run dev:api`
 node scripts/ui-shots.ts <dir> [--light]   # screenshots of key screens for a visual check
 # All browsers are muted (--mute-audio + speechSynthesis stub in e2e/fixtures.ts): never play sound.
@@ -103,7 +107,7 @@ headless shell's SwiftShader gives 2-3 fps) -> `scripts/demo-landscape.ts` -> `s
 
 ## State on 2026-10-21
 
-Done and verified: all features above; 512 unit + 70 e2e pass; README updated; demo videos made.
+Done and verified: all features above; 522 unit + 70 e2e pass; README updated; demo videos made.
 Redesign v2 (later 2026-10-21): new theme and map, generated per-model 3D cars (22), plate/VIN lookup, OBD
 auto-detect. Promo re-recorded for v2 (release `demo-2026-10-21-v2`). Voice venv needs Python 3.12
 (`/opt/homebrew/bin/python3.12`; system 3.9 can't unpack the model).

@@ -72,6 +72,14 @@ export function About({ dataset, onClose }: Props) {
         </ul>
       )}
 
+      <h3>Live battery over OBD-II (beta)</h3>
+      <p class="small">
+        With your own Bluetooth ELM327 adapter, ChargeOne reads live battery % and speed from the car. Most EVs answer the standard OBD-II
+        battery PID; for MG and BYD, which don't, we use the maker's own published battery diagnostic identifier (the same read-only codes Car
+        Scanner and Torque Pro use). We only ever read — never write, clear codes, or reverse-engineer a maker's app — and a reading that
+        doesn't check out is dropped rather than shown. If your car shares nothing, phone tracking still estimates range.
+      </p>
+
       <h3>Privacy</h3>
       <p class="small">
         Your location is used on your phone to show nearby chargers and is only sent to us when you report a charger or plan a trip. Your car

@@ -105,6 +105,22 @@ export function pidPayloads(lines: string[], pid: number): number[][] {
   return out;
 }
 
+/** Data bytes of a Mode 22 reply, from the first line that contains `responsePrefix` (e.g. '62B046'). */
+export function mode22Payload(lines: string[], responsePrefix: string): number[] | null {
+  const prefix = responsePrefix.toUpperCase();
+  for (const line of lines) {
+    const c = compact(line);
+    const at = c.indexOf(prefix);
+    if (at < 0) continue;
+    const hex = c.slice(at + prefix.length);
+    if (hex.length === 0 || hex.length % 2 !== 0 || !/^[0-9A-F]+$/.test(hex)) continue;
+    const bytes: number[] = [];
+    for (let i = 0; i < hex.length; i += 2) bytes.push(parseInt(hex.slice(i, i + 2), 16));
+    return bytes;
+  }
+  return null;
+}
+
 /** PIDs flagged in a 4-byte "supported PIDs" bitmap; bit 7 of byte A is PID base+1. */
 export function supportedFromBitmap(base: number, bytes: number[]): number[] {
   const out: number[] = [];
@@ -246,6 +262,30 @@ export class Elm327 {
 
   async readModuleVoltage(): Promise<number | null> {
     return this.readDecoded(PID.moduleVoltage, 2, decode.moduleVoltage);
+  }
+
+  /**
+   * A maker-specific BMS value read with Mode 22 at a particular ECU header, restoring the broadcast
+   * header afterwards. Returns the data bytes after `responsePrefix`, or null when the car has nothing.
+   * Used for battery % on EVs that skip the standard PID 0x5B (see socProfiles.ts).
+   */
+  async readMode22(header: string, request: string, responsePrefix: string): Promise<number[] | null> {
+    try {
+      await this.send(`ATSH${header}`);
+      const lines = await this.send(request, Math.max(this.timeoutMs, 5000));
+      return mode22Payload(lines, responsePrefix);
+    } catch (err) {
+      if (err instanceof ObdError && ['no_data', 'bad_response', 'unknown_command', 'timeout'].includes(err.code)) return null;
+      throw err;
+    } finally {
+      await this.send('ATSH7DF').catch(() => undefined);
+    }
+  }
+
+  /** Battery % via a maker's diagnostic identifier, decoded and range-gated by the profile; null if unavailable. */
+  async readProfileSoc(p: { header: string; request: string; responsePrefix: string; decode: (b: number[]) => number | null }): Promise<number | null> {
+    const bytes = await this.readMode22(p.header, p.request, p.responsePrefix);
+    return bytes ? p.decode(bytes) : null;
   }
 
   /**
