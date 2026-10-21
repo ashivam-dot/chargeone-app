@@ -16,10 +16,10 @@ const SCREEN = { x: 1262, y: 40, w: 450, h: 1000, radius: 46 };
 const BEZEL = 13;
 
 const CHAPTERS: Array<{ title: string; sub: string; from: string }> = [
-  { title: 'Your car, in 3D', sub: 'Pick a model and paint · Plus free for 7 days', from: 'pickcar' },
+  { title: 'Your car, in 3D', sub: 'Found by chassis number · built from real dimensions', from: 'pickcar' },
   { title: 'A 3D map of India', sub: 'Globe, terrain and glowing chargers', from: 'globe' },
   { title: 'Available or occupied', sub: 'Driver reports · opens the operator’s app', from: 'station' },
-  { title: 'Connected car', sub: 'Live battery and power · phone GPS or OBD-II beta', from: 'car' },
+  { title: 'Connected car', sub: 'Live battery · phone GPS or OBD-II beta that knows your car', from: 'car' },
   { title: 'AI trip co-pilot', sub: 'Plan by voice in Hindi or English · HD voice', from: 'copilot' },
   { title: 'Compare routes', sub: 'Up to 3 routes, drawn in and explained', from: 'routes' },
   { title: 'Live drive alerts', sub: 'Battery dropping fast? Charge earlier', from: 'drive' },
@@ -32,33 +32,33 @@ function page(active: number | null): string {
   ).join('');
   return `<!doctype html><html><head><style>
   @font-face{font-family:Inter;src:url(${fonts}geist/files/geist-latin-wght-normal.woff2) format('woff2');font-weight:100 900}
-  @font-face{font-family:Grotesk;src:url(${fonts}unbounded/files/unbounded-latin-wght-normal.woff2) format('woff2');font-weight:200 900}
+  @font-face{font-family:Grotesk;src:url(${fonts}geist/files/geist-latin-wght-normal.woff2) format('woff2');font-weight:200 900}
   *{box-sizing:border-box;margin:0;padding:0}
   body{width:1920px;height:1080px;overflow:hidden;color:#e6edf6;font-family:Inter,sans-serif;
-    background:radial-gradient(900px 700px at 8% 0%,rgba(34,211,238,.20),transparent 60%),
-      radial-gradient(900px 800px at 100% 100%,rgba(139,92,246,.22),transparent 60%),
-      radial-gradient(600px 600px at 74% 45%,rgba(52,211,153,.10),transparent 70%),#05070b}
+    background:radial-gradient(900px 700px at 8% 0%,rgba(43,107,255,.20),transparent 60%),
+      radial-gradient(900px 800px at 100% 100%,rgba(30,58,138,.22),transparent 60%),
+      radial-gradient(600px 600px at 74% 45%,rgba(91,140,255,.10),transparent 70%),#05070b}
   body::before{content:'';position:absolute;inset:0;opacity:.35;
     background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
     background-size:64px 64px;mask-image:radial-gradient(circle at 30% 40%,#000,transparent 75%)}
   .left{position:absolute;left:150px;top:96px;width:880px}
   .brand{display:flex;align-items:center;gap:22px}
-  .brand svg{width:76px;height:76px;border-radius:20px;box-shadow:0 10px 40px rgba(34,211,238,.35)}
+  .brand svg{width:76px;height:76px;border-radius:20px;box-shadow:0 10px 40px rgba(43,107,255,.35)}
   h1{font:700 76px/1 Grotesk,sans-serif;letter-spacing:-2px}
-  h1 span{background:linear-gradient(90deg,#22d3ee,#34d399);-webkit-background-clip:text;color:transparent}
+  h1 span{background:linear-gradient(90deg,#2b6bff,#5b8cff);-webkit-background-clip:text;color:transparent}
   .tag{margin-top:22px;font-size:30px;line-height:1.3;color:#b9c4d4;font-weight:500}
   ul{list-style:none;margin-top:46px;display:grid;gap:10px}
   li{display:flex;gap:20px;align-items:center;padding:13px 20px;border-radius:18px;opacity:.42;border:1px solid transparent}
-  li .n{font:600 20px Grotesk,sans-serif;color:#67e8f9;width:30px}
+  li .n{font:600 20px Grotesk,sans-serif;color:#7fb0ff;width:30px}
   li b{display:block;font-size:26px;font-weight:650}
   li small{display:block;font-size:18px;color:#9fb0c6;margin-top:3px}
-  li.on{opacity:1;background:linear-gradient(90deg,rgba(34,211,238,.16),rgba(139,92,246,.10));border-color:rgba(103,232,249,.35);
-    box-shadow:0 10px 40px rgba(34,211,238,.12)}
+  li.on{opacity:1;background:linear-gradient(90deg,rgba(43,107,255,.16),rgba(30,58,138,.10));border-color:rgba(127,176,255,.35);
+    box-shadow:0 10px 40px rgba(43,107,255,.12)}
   .foot{position:absolute;left:150px;bottom:64px;font-size:20px;color:#9fb0c6}
   .foot b{color:#e6edf6;font-weight:600}
   .bezel{position:absolute;left:${SCREEN.x - BEZEL}px;top:${SCREEN.y - BEZEL}px;width:${SCREEN.w + 2 * BEZEL}px;height:${SCREEN.h + 2 * BEZEL}px;
     border-radius:${SCREEN.radius + BEZEL}px;background:linear-gradient(160deg,#1b2230,#07090e 40%,#141a25);
-    box-shadow:0 0 0 1.5px rgba(255,255,255,.14),0 40px 120px rgba(0,0,0,.65),0 0 90px rgba(34,211,238,.18)}
+    box-shadow:0 0 0 1.5px rgba(255,255,255,.14),0 40px 120px rgba(0,0,0,.65),0 0 90px rgba(43,107,255,.18)}
   </style></head><body>
   <div class="left">
     <div class="brand">${icon}<h1>Charge<span>One</span></h1></div>

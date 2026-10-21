@@ -44,26 +44,27 @@ const overlay = () => {
       font:600 15px/1.35 'Geist Variable',system-ui,sans-serif;padding:11px 14px;border-radius:16px;
       border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 30px rgba(0,0,0,.45);transition:opacity .3s;opacity:0}
     #demo-cap.top{top:calc(14px + env(safe-area-inset-top));bottom:auto}
-    #demo-cap small{display:block;font-weight:500;font-size:12.5px;color:#67e8f9;margin-top:3px}
+    #demo-cap.actions{bottom:calc(142px + env(safe-area-inset-bottom))}
+    #demo-cap small{display:block;font-weight:500;font-size:12.5px;color:#7fb0ff;margin-top:3px}
     .demo-tap{position:fixed;z-index:99999;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
-      border:3px solid #22d3ee;background:rgba(34,211,238,.22);pointer-events:none;animation:demo-tap .7s ease-out forwards}
+      border:3px solid #2b6bff;background:rgba(43,107,255,.22);pointer-events:none;animation:demo-tap .7s ease-out forwards}
     @keyframes demo-tap{from{transform:scale(.4);opacity:1}to{transform:scale(1.5);opacity:0}}
     #demo-card{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;justify-content:center;
       align-items:center;text-align:center;padding:32px;color:#fff;font-family:'Geist Variable',system-ui,sans-serif;
-      background:radial-gradient(120% 70% at 50% 0%,rgba(34,211,238,.22),transparent 60%),
-        radial-gradient(90% 60% at 50% 100%,rgba(139,92,246,.22),transparent 60%),#05070b;
+      background:radial-gradient(120% 70% at 50% 0%,rgba(43,107,255,.22),transparent 60%),
+        radial-gradient(90% 60% at 50% 100%,rgba(30,58,138,.22),transparent 60%),#05070b;
       background-size:100% 160%;animation:demo-drift 6s ease-in-out infinite alternate;transition:opacity .5s}
     @keyframes demo-drift{from{background-position:0 0}to{background-position:0 100%}}
-    #demo-card h1{font:700 42px/1 'Unbounded Variable',system-ui,sans-serif;margin:0 0 14px;letter-spacing:-1px}
-    #demo-card h1 span{background:linear-gradient(90deg,#22d3ee,#34d399,#22d3ee);background-size:200% 100%;
+    #demo-card h1{font:700 42px/1 'Geist Variable',system-ui,sans-serif;margin:0 0 14px;letter-spacing:-1px}
+    #demo-card h1 span{background:linear-gradient(90deg,#2b6bff,#5b8cff,#2b6bff);background-size:200% 100%;
       -webkit-background-clip:text;color:transparent;animation:demo-shine 3s linear infinite}
     @keyframes demo-shine{to{background-position:-200% 0}}
     #demo-card p{font-size:17px;color:#cbd5e1;margin:4px 0;line-height:1.45;animation:demo-in .6s both}
     #demo-card ul{list-style:none;padding:0;margin:24px 0 0;font-size:15.5px;line-height:1.95;color:#e2e8f0}
     #demo-card li{animation:demo-in .6s both}
     @keyframes demo-in{from{opacity:0;transform:translateY(12px)}}
-    #demo-card .hook{font:700 25px/1.25 'Unbounded Variable',system-ui,sans-serif;color:#fff;margin-top:18px}
-    #demo-card b{color:#67e8f9}`,
+    #demo-card .hook{font:700 25px/1.25 'Geist Variable',system-ui,sans-serif;color:#fff;margin-top:18px}
+    #demo-card b{color:#7fb0ff}`,
   );
   const install = () => {
     document.head.appendChild(style);
@@ -75,9 +76,10 @@ const overlay = () => {
   else install();
 
   (window as any).__demo = {
-    caption(title: string, sub: string, top = false) {
+    caption(title: string, sub: string, place: 'bottom' | 'top' | 'actions' = 'bottom') {
       const cap = document.getElementById('demo-cap')!;
-      cap.classList.toggle('top', top);
+      cap.classList.toggle('top', place === 'top');
+      cap.classList.toggle('actions', place === 'actions');
       cap.replaceChildren();
       if (title) {
         cap.append(title);
@@ -154,7 +156,7 @@ async function seedReport(stationId: string, lat: number, lng: number): Promise<
 
 // Full Chromium's headless mode renders WebGL on the GPU (about 60 fps on an M3); the default headless shell
 // falls back to SwiftShader at 2-3 fps, too slow for the 3D map and car. Needs `npx playwright install chromium`.
-const browser = await chromium.launch({ channel: 'chromium', args: ['--force-device-scale-factor=2', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ channel: 'chromium', args: ['--force-device-scale-factor=2', '--ignore-gpu-blocklist', '--mute-audio'] });
 const context = await browser.newContext({
   ...devices['Pixel 7'],
   deviceScaleFactor: 2,
@@ -205,10 +207,10 @@ function writeConcatList(endT: number): void {
 }
 
 const wait = (ms: number) => page.waitForTimeout(ms);
-/** Captions sit at the top while onboarding, whose buttons fill the bottom of the screen. */
-let captionTop = false;
+/** Onboarding's buttons fill the bottom of the screen, so its captions sit at the top or just above the buttons. */
+let captionPlace: 'bottom' | 'top' | 'actions' = 'bottom';
 async function say(title: string, sub = ''): Promise<void> {
-  await page.evaluate(([t, s, top]) => (window as any).__demo.caption(t, s, top), [title, sub, captionTop] as const);
+  await page.evaluate(([t, s, place]) => (window as any).__demo.caption(t, s, place), [title, sub, captionPlace] as const);
 }
 
 const cues: Array<{ id: string; t: number }> = [];
@@ -298,31 +300,41 @@ try {
   await ready(page, '[data-testid="onboard-start"]');
   await settle(100);
   await hideCard();
-  captionTop = true;
+  captionPlace = 'actions';
   await tap(id('onboard-start'));
-  await narrate('pickcar', 'Pick your car', '3D model in your colour · real battery and range');
+  await narrate('pickcar', 'Find your car by its chassis number', 'Sample VIN · each model built from its real dimensions');
   await ready(page, '[data-testid="car-view"]');
-  await wait(700);
+  await wait(600);
+  // A sample VIN with Tata's Nexon EV prefix; it is decoded on the phone, nothing is looked up.
+  await type(id('find-car-input'), 'MAT635003NLG08611', 40);
+  await tap(id('find-car-go'), 300);
+  await id('find-car-result').waitFor({ timeout: 10000 });
+  await wait(1500);
+  await tap(page.getByRole('radio', { name: 'Ocean Blue' }));
+  await wait(900);
+  await dragCar(-240);
   const models = page.getByRole('listbox', { name: 'Model' }).getByRole('option');
   await tap(page.getByRole('tab', { name: 'Mahindra' }));
   await wait(500);
-  await tap(models.filter({ hasText: 'XEV 9S (79' }).first());
-  await wait(1100);
-  await tap(page.getByRole('radio', { name: 'Flame Red' }));
-  await wait(1200);
-  await dragCar(-260);
+  // Each model change remounts the 3D stage and rolls the new car in, which takes about 2.5 s.
+  await tap(models.filter({ hasText: 'BE 6 (79' }).first());
+  await wait(2800);
+  await dragCar(220);
+  await tap(models.filter({ hasText: 'XEV 9e (79' }).first());
+  await wait(3000);
   await tap(page.getByRole('tab', { name: 'Tata' }));
   await wait(400);
   await tap(models.filter({ hasText: 'Nexon EV 45' }).first());
   await wait(900);
-  await tap(page.getByRole('radio', { name: 'Electric Teal' }));
+  await tap(page.getByRole('radio', { name: 'Ocean Blue' }));
   await settle(300);
+  captionPlace = 'top';
   await tap(id('onboard-car'));
   await narrate('trialoffer', 'A free week of Plus for your car', 'Or keep Basic: free, no sign-in');
   await settle(300);
   await tap(id('onboard-basic'));
   await appReady();
-  captionTop = false;
+  captionPlace = 'bottom';
   await say('');
 
   // 2. Globe fly-in (it played behind onboarding, so open the map again with ?intro), 3D tilt over the
@@ -405,7 +417,7 @@ try {
   await wait(2600);
   await dragCar(220);
   await settle(300);
-  await narrate('carhonest', 'Honest about car data', 'Phone GPS today · Bluetooth OBD-II in beta');
+  await narrate('carhonest', 'Honest about car data', 'Phone GPS today · Bluetooth OBD-II in beta, recognises your car');
   await wait(1600);
   await page.mouse.wheel(0, 420);
   await wait(2600);

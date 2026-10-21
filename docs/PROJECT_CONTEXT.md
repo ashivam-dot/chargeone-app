@@ -15,8 +15,8 @@ voice), feedback. Web (PWA) first, Android (Google Play first) and iOS (later) t
 - Task folder: `/Users/ashivam/Desktop/Side-Income/ev-charging-super-app-plan-2026-10-20/`
   - `chargeone-app/`: the git repo, private GitHub `ashivam-dot/chargeone-app` (branch `main`).
   - `PLAN.md`, `ZERO-BUDGET-PLAN.md`: original business and zero-budget plans.
-  - `demo/`: promo videos. The 2026-10-21 remake (3D map, 3D car, HD voice) is in the release
-    `demo-2026-10-21`; the first cut is in `demo-2026-10-20`.
+  - Promo videos live only in GitHub releases (no local copy): current `demo-2026-10-21-v2` (redesign v2,
+    158 s, portrait + 16:9 + poster); older `demo-2026-10-21` (also the HD voice samples), `demo-2026-10-20`.
   - `research/`: ui-styles.md, indian-tts.md, car-models.md, charger-apps.md, vehicle-identification.md,
     car-designs.md/json (sizes, profiles, paints for the 22 cars).
 - Last commits: the 2026-10-21 upgrade (see "State"), `7cf1b3d` (UPI + Play Billing), `c123617` (review fixes).
