@@ -19,7 +19,7 @@ const CHAPTERS: Array<{ title: string; sub: string; from: string }> = [
   { title: 'Your car, in 3D', sub: 'Found by chassis number · built from real dimensions', from: 'pickcar' },
   { title: 'A 3D map of India', sub: 'Globe, terrain and glowing chargers', from: 'globe' },
   { title: 'Available or occupied', sub: 'Driver reports · opens the operator’s app', from: 'station' },
-  { title: 'Connected car', sub: 'Live battery · phone GPS or OBD-II beta that knows your car', from: 'car' },
+  { title: 'Connected car', sub: 'Live battery · phone GPS, or OBD-II beta read from the car', from: 'car' },
   { title: 'AI trip co-pilot', sub: 'Plan by voice in Hindi or English · HD voice', from: 'copilot' },
   { title: 'Compare routes', sub: 'Up to 3 routes, drawn in and explained', from: 'routes' },
   { title: 'Live drive alerts', sub: 'Battery dropping fast? Charge earlier', from: 'drive' },

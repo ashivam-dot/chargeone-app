@@ -417,7 +417,7 @@ try {
   await wait(2600);
   await dragCar(220);
   await settle(300);
-  await narrate('carhonest', 'Honest about car data', 'Phone GPS today · Bluetooth OBD-II in beta, recognises your car');
+  await narrate('carhonest', 'Honest about car data', 'Phone GPS · OBD-II (beta) reads live battery from the car');
   await wait(1600);
   await page.mouse.wheel(0, 420);
   await wait(2600);

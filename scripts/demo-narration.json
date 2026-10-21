@@ -12,7 +12,7 @@
     { "id": "station", "text": "Tap a charger to see if it's available or occupied, from drivers' reports. One tap opens the operator's own app, to start charging and pay." },
     { "id": "trialstart", "text": "Sign in, and one tap starts your free Plus week." },
     { "id": "car", "text": "Connect your car. This is the demo car, clearly labelled. It rolls in, switches its lights on, and shows live speed, power and battery." },
-    { "id": "carhonest", "text": "Car makers don't share connected car data with other apps yet. So ChargeOne uses your phone's GPS, or a Bluetooth OBD adapter in beta, which can even recognise your car by itself." },
+    { "id": "carhonest", "text": "Car makers don't share connected car data with other apps yet. So ChargeOne uses your phone's GPS, or a Bluetooth OBD adapter in beta that reads live battery straight from the car, and can even recognise it by itself." },
     { "id": "copilot", "text": "Plus members get a trip co-pilot. Ask it by voice, in Hindi or English." },
     { "id": "hindi_user", "voice": 6, "lang": "hi", "speed": 1.0, "text": "कोयंबटूर से चेन्नई जाना है, बैटरी साठ प्रतिशत है।" },
     { "id": "hindi_reply", "voice": 1, "lang": "hi", "speed": 1.0, "text": "कोयंबटूर से चेन्नई का प्लान बना रही हूँ, बैटरी साठ प्रतिशत।" },
