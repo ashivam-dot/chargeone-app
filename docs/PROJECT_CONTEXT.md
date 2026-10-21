@@ -105,7 +105,8 @@ headless shell's SwiftShader gives 2-3 fps) -> `scripts/demo-landscape.ts` -> `s
 
 Done and verified: all features above; 512 unit + 70 e2e pass; README updated; demo videos made.
 Redesign v2 (later 2026-10-21): new theme and map, generated per-model 3D cars (22), plate/VIN lookup, OBD
-auto-detect. The promo video predates v2 (re-record only if asked).
+auto-detect. Promo re-recorded for v2 (release `demo-2026-10-21-v2`). Voice venv needs Python 3.12
+(`/opt/homebrew/bin/python3.12`; system 3.9 can't unpack the model).
 
 2026-10-21 upgrade (owner asked for a futuristic map, real 3D cars, Razorpay "replica", reverse-engineered car
 and charger connectors, live availability, operator-app redirect, an Indian human voice, a promo video):
