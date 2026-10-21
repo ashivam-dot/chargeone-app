@@ -1,30 +1,32 @@
 /* ChargeOne visual layer: dark-first, glass surfaces, electric accent, spring motion. Loaded after styles.css. */
 
 :root {
-  --bg: #f3f5f9;
+  --bg: #f2f2f4;
   --bg-elev: #ffffff;
-  --panel: rgba(255, 255, 255, 0.78);
+  --panel: rgba(255, 255, 255, 0.9);
   --panel-solid: #ffffff;
-  --text: #0a0f1a;
-  --muted: #5d6879;
-  --line: rgba(10, 15, 26, 0.09);
-  --line-strong: rgba(10, 15, 26, 0.16);
-  --chip: rgba(255, 255, 255, 0.8);
-  --chip-on: #0a0f1a;
+  --text: #0a0a0b;
+  --muted: #5f6368;
+  --line: rgba(0, 0, 0, 0.08);
+  --line-strong: rgba(0, 0, 0, 0.14);
+  --chip: rgba(255, 255, 255, 0.94);
+  --chip-on: #0a0a0b;
   --chip-on-text: #ffffff;
-  --accent: #0891b2;
-  --accent-strong: #0e7490;
-  --accent-2: #059669;
+  --accent: #1f5fe0;
+  --accent-strong: #1a4fc0;
+  --accent-2: #0a84ff;
   --accent-text: #ffffff;
-  --plus: #7c3aed;
-  --good: #059669;
-  --bad: #dc2626;
-  --warn: #c2410c;
-  --grad: linear-gradient(120deg, #06b6d4 0%, #10b981 100%);
-  --grad-plus: linear-gradient(120deg, #8b5cf6 0%, #06b6d4 100%);
-  --glow: 0 10px 34px rgba(6, 182, 212, 0.28);
-  --shadow: 0 18px 50px rgba(10, 15, 26, 0.12), 0 2px 8px rgba(10, 15, 26, 0.06);
-  --radius: 22px;
+  --plus: #5b3df5;
+  --good: #15803d;
+  --bad: #d70015;
+  --warn: #b45309;
+  --cta: #0a0a0b;
+  --cta-text: #ffffff;
+  --grad: linear-gradient(180deg, #2f6cf0 0%, #1f5fe0 100%);
+  --grad-plus: linear-gradient(120deg, #5b3df5 0%, #1f5fe0 100%);
+  --glow: 0 8px 24px rgba(31, 95, 224, 0.22);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --radius: 18px;
   --blur: saturate(160%) blur(22px);
   --tabbar-h: calc(68px + var(--safe-bottom));
   --font: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Devanagari', sans-serif;
@@ -38,29 +40,31 @@
 }
 
 [data-theme='dark'] {
-  --bg: #05070b;
-  --bg-elev: #0b0f17;
-  --panel: rgba(13, 17, 25, 0.72);
-  --panel-solid: #0c1018;
-  --text: #eef2f8;
-  --muted: #8a94a6;
-  --line: rgba(255, 255, 255, 0.075);
+  --bg: #000000;
+  --bg-elev: #0d0d0f;
+  --panel: rgba(18, 18, 20, 0.86);
+  --panel-solid: #121214;
+  --text: #f5f5f7;
+  --muted: #98989f;
+  --line: rgba(255, 255, 255, 0.08);
   --line-strong: rgba(255, 255, 255, 0.14);
-  --chip: rgba(16, 21, 31, 0.72);
-  --chip-on: #eef2f8;
-  --chip-on-text: #05070b;
-  --accent: #22d3ee;
-  --accent-strong: #67e8f9;
-  --accent-2: #34d399;
-  --accent-text: #021014;
-  --plus: #a78bfa;
-  --good: #34d399;
-  --bad: #f87171;
-  --warn: #fbbf24;
-  --grad: linear-gradient(120deg, #22d3ee 0%, #34d399 100%);
-  --grad-plus: linear-gradient(120deg, #a78bfa 0%, #22d3ee 100%);
-  --glow: 0 10px 40px rgba(34, 211, 238, 0.3);
-  --shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --chip: rgba(22, 22, 25, 0.88);
+  --chip-on: #f5f5f7;
+  --chip-on-text: #000000;
+  --accent: #2b6bff;
+  --accent-strong: #7fb0ff;
+  --accent-2: #5ac8fa;
+  --accent-text: #ffffff;
+  --plus: #a99bff;
+  --good: #30d158;
+  --bad: #ff453a;
+  --warn: #ff9f0a;
+  --cta: #f5f5f7;
+  --cta-text: #000000;
+  --grad: linear-gradient(180deg, #3a76ff 0%, #2b6bff 100%);
+  --grad-plus: linear-gradient(120deg, #8f7bff 0%, #2b6bff 100%);
+  --glow: 0 8px 28px rgba(43, 107, 255, 0.3);
+  --shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 html,
@@ -316,39 +320,16 @@ body {
   bottom: calc(var(--tabbar-h) + 18px);
   height: 58px;
   padding: 0 28px;
-  background: var(--grad);
-  color: var(--accent-text);
-  font-weight: 750;
+  background: var(--cta);
+  color: var(--cta-text);
+  font-weight: 600;
   letter-spacing: -0.01em;
-  box-shadow: 0 16px 40px rgba(34, 211, 238, 0.35);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4);
   isolation: isolate;
   animation: fab-in 0.8s var(--spring-bouncy) both 0.2s;
 }
-.fab::before {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: inherit;
-  background: conic-gradient(from var(--fab-angle, 0deg), transparent 0 70%, rgba(255, 255, 255, 0.9) 80%, transparent 90%);
-  z-index: -1;
-  animation: fab-spin 3.6s linear infinite;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-  padding: 2px;
-  opacity: 0.55;
-}
 .fab:active {
   transform: translateX(-50%) scale(0.96);
-}
-@property --fab-angle {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 0deg;
-}
-@keyframes fab-spin {
-  to {
-    --fab-angle: 360deg;
-  }
 }
 @keyframes fab-in {
   from {
@@ -389,15 +370,15 @@ body {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(34, 211, 238, 0.45), transparent);
+  background: radial-gradient(closest-side, rgba(43, 107, 255, 0.5), transparent);
   animation: marker-pulse 2s var(--ease-out) infinite;
 }
 .car-marker__arrow {
   position: absolute;
   inset: 12px;
-  background: linear-gradient(180deg, #67e8f9, #22d3ee 50%, #0891b2);
+  background: linear-gradient(180deg, #ffffff, #dfe6f5);
   clip-path: polygon(50% 0, 92% 92%, 50% 72%, 8% 92%);
-  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.9));
+  filter: drop-shadow(0 0 6px rgba(43, 107, 255, 0.95)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
 }
 @keyframes marker-pulse {
   from {

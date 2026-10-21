@@ -24,6 +24,14 @@ export interface Env {
   VOICE_TTS_URL?: string;
   /** Shared secret for voice-server, at least 24 characters. */
   VOICE_TTS_TOKEN?: string;
+  /** Deepvue RC verification (registration number -> car). Unset = number lookup off. */
+  DEEPVUE_CLIENT_ID?: string;
+  DEEPVUE_CLIENT_SECRET?: string;
+  /** Cashfree Secure ID vehicle RC, used when Deepvue isn't set up. */
+  CASHFREE_CLIENT_ID?: string;
+  CASHFREE_CLIENT_SECRET?: string;
+  /** '1' = Cashfree sandbox (test numbers only). */
+  CASHFREE_SANDBOX?: string;
   AGENT_MODEL?: string;
   AGENT_FALLBACK_MODEL?: string;
 }

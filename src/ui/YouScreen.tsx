@@ -53,7 +53,7 @@ function TrialRing({ endsAt }: { endsAt: string }) {
         <defs>
           <linearGradient id="trial-ring-grad" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0" stop-color="#a78bfa" />
-            <stop offset="1" stop-color="#22d3ee" />
+            <stop offset="1" stop-color="#2b6bff" />
           </linearGradient>
         </defs>
         <circle cx="32" cy="32" r="26" class="trial-ring__track" />

@@ -1,30 +1,16 @@
-/* ChargeOne design layer: liquid glass, bento, spatial depth. Loads after theme.css and overrides it. */
+/* ChargeOne design layer: automotive minimal, after the Tesla, BMW and Mercedes apps. Black and graphite
+   surfaces with hairlines, white type, white primary actions and one electric-blue accent. Loads after theme.css. */
 
 :root {
   --font: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans Devanagari Variable', sans-serif;
-  --font-num: 'Geist Mono Variable', 'Geist Variable', ui-monospace, monospace;
-  --font-display: 'Unbounded Variable', 'Geist Variable', system-ui, sans-serif;
-
-  --lg-fill: color-mix(in srgb, #ffffff 56%, transparent);
-  --lg-rim:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.35),
-    inset 0 -1px 1px rgba(10, 15, 26, 0.06);
-  --lg-shadow: 0 12px 32px rgba(10, 15, 26, 0.14), 0 2px 6px rgba(10, 15, 26, 0.08);
-  --lg-spec: radial-gradient(140px circle at var(--mx, 28%) var(--my, -10%), rgba(255, 255, 255, 0.6), transparent 70%);
-  --lg-blur: blur(16px) saturate(190%) brightness(1.05);
-  --lg-refract: url(#lg-refract) blur(5px) saturate(190%) brightness(1.05);
+  --font-num: 'Geist Variable', system-ui, sans-serif;
+  --font-display: 'Geist Variable', system-ui, sans-serif;
+  --surface-blur: blur(20px) saturate(140%);
+  --overlay-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  --label: 600 0.7rem/1.2 var(--font);
 }
 [data-theme='dark'] {
-  --lg-fill: color-mix(in srgb, #0a1422 50%, transparent);
-  --lg-rim:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
-    inset 0 -1px 1px rgba(103, 232, 249, 0.06);
-  --lg-shadow: 0 16px 44px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
-  --lg-spec: radial-gradient(160px circle at var(--mx, 28%) var(--my, -10%), rgba(125, 233, 255, 0.16), transparent 70%);
-  --lg-blur: blur(18px) saturate(170%) brightness(0.92);
-  --lg-refract: url(#lg-refract) blur(6px) saturate(170%) brightness(0.92);
+  --overlay-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
 }
 
 html {
@@ -35,85 +21,159 @@ html {
   font-family: 'Noto Sans Devanagari Variable', var(--font);
 }
 
-/* ---------- Liquid glass material ---------- */
-.lg,
+/* ---------- Surfaces floating over the map ---------- */
 .place__input,
 .chip:not([aria-pressed='true']),
-.tabbar__inner,
 .maplibregl-ctrl-group,
 .avatar:not(.avatar--paid),
 .filters__count,
 .banner:not(.banner--error) {
-  background: var(--lg-spec), var(--lg-fill) !important;
-  border-color: transparent !important;
-  box-shadow: var(--lg-rim), var(--lg-shadow) !important;
-  -webkit-backdrop-filter: var(--lg-blur);
-  backdrop-filter: var(--lg-blur);
+  background: var(--panel) !important;
+  border: 1px solid var(--line-strong) !important;
+  box-shadow: var(--overlay-shadow) !important;
+  -webkit-backdrop-filter: var(--surface-blur);
+  backdrop-filter: var(--surface-blur);
 }
-/* Real refraction on Chromium (Android WebView, Chrome): the map bends at the rim of each control. */
-html[data-refract='on']:not(.map-moving) :is(.tabbar__inner, .place__input, .chip:not([aria-pressed='true']), .maplibregl-ctrl-group) {
-  backdrop-filter: var(--lg-refract);
+.place__input {
+  border-radius: 14px;
+  font-weight: 450;
 }
 .place__input:focus {
-  box-shadow: var(--lg-rim), 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent), var(--lg-shadow) !important;
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent), var(--overlay-shadow) !important;
+}
+.brand {
+  border-radius: 14px;
 }
 
-.sheet {
-  background: var(--lg-spec), color-mix(in srgb, var(--panel-solid) 80%, transparent);
-  box-shadow: var(--lg-rim), 0 -24px 70px rgba(0, 0, 0, 0.32);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  backdrop-filter: blur(28px) saturate(180%);
+/* ---------- Docked tab bar with a thin line over the active tab ---------- */
+.tabbar {
+  padding: 0;
 }
-.sheet__head h2 {
-  font-weight: 680;
-  letter-spacing: -0.03em;
-}
-
-/* Floating "ornament" tab bar with a liquid drop that slides between tabs. */
 .tabbar__inner {
-  height: 64px;
-  border-radius: 32px;
+  max-width: none;
+  height: calc(60px + var(--safe-bottom));
+  padding: 0 8px var(--safe-bottom);
+  border-radius: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  box-shadow: none;
+  -webkit-backdrop-filter: var(--surface-blur);
+  backdrop-filter: var(--surface-blur);
 }
 .tabbar__indicator {
-  border-radius: 27px;
+  top: -1px;
+  bottom: auto;
+  left: 8px;
+  width: calc((100% - 16px) / var(--n));
+  height: 2px;
   border: 0;
-  background:
-    radial-gradient(60% 80% at 50% 0%, rgba(255, 255, 255, 0.35), transparent 70%),
-    color-mix(in srgb, var(--accent) 22%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -6px 14px color-mix(in srgb, var(--accent) 22%, transparent),
-    0 6px 22px color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 0 0 2px 2px;
+  background: var(--text);
+  box-shadow: none;
+  clip-path: inset(0 32%);
 }
-.tabbar__tab.is-active .tabbar__icon {
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 70%, transparent));
+.tabbar__tab {
+  font-size: 0.66rem;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+}
+.tabbar__tab.is-active .lucide,
+.tabbar__tab--copilot.is-active .lucide {
+  color: var(--text);
+  filter: none;
 }
 
-/* Glossy pills: a highlight on top and a slow sheen across the primary actions. */
-.fab,
-.btn--primary,
-.btn--plus,
-.chip[aria-pressed='true'] {
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 55%), var(--grad);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -2px 6px rgba(0, 0, 0, 0.12), var(--glow);
+/* ---------- Sheets and pages: solid graphite, no aurora ---------- */
+.sheet {
+  background: var(--panel-solid);
+  border-color: var(--line);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35);
 }
-.btn--plus {
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 55%), var(--grad-plus);
+.sheet--modal {
+  background: var(--panel-solid);
 }
-.fab {
-  font-family: var(--font-display);
+.sheet__head h2 {
   font-weight: 600;
-  font-size: 0.95rem;
-  letter-spacing: 0;
+  letter-spacing: -0.025em;
 }
-
-/* ---------- Type ---------- */
+.sheet h3 {
+  font: var(--label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.page__aurora {
+  display: none;
+}
 .page__title {
   font-family: var(--font-display);
-  font-weight: 640;
-  font-size: 1.85rem;
-  letter-spacing: -0.035em;
+  font-weight: 600;
+  font-size: 2rem;
+  letter-spacing: -0.04em;
 }
+.card,
+.list,
+.plan,
+.compare,
+.route-card,
+.verdict,
+.live {
+  background: var(--bg-elev);
+  border-color: var(--line);
+}
+[data-theme='dark'] :is(.sheet, .sheet--modal) :is(.card, .list, .plan, .compare, .route-card, .live) {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+/* ---------- Actions ---------- */
+.btn {
+  border-radius: 14px;
+  font-weight: 600;
+}
+.btn--primary {
+  background: var(--cta);
+  color: var(--cta-text);
+  box-shadow: none;
+}
+.btn--primary::after {
+  display: none;
+}
+.btn--plus {
+  box-shadow: none;
+}
+.btn--glass {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  border-color: transparent;
+}
+.chip {
+  height: 36px;
+  font-weight: 550;
+  font-size: 0.86rem;
+}
+.chip[aria-pressed='true'] {
+  background: var(--chip-on);
+  color: var(--chip-on-text);
+  box-shadow: var(--overlay-shadow);
+}
+.fab {
+  font-family: var(--font);
+  font-weight: 600;
+  font-size: 1rem;
+  height: 54px;
+}
+.route-card.is-on {
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-solid));
+  border-color: var(--accent);
+  box-shadow: none;
+}
+.link {
+  color: var(--accent-strong);
+}
+
+/* ---------- Numbers read like an instrument cluster ---------- */
 .num,
 .stats strong,
 .plan__price strong,
@@ -123,32 +183,29 @@ html[data-refract='on']:not(.map-moving) :is(.tabbar__inner, .place__input, .chi
   letter-spacing: -0.03em;
 }
 
-/* ---------- Bento tiles: glass with depth and a lift on press ---------- */
+/* ---------- Tiles ---------- */
 .tile {
-  background: var(--lg-spec), color-mix(in srgb, var(--panel-solid) 62%, transparent);
-  border-color: transparent;
-  box-shadow: var(--lg-rim), 0 10px 30px rgba(0, 0, 0, 0.12);
-  transition: transform 0.4s var(--spring), box-shadow 0.4s var(--ease-out);
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  box-shadow: none;
+  transition: transform 0.35s var(--spring), border-color 0.2s;
 }
 .tile:is(button, a):active {
-  transform: scale(0.98) translateY(1px);
+  transform: scale(0.98);
 }
 
-/* ---------- Spatial depth: the map recedes behind open sheets ---------- */
+/* ---------- The map recedes slightly behind open panels ---------- */
 .map::after {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(130% 90% at 50% 40%, transparent 55%, rgba(2, 6, 14, 0.28));
-  transition: background-color 0.5s var(--ease-out);
-}
-[data-theme='dark'] .map::after {
-  background-image: radial-gradient(130% 90% at 50% 40%, transparent 50%, rgba(0, 3, 10, 0.6));
+  background-color: transparent;
+  transition: background-color 0.4s var(--ease-out);
 }
 .app:has(.sheet:not(.sheet--collapsed)) .map::after,
 .app:has(.page) .map::after {
-  background-color: rgba(2, 6, 14, 0.22);
+  background-color: rgba(0, 0, 0, 0.25);
 }
 .sheet,
 .page {
@@ -164,8 +221,8 @@ html[data-refract='on']:not(.map-moving) :is(.tabbar__inner, .place__input, .chi
   border-radius: 999px;
   font: 600 0.95rem/1 var(--font);
   color: var(--text);
-  background: color-mix(in srgb, var(--live) 18%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--live) 45%, transparent), 0 0 22px color-mix(in srgb, var(--live) 22%, transparent);
+  background: color-mix(in srgb, var(--live) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--live) 50%, transparent);
 }
 .live__badge .live__dot {
   width: 10px;
@@ -184,20 +241,23 @@ html[data-refract='on']:not(.map-moving) :is(.tabbar__inner, .place__input, .chi
   text-decoration: none;
 }
 
-/* ---------- Map HUD ---------- */
+/* ---------- Map controls ---------- */
+.maplibregl-ctrl-group {
+  border-radius: 12px !important;
+}
 .map-3d {
-  font: 700 0.78rem/1 var(--font-display);
+  font: 650 0.78rem/1 var(--font);
   letter-spacing: 0.04em;
   color: var(--text) !important;
 }
 .map-3d[aria-pressed='true'] {
-  color: var(--accent-text) !important;
-  background-image: var(--grad) !important;
+  color: var(--cta-text) !important;
+  background: var(--cta) !important;
 }
 .station-pulse {
-  --live: #22d3ee;
-  width: 64px;
-  height: 64px;
+  --live: #2b6bff;
+  width: 56px;
+  height: 56px;
   pointer-events: none;
 }
 .station-pulse::before,
@@ -207,7 +267,6 @@ html[data-refract='on']:not(.map-moving) :is(.tabbar__inner, .place__input, .chi
   inset: 0;
   border-radius: 50%;
   border: 2px solid var(--live);
-  box-shadow: 0 0 18px var(--live), inset 0 0 12px var(--live);
   animation: station-ring 2.2s var(--ease-out) infinite;
 }
 .station-pulse::after {
@@ -216,10 +275,10 @@ html[data-refract='on']:not(.map-moving) :is(.tabbar__inner, .place__input, .chi
 @keyframes station-ring {
   from {
     transform: scale(0.35);
-    opacity: 0.95;
+    opacity: 0.9;
   }
   to {
-    transform: scale(1.25);
+    transform: scale(1.2);
     opacity: 0;
   }
 }
@@ -231,17 +290,83 @@ html[data-refract='on']:not(.map-moving) :is(.tabbar__inner, .place__input, .chi
   }
 }
 
+/* Find my car (number or VIN) and the OBD-II recognition note */
+.find-car {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  text-align: left;
+}
+.find-car .field {
+  margin: 0;
+}
+.find-car__row {
+  display: flex;
+  gap: 8px;
+}
+.find-car__row input {
+  flex: 1;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.find-car__row input::placeholder {
+  letter-spacing: 0;
+  text-transform: none;
+}
+.find-car__row .btn {
+  flex: none;
+}
+.find-car__consent {
+  align-items: flex-start;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.find-car__result {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: var(--muted);
+}
+.find-car__result.is-ok {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.detected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  color: var(--muted);
+}
+.detected svg {
+  color: var(--accent);
+  flex: none;
+}
+.detected--ask {
+  display: grid;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--warn) 50%, transparent);
+  background: var(--bg-elev);
+  color: var(--text);
+}
+.detected--ask p {
+  margin: 0;
+}
+
 @media (prefers-reduced-transparency: reduce) {
-  .lg,
   .place__input,
   .chip:not([aria-pressed='true']),
   .tabbar__inner,
   .maplibregl-ctrl-group,
   .avatar:not(.avatar--paid),
   .filters__count,
-  .banner:not(.banner--error),
-  .tile,
-  .sheet {
+  .banner:not(.banner--error) {
     background: var(--panel-solid) !important;
     -webkit-backdrop-filter: none;
     backdrop-filter: none !important;

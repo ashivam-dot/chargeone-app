@@ -47,7 +47,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/data/'),
+            urlPattern: ({ url }) => url.pathname.startsWith('/data/') || url.pathname.startsWith('/map/'),
             handler: 'StaleWhileRevalidate',
             options: { cacheName: 'station-data', expiration: { maxEntries: 6 } },
           },

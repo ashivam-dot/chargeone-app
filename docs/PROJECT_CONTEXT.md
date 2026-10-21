@@ -17,7 +17,8 @@ voice), feedback. Web (PWA) first, Android (Google Play first) and iOS (later) t
   - `PLAN.md`, `ZERO-BUDGET-PLAN.md`: original business and zero-budget plans.
   - `demo/`: promo videos. The 2026-10-21 remake (3D map, 3D car, HD voice) is in the release
     `demo-2026-10-21`; the first cut is in `demo-2026-10-20`.
-  - `research/`: ui-styles.md, indian-tts.md, car-models.md, charger-apps.md (2026-10-21 upgrade research).
+  - `research/`: ui-styles.md, indian-tts.md, car-models.md, charger-apps.md, vehicle-identification.md,
+    car-designs.md/json (sizes, profiles, paints for the 22 cars).
 - Last commits: the 2026-10-21 upgrade (see "State"), `7cf1b3d` (UPI + Play Billing), `c123617` (review fixes).
 
 ## Accounts and hard limits
@@ -36,17 +37,27 @@ Vite 8, Preact 11, TypeScript 7, MapLibre 6.14 (globe, Mapterhorn terrain, 3D bu
 (lazy `Car3D` chunk, budget exception 175 KB), Cloudflare Workers (D1 `chargeone`, Workers AI),
 Capacitor 8.5.3, Playwright 1.64, vitest 5. Node >= 23.6 runs `.ts` scripts directly.
 
-Design (2026-10-21): "Liquid Glass + bento + spatial". `src/design.css` (glass tokens, fonts Geist / Geist
-Mono / Unbounded / Noto Sans Devanagari), `src/ui/glass.ts` (SVG refraction on fast Blink only, specular
-follows the pointer), `src/map/futuristic.ts` (globe, sky, relief, hillshade, 3D buildings, route draw-in,
-`Tilt3dControl`, one-time globe intro; `?intro` forces it). Reduced motion and reduced transparency respected.
+Design (v2, 2026-10-21, owner: "modern futuristic, like the Tesla/BMW/Mercedes apps"): near-black surfaces,
+one blue accent (`--accent` #2b6bff dark / #1f5fe0 light), `--good` green, Geist; dark by default (own
+`chargeone:dark` setting, not the OS). `src/theme.css` + `src/design.css` (glass.ts removed). Map: own
+styles `public/map/*.json` via `src/map/map-style.ts`, `src/map/futuristic.ts` (globe, sky, atmosphere faded
+out by zoom 3.6, terrain, 3D buildings, route draw-in, `Tilt3dControl`). No cyan hard-codes left.
 
 - `src/`: app. `src/planner/` (trip planner, `journey.ts`, `routeCompare.ts`), `src/drive/driveEngine.ts`,
   `src/vehicle/` (demo car, phone GPS tracker, OBD-II over BLE, energy model), `src/voice/`
   (Hindi/English intent parser, speech, phrases), `src/lib/agentClient.ts`, `src/native/` (Capacitor helpers),
   `src/ui/` (tab shell: Explore, Trip, Car, Copilot, You).
-  `src/ui/car/` (`CarStage` picks `Car3D` when WebGL works, else the 2D `CarHero`; `models3d.ts`: Quaternius
-  CC0 SUV/sedan/hatch GLBs in `public/models/`, tinted; `EXACT` list empty until licensed exact models exist),
+  `src/ui/car/` (`CarStage` picks `Car3D` when WebGL works, else the 2D `CarHero`. 3D cars are generated, no
+  GLBs: `carDesigns.ts` holds a spec per catalogue car (published size, 9-number side profile, lamp styles,
+  cladding, factory paints; `designFor`, `paintsFor`), `carMesh.ts` `buildCar()` lofts body, arches, glasshouse,
+  wheels and lamps, then merges by material (~26 draw calls). Labelled "ChargeOne model, not an official
+  render". Tune with `npx vite` + `node scripts/car-lab-shots.ts <dir> [ids] --views side,front34,rear34`;
+  refs in `../redesign-2026-10-21/`. `PaintSwatches.tsx` shows the car's own colours),
+  Car identity: `src/shared/vin.ts` (WMI/year/month decode on the phone), `src/shared/vehicleMatch.ts`,
+  `src/ui/car/FindCar.tsx` (plate or VIN, in onboarding and Garage), `worker/vehicleLookup.ts`
+  (`POST /api/vehicle/lookup`: Deepvue, Cashfree fallback; off until secrets; consent `veh-lookup-v1`;
+  3/device + 20/IP a day; owner PII stripped, VIN cut to 10 chars). OBD: `elm327.readVin()` (0902, then UDS
+  22F190) -> `carLink.detected` -> "Recognised over OBD-II" / "connected car is a …" note on the Car tab.
   `src/shared/operatorApps.ts` (62 operators: Android package, iOS id, website; packages also in the manifest
   `<queries>`), `src/native/operatorApp.ts` (open if installed, else store), `src/voice/normalize.ts`.
 - `worker/`: API. `agent.ts` (copilot on `@cf/google/gemma-4-26b-a4b-it`, fallback model), `trial.ts`,
@@ -76,9 +87,10 @@ follows the pointer), `src/map/futuristic.ts` (globe, sky, relief, hillshade, 3D
 npm run setup:dev            # local D1 + migrations
 npm run dev:api              # wrangler dev on 8787 (serves the built app too)
 npm run build                # typecheck, build, prerender, bundle budget (380 KB start-up)
-npm test                     # 458 unit tests (app + worker)
-npx playwright test          # 47 e2e (pixel-7 + desktop); needs `npm run build` and `npm run dev:api` first
-node scripts/ui-shots.ts <dir> [--car] [--trip]   # screenshots of every screen for a visual check
+npm test                     # 512 unit tests (app + worker)
+npx playwright test          # 70 e2e (pixel-7, small-phone-360, desktop); needs `npm run build` and `npm run dev:api`
+node scripts/ui-shots.ts <dir> [--light]   # screenshots of key screens for a visual check
+# All browsers are muted (--mute-audio + speechSynthesis stub in e2e/fixtures.ts): never play sound.
 npm run smoke:api -- http://127.0.0.1:8787
 npm run deploy               # build, remote migrations, wrangler deploy (not done yet)
 ```
@@ -91,7 +103,9 @@ headless shell's SwiftShader gives 2-3 fps) -> `scripts/demo-landscape.ts` -> `s
 
 ## State on 2026-10-21
 
-Done and verified: all features above; 458 unit + 47 e2e pass; README updated; demo videos made.
+Done and verified: all features above; 512 unit + 70 e2e pass; README updated; demo videos made.
+Redesign v2 (later 2026-10-21): new theme and map, generated per-model 3D cars (22), plate/VIN lookup, OBD
+auto-detect. The promo video predates v2 (re-record only if asked).
 
 2026-10-21 upgrade (owner asked for a futuristic map, real 3D cars, Razorpay "replica", reverse-engineered car
 and charger connectors, live availability, operator-app redirect, an Indian human voice, a promo video):
@@ -115,8 +129,9 @@ Blocked or waiting on the owner:
 5. HD voice: run `voice-server/` on a free CPU box (Oracle Always Free A1) behind HTTPS, then
    `wrangler secret put VOICE_TTS_URL` and `VOICE_TTS_TOKEN`.
 6. UPI: `UPI_VPA`, `UPI_PAYEE_NAME`, `ADMIN_TOKEN`; Play: service account + products (see README).
-7. Exact 3D cars: download licensed models (Ioniq 5, Punch on Sketchfab, CC BY) into `public/models/cars/`
-   and add them to `EXACT` in `models3d.ts` with credit.
+7. Number-plate lookup: sign up at Deepvue (or Cashfree) with the personal Gmail, then
+   `wrangler secret put DEEPVUE_CLIENT_ID` and `DEEPVUE_CLIENT_SECRET`. Until then the app decodes VINs only.
+   3D cars are likenesses; closer fidelity means more tuning in `carDesigns.ts` against photos.
 8. Live operator status: only through partner feeds (OCPI from operators, Delhi EV portal); needs agreements.
 
 Known limits (keep honest in copy): no car-maker APIs exist, so "car connection" = phone GPS, demo car,

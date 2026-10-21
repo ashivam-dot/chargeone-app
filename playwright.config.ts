@@ -22,6 +22,8 @@ export default defineConfig({
     colorScheme: 'dark',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    // Drive and copilot speak alerts aloud; tests must never play sound on the machine running them.
+    launchOptions: { args: ['--mute-audio'] },
     ...geo,
   },
   projects: [

@@ -1,7 +1,7 @@
 import type { Coord } from '../planner/geometry.ts';
 import type { Plan, PlanId, UsageCounts } from '../shared/plans.ts';
 import type { ReportKind, StationStatus } from '../shared/status.ts';
-import type { FeedbackRequest, RouteAlternativeWire, RouteRequest, TrialInfo } from '../shared/contracts.ts';
+import type { FeedbackRequest, RouteAlternativeWire, RouteRequest, TrialInfo, VehicleLookupRequest, VehicleLookupResult } from '../shared/contracts.ts';
 import { apiFetch, type ApiResponse } from './transport.ts';
 
 export class ApiError extends Error {
@@ -47,6 +47,8 @@ export interface Config {
   devLogin: boolean;
   /** The server can read replies in a neural voice (/api/voice/tts). Older servers don't send it. */
   voiceHd?: boolean;
+  /** Registration-number lookup is set up (/api/vehicle/lookup). Older servers don't send it. */
+  vehicleLookup?: boolean;
   plans: Plan[];
 }
 
@@ -119,6 +121,8 @@ export const api = {
     request<{ plan: PlanId; activeUntil: string | null; granted?: boolean }>('POST', '/api/billing/play/verify', { productId, purchaseToken }),
   playSync: () => request<{ synced: number }>('POST', '/api/billing/play/sync', {}),
   voiceTts: (text: string, lang: 'en' | 'hi') => request<{ mime: string; audio: string; cached: boolean }>('POST', '/api/voice/tts', { text, lang }),
+  vehicleLookup: (plate: string, consent: VehicleLookupRequest['consent']) =>
+    request<VehicleLookupResult>('POST', '/api/vehicle/lookup', { plate, consent } satisfies VehicleLookupRequest),
 };
 
 export interface UpiPayment {

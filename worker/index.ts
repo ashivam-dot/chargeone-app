@@ -21,6 +21,7 @@ import { playEnabled, storeAccountToken, syncPlayPurchases, verifyPlayPurchase }
 import { planRoute } from './routing.ts';
 import { startTrial, trialInfo } from './trial.ts';
 import { claimUpiPayment, createUpiPayment, decideUpiPayment, listUpiPayments, requireAdmin, upiEnabled } from './upi.ts';
+import { lookupProvider, vehicleLookup } from './vehicleLookup.ts';
 import { voiceEnabled, voiceTts } from './voice.ts';
 
 type Handler = (req: Request, env: Env, params: Record<string, string>) => Promise<Response>;
@@ -90,6 +91,7 @@ route('GET', '/api/config', async (_req, env) =>
       payments: { razorpay: Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET), upi: upiEnabled(env), play: playEnabled(env) },
       devLogin: isDev(env),
       voiceHd: voiceEnabled(env),
+      vehicleLookup: lookupProvider(env) !== null,
       plans: PAID_PLANS.map((id) => PLANS[id]),
     },
     { headers: { 'Cache-Control': 'public, max-age=300' } },
@@ -191,6 +193,7 @@ route('POST', '/api/feedback', async (req, env) => {
 
 route('POST', '/api/agent/chat', async (req, env) => agentChat(req, env, await requireUser(req, env)));
 route('POST', '/api/voice/tts', async (req, env) => voiceTts(req, env));
+route('POST', '/api/vehicle/lookup', async (req, env) => json(await vehicleLookup(req, env)));
 route('POST', '/api/agent/parse-trip', async (req, env) => json(await parseTrip(req, env, await requireUser(req, env))));
 
 route('POST', '/api/billing/checkout', async (req, env) => json(await createCheckout(req, env, await requireUser(req, env))));

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures.ts';
 import { watchErrors } from './helpers.ts';
 
 test.describe('first launch', () => {

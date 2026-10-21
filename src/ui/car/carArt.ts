@@ -85,22 +85,6 @@ export function bodyTypeFor(modelId: string): BodyType {
   return 'suv';
 }
 
-export interface Paint {
-  id: string;
-  name: string;
-  hex: string;
-}
-
-export const PAINTS: Paint[] = [
-  { id: 'teal', name: 'Electric Teal', hex: '#0e7c86' },
-  { id: 'white', name: 'Arctic White', hex: '#dfe4ea' },
-  { id: 'graphite', name: 'Graphite', hex: '#3b4250' },
-  { id: 'midnight', name: 'Midnight Black', hex: '#141821' },
-  { id: 'blue', name: 'Ocean Blue', hex: '#1f4fbf' },
-  { id: 'red', name: 'Flame Red', hex: '#b4232a' },
-  { id: 'gold', name: 'Desert Gold', hex: '#a88a5c' },
-];
-
 function channel(hex: string, i: number): number {
   return parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
 }

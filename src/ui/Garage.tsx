@@ -1,17 +1,21 @@
 import { useState } from 'preact/hooks';
 import type { ConnectorType } from '../data/model.ts';
 import { CUSTOM_VEHICLE_ID, VEHICLES, baseWhPerKm, myVehicleFromModel, type MyVehicle } from '../shared/vehicles.ts';
+import { FindCar } from './car/FindCar.tsx';
 import { Sheet } from './Sheet.tsx';
 
 interface Props {
   vehicle: MyVehicle | null;
+  /** Registration-number lookup is set up on the server. */
+  lookupOn: boolean;
+  onPaint: (hex: string) => void;
   onSave: (v: MyVehicle) => void;
   onClose: () => void;
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
-export function Garage({ vehicle, onSave, onClose }: Props) {
+export function Garage({ vehicle, lookupOn, onPaint, onSave, onClose }: Props) {
   const [modelId, setModelId] = useState(vehicle?.modelId ?? VEHICLES[0].id);
   const [range, setRange] = useState(vehicle?.realRangeKm ? String(vehicle.realRangeKm) : '');
   const [custom, setCustom] = useState({
@@ -58,6 +62,13 @@ export function Garage({ vehicle, onSave, onClose }: Props) {
 
   return (
     <Sheet title="Your car" onClose={onClose} modal>
+      <FindCar
+        lookupOn={lookupOn}
+        onFound={(car) => {
+          setModelId(car.candidates[0]);
+          if (car.colourHex) onPaint(car.colourHex);
+        }}
+      />
       <label class="field">
         Model
         <select value={modelId} onChange={(e) => setModelId((e.target as HTMLSelectElement).value)}>

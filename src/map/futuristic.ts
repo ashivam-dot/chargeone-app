@@ -16,7 +16,7 @@ const DEM: RasterDEMSourceSpecification = {
   maxzoom: 12,
   attribution: MAPTERHORN_ATTRIBUTION,
 };
-export const ROUTE_GRADIENT: ExpressionSpecification = ['interpolate', ['linear'], ['line-progress'], 0, '#22d3ee', 0.55, '#2dd4bf', 1, '#34d399'];
+export const ROUTE_GRADIENT: ExpressionSpecification = ['interpolate', ['linear'], ['line-progress'], 0, '#2b6bff', 1, '#4fb3ff'];
 
 export const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -43,39 +43,36 @@ function labelFonts(map: MapLibreMap): void {
   }
 }
 
-/** Calm, HUD-like labels: cities spaced in capitals, roads dimmed so the route reads first. */
-function restyleLabels(map: MapLibreMap, dark: boolean): void {
-  for (const layer of map.getStyle().layers) {
-    if (layer.type !== 'symbol') continue;
-    const id = layer.id;
-    const place = /place|city|town|country|state/.test(id);
-    const road = /road|highway|transportation|street/.test(id);
-    if (place) {
-      map.setLayoutProperty(id, 'text-letter-spacing', /country|state/.test(id) ? 0.3 : 0.12);
-      if (/city|country|state/.test(id)) map.setLayoutProperty(id, 'text-transform', 'uppercase');
-      map.setPaintProperty(id, 'text-color', dark ? '#a8bccf' : '#334155');
-      map.setPaintProperty(id, 'text-halo-color', dark ? 'rgba(3,6,12,0.88)' : 'rgba(255,255,255,0.9)');
-      map.setPaintProperty(id, 'text-halo-width', 1.3);
-    } else if (road && dark) {
-      map.setPaintProperty(id, 'text-color', '#5b6b7d');
-    }
-  }
+/** A lightning bolt drawn once into the map as a recolourable (SDF) icon, for charger pins. */
+export function addMapIcons(map: MapLibreMap): void {
+  if (map.hasImage('co-bolt')) return;
+  const size = 48;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  if (!g) return;
+  g.fillStyle = '#000';
+  g.beginPath();
+  for (const [x, y] of [[27, 5], [12, 27], [22, 27], [19, 43], [36, 19], [26, 19], [30, 5]]) g.lineTo(x, y);
+  g.closePath();
+  g.fill();
+  map.addImage('co-bolt', g.getImageData(0, 0, size, size), { pixelRatio: 4, sdf: true });
 }
 
-/** Sky, fog, globe, relief and 3D buildings. Called on every `style.load`, before ChargeOne's own layers. */
+/** Sky, fog, globe, terrain shading and 3D buildings. Called on every `style.load`, before ChargeOne's own layers. */
 export function futuristicStyle(map: MapLibreMap, dark: boolean): void {
   const beforeLabels = firstSymbolId(map);
   map.setProjection({ type: 'globe' });
   map.setSky(
     dark
       ? {
-          'sky-color': '#02050b',
-          'horizon-color': '#0b3b52',
-          'fog-color': '#04070d',
+          'sky-color': '#000000',
+          'horizon-color': '#16263d',
+          'fog-color': '#06080b',
           'sky-horizon-blend': 0.6,
           'horizon-fog-blend': 0.7,
           'fog-ground-blend': 0.25,
-          'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0],
+          'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.55, 2.5, 0.3, 3.6, 0],
         }
       : {
           'sky-color': '#cfe9f5',
@@ -84,27 +81,15 @@ export function futuristicStyle(map: MapLibreMap, dark: boolean): void {
           'sky-horizon-blend': 0.5,
           'horizon-fog-blend': 0.6,
           'fog-ground-blend': 0.3,
-          'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0],
+          'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.55, 2.5, 0.3, 3.6, 0],
         },
   );
-  map.setLight({ anchor: 'map', position: [1.4, 210, 40], color: dark ? '#a5f3fc' : '#ffffff', intensity: dark ? 0.4 : 0.3 });
+  map.setLight({ anchor: 'map', position: [1.4, 210, 40], color: '#ffffff', intensity: dark ? 0.35 : 0.3 });
 
   if (!map.getSource('dem-shade')) map.addSource('dem-shade', DEM);
   if (!map.getSource('dem-terrain')) map.addSource('dem-terrain', DEM);
-  if (dark) {
-    map.addLayer(
-      {
-        id: 'relief',
-        type: 'color-relief',
-        source: 'dem-shade',
-        paint: {
-          'color-relief-opacity': 0.5,
-          'color-relief-color': ['interpolate', ['linear'], ['elevation'], 0, '#04070c', 300, '#061420', 1500, '#0a2433', 3500, '#123a4f', 6000, '#2b6f8a', 8800, '#cfefff'],
-        },
-      },
-      beforeLabels,
-    );
-  }
+  // Shade the hills under the roads and water, so terrain reads without muddying the map.
+  const beforeWater = map.getStyle().layers.find((l) => l.id === 'water')?.id ?? beforeLabels;
   map.addLayer(
     {
       id: 'hillshade',
@@ -112,43 +97,16 @@ export function futuristicStyle(map: MapLibreMap, dark: boolean): void {
       source: 'dem-shade',
       paint: {
         'hillshade-method': 'igor',
-        'hillshade-exaggeration': dark ? 0.45 : 0.3,
-        'hillshade-shadow-color': dark ? '#000000' : '#5b6b7d',
-        'hillshade-highlight-color': dark ? 'rgba(103,232,249,0.18)' : 'rgba(255,255,255,0.6)',
-        'hillshade-accent-color': dark ? '#0b1220' : '#94a3b8',
+        'hillshade-exaggeration': dark ? 0.35 : 0.28,
+        'hillshade-shadow-color': dark ? '#000000' : '#6b7280',
+        'hillshade-highlight-color': dark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.55)',
+        'hillshade-accent-color': dark ? '#000000' : '#9ca3af',
       },
     },
-    beforeLabels,
+    beforeWater,
   );
-
-  if (map.getSource('openmaptiles') && !map.getLayer('building-3d')) {
-    const height: ExpressionSpecification = ['coalesce', ['get', 'render_height'], 0];
-    map.addLayer(
-      {
-        id: 'building-3d',
-        type: 'fill-extrusion',
-        source: 'openmaptiles',
-        'source-layer': 'building',
-        minzoom: 14,
-        paint: {
-          'fill-extrusion-color': dark
-            ? ['interpolate', ['linear'], height, 0, '#0b1220', 25, '#10283a', 80, '#155e75', 200, '#22d3ee']
-            : ['interpolate', ['linear'], height, 0, '#e2e8f0', 40, '#cbd5e1', 150, '#a5d8e6'],
-          'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 15.5, height],
-          'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
-          'fill-extrusion-opacity': dark ? 0.88 : 0.8,
-          'fill-extrusion-vertical-gradient': true,
-        },
-      },
-      beforeLabels,
-    );
-    for (const l of map.getStyle().layers) {
-      if (l.type === 'fill' && 'source-layer' in l && l['source-layer'] === 'building') map.setLayoutProperty(l.id, 'visibility', 'none');
-    }
-  }
-
+  // 3D buildings come from the map style itself (public/map/*.json).
   labelFonts(map);
-  restyleLabels(map, dark);
 }
 
 /** Rises the land into real 3D (drive mode and the 3D button only: it costs GPU and battery). */

@@ -46,8 +46,8 @@
   border-radius: 50%;
   background:
     radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.55), transparent 42%),
-    conic-gradient(from 0deg, #8b5cf6, #22d3ee, #34d399, #8b5cf6);
-  box-shadow: 0 0 40px rgba(139, 92, 246, 0.45), 0 0 80px rgba(34, 211, 238, 0.25), inset 0 -10px 24px rgba(0, 0, 0, 0.25);
+    conic-gradient(from 0deg, #8b5cf6, var(--accent), var(--good), #8b5cf6);
+  box-shadow: 0 0 40px rgba(139, 92, 246, 0.45), 0 0 80px color-mix(in srgb, var(--accent) 25%, transparent), inset 0 -10px 24px rgba(0, 0, 0, 0.25);
   animation: orb-breathe 4s ease-in-out infinite, orb-hue 9s linear infinite;
 }
 .orb__ring {
@@ -59,15 +59,15 @@
 }
 .orb__ring--2 {
   animation-delay: 1.6s;
-  border-color: rgba(34, 211, 238, 0.4);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .orb--listening .orb__core {
   animation: orb-listen 0.9s ease-in-out infinite, orb-hue 3s linear infinite;
-  box-shadow: 0 0 60px rgba(34, 211, 238, 0.7), 0 0 120px rgba(52, 211, 153, 0.35);
+  box-shadow: 0 0 60px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 120px color-mix(in srgb, var(--good) 35%, transparent);
 }
 .orb--listening .orb__ring {
   animation-duration: 1.2s;
-  border-color: rgba(34, 211, 238, 0.7);
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
 }
 .orb--thinking .orb__core {
   animation: orb-hue 1.4s linear infinite;

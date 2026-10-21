@@ -15,7 +15,7 @@ import { PLANS, isPlus, type PlanId } from './shared/plans.ts';
 import { liveState, type StationStatus } from './shared/status.ts';
 import type { MyVehicle } from './shared/vehicles.ts';
 import { About } from './ui/About.tsx';
-import { PAINTS } from './ui/car/carArt.ts';
+import { DEFAULT_PAINTS } from './ui/car/carDesigns.ts';
 import { useCarLink } from './ui/car/carLink.ts';
 import type { VoiceTrip } from './ui/copilot/CopilotScreen.tsx';
 import type { CarPosition } from './ui/drive/DriveMode.tsx';
@@ -53,7 +53,8 @@ const readViewport = () => ({ height: window.innerHeight, desktop: window.innerW
 const isVehicle = (v: unknown): v is MyVehicle => isObject(v) && typeof v.modelId === 'string' && typeof v.batteryKwh === 'number';
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-const isPaint = (v: unknown): v is string => typeof v === 'string' && PAINTS.some((p) => p.hex === v);
+/** Any solid colour: each model has its own official paints, and number lookup brings the car's own. */
+const isPaint = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
 
 /** The last plan /api/me reported, so a paid user offline (or before /api/me answers) still gets their features. */
 interface CachedPlan {
@@ -108,7 +109,7 @@ export function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [cachedPlan] = useState(loadCachedPlan);
   const [vehicle, setVehicle] = useState<MyVehicle | null>(() => loadJson<MyVehicle | null>('vehicle', null, (v): v is MyVehicle | null => v === null || isVehicle(v)));
-  const [paint, setPaint] = useState(() => loadJson('paint', PAINTS[0].hex, isPaint));
+  const [paint, setPaint] = useState(() => loadJson('paint', DEFAULT_PAINTS[0].hex, isPaint));
   const [dark, setDark] = useState(() => loadJson('dark', true, isBool));
   const [online, setOnline] = useState(navigator.onLine);
   // First visit only, and not when a shared link opens a charger or place.
@@ -588,6 +589,7 @@ export function App() {
           canConnect={canConnect}
           trialAvailable={trialAvailable}
           onPaint={choosePaint}
+          onVehicle={saveVehicle}
           onGarage={() => setOverlay('garage')}
           onUnlock={() => unlock()}
           onStartTrial={() => void beginTrial()}
@@ -698,6 +700,8 @@ export function App() {
       {overlay === 'garage' && (
         <Garage
           vehicle={vehicle}
+          lookupOn={config?.vehicleLookup === true}
+          onPaint={choosePaint}
           onClose={() => {
             trialWanted.current = false;
             setOverlay(null);
@@ -720,6 +724,7 @@ export function App() {
           vehicle={vehicle}
           paint={paint}
           trialAvailable={trialAvailable}
+          lookupOn={config?.vehicleLookup === true}
           onPaint={choosePaint}
           onVehicle={saveVehicle}
           onStartTrial={(v) => {

@@ -1,5 +1,6 @@
 // Request and response shapes shared by the app and the Worker.
 import type { Coord } from '../planner/geometry.ts';
+import type { Maker } from './vin.ts';
 
 /** Sent by the app on every API call; a random id per install, used for Basic (no sign-in) limits and one trial per device. */
 export const DEVICE_HEADER = 'X-ChargeOne-Device';
@@ -49,6 +50,36 @@ export interface FeedbackRequest {
   platform: 'web' | 'android' | 'ios';
   /** The driver agrees to be emailed about it (signed-in only). */
   contactOk: boolean;
+}
+
+/**
+ * POST /api/vehicle/lookup: a registration number checked through a licensed provider, with the
+ * owner's consent. Only facts about the car come back; no owner name, address, phone or full VIN.
+ */
+/** Bump when the consent wording in FindCar changes. */
+export const LOOKUP_CONSENT_VERSION = 'veh-lookup-v1';
+
+export interface VehicleLookupRequest {
+  plate: string;
+  consent: { version: string; acceptedAt: string };
+}
+
+export interface VehicleLookupResult {
+  status: 'ok' | 'not_found' | 'not_ev' | 'not_car';
+  maker: Maker;
+  /** The model as the registration record writes it, e.g. "NEXON EV MAX LR". */
+  modelText: string;
+  fuel: string;
+  isEv: boolean;
+  colour: string;
+  colourHex: string | null;
+  /** YYYY-MM. */
+  builtYm: string | null;
+  registeredYm: string | null;
+  /** First ten VIN characters (maker, model code, year), never the serial. */
+  vinPrefix: string | null;
+  /** App vehicle ids that match; several when the model came with more than one battery. */
+  candidates: string[];
 }
 
 export type AgentLang = 'en' | 'hi';

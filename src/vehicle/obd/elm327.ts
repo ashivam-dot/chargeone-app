@@ -114,6 +114,49 @@ export function supportedFromBitmap(base: number, bytes: number[]): number[] {
   return out;
 }
 
+const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/;
+
+/**
+ * The VIN in a mode 09 PID 02 reply (prefix '4902') or a UDS ReadDataByIdentifier F190 reply ('62F190').
+ * Handles ISO-TP multi-frame output ('014', '0:4902…', '1:…') and legacy one-line-per-chunk replies.
+ * null for all-FF fillers, ECU names and other non-VINs.
+ */
+export function parseVinReply(lines: string[], prefix: '4902' | '62F190'): string | null {
+  const c = lines.map(compact).filter((l) => l && l !== 'OK');
+  let hex = '';
+  let total = Infinity;
+  if (c.length > 0 && /^[0-9A-F]{3}$/.test(c[0])) {
+    total = parseInt(c[0], 16);
+    for (const line of c.slice(1)) {
+      const m = line.match(/^[0-9A-F]:([0-9A-F]+)$/);
+      if (m) hex += m[1];
+    }
+    hex = hex.slice(0, total * 2);
+  } else if (prefix === '4902' && c.filter((l) => l.startsWith('4902')).length > 1) {
+    // Legacy protocols: '49 02 0N' + four bytes per line.
+    hex = `4902${c.filter((l) => l.startsWith('4902')).map((l) => l.slice(6)).join('')}`;
+  } else {
+    hex = c.join('');
+  }
+  let at = hex.indexOf(prefix);
+  while (at > 0 && at % 2 !== 0) at = hex.indexOf(prefix, at + 1);
+  if (at < 0) return null;
+  let data = hex.slice(at + prefix.length);
+  if (prefix === '4902' && c.length > 0 && /^[0-9A-F]{3}$/.test(c[0])) data = data.slice(2);
+  let text = '';
+  for (let i = 0; i + 1 < data.length; i += 2) {
+    const b = parseInt(data.slice(i, i + 2), 16);
+    if (b === 0x00 || b === 0xff) continue;
+    text += String.fromCharCode(b);
+  }
+  text = text.toUpperCase().trim();
+  const vin = text.length > 17 ? text.slice(-17) : text;
+  return VIN_RE.test(vin) ? vin : null;
+}
+
+/** ECUs asked for the VIN over UDS when mode 09 has nothing; some answer only when addressed directly. */
+const UDS_VIN_HEADERS = ['7E0', '7E2', '7E4'] as const;
+
 export const decode = {
   speedKmh: (b: number[]) => b[0],
   evBatteryPct: (b: number[]) => (b[0] * 100) / 255,
@@ -203,6 +246,36 @@ export class Elm327 {
 
   async readModuleVoltage(): Promise<number | null> {
     return this.readDecoded(PID.moduleVoltage, 2, decode.moduleVoltage);
+  }
+
+  /**
+   * The car's VIN, or null when it won't share it. Many EVs answer neither request: India's OBD rules
+   * are about emissions, so this is a bonus, never a requirement. Call after supportedPids().
+   */
+  async readVin(): Promise<string | null> {
+    const ask = async (command: string, prefix: '4902' | '62F190') => {
+      try {
+        return parseVinReply(await this.send(command, Math.max(this.timeoutMs, 5000)), prefix);
+      } catch (err) {
+        if (err instanceof ObdError && ['no_data', 'bad_response', 'unknown_command'].includes(err.code)) return null;
+        throw err;
+      }
+    };
+    const vin = await ask('0902', '4902');
+    if (vin) return vin;
+    try {
+      for (const header of UDS_VIN_HEADERS) {
+        await this.send(`ATSH${header}`);
+        const uds = await ask('22F190', '62F190');
+        if (uds) return uds;
+      }
+      return null;
+    } catch (err) {
+      if (err instanceof ObdError && err.code === 'unknown_command') return null;
+      throw err;
+    } finally {
+      await this.send('ATSH7DF').catch(() => undefined);
+    }
   }
 
   async close(): Promise<void> {

@@ -71,6 +71,26 @@ describe('ObdSource', () => {
     expect(t.closed).toBe(true);
   });
 
+  it('identifies the car from its VIN on connect, even when it then refuses for battery %', async () => {
+    const vinReply = '014\n0:4902014D4154\n1:3633353030334E\n2:4C473038363131';
+    const seen: string[] = [];
+    await new ObdSource({ vehicle: nexon, openTransport: async () => adapter({ '0902': vinReply }), onVin: (v) => seen.push(v) }).connect();
+    const noSoc = adapter({ '0902': vinReply, '0140': bitmapReply(0x40, [PID.ambientTemp]) });
+    await new ObdSource({ vehicle: nexon, openTransport: async () => noSoc, onVin: (v) => seen.push(v) }).connect().catch(() => undefined);
+    expect(seen).toEqual(['MAT635003NLG08611', 'MAT635003NLG08611']);
+  });
+
+  it('connects normally when the car keeps its VIN to itself', async () => {
+    const t = adapter();
+    const onVin = vi.fn();
+    const src = new ObdSource({ vehicle: nexon, openTransport: async () => t, onVin });
+    await src.connect();
+    expect(src.state).toBe('connected');
+    expect(onVin).not.toHaveBeenCalled();
+    expect(t.sent('ATSH7DF')).toBe(1);
+    await src.disconnect();
+  });
+
   it('reports an adapter that cannot reach the car', async () => {
     const t = adapter({ '0100': 'UNABLE TO CONNECT' });
     const src = new ObdSource({ vehicle: nexon, openTransport: async () => t });

@@ -1,7 +1,6 @@
 import type { Dataset } from '../data/model.ts';
 import { formatDate } from '../lib/format.ts';
 import { LIVE_COLOUR, LIVE_LABEL, type LiveState } from '../shared/status.ts';
-import { CAR_MODEL_CREDITS } from './car/models3d.ts';
 import { Sheet } from './Sheet.tsx';
 
 interface Props {
@@ -66,7 +65,10 @@ export function About({ dataset, onClose }: Props) {
             Photon. Routes by openrouteservice. Terrain ©{' '}
             <a href="https://mapterhorn.com/attribution" target="_blank" rel="noopener noreferrer">Mapterhorn</a>.
           </li>
-          <li>3D cars: {CAR_MODEL_CREDITS.join(', ')}. HD voice: Supertonic 3 by Supertone.</li>
+          <li>
+            3D cars are ChargeOne's own models, built from each maker's published dimensions; they are likenesses, not official renders. Brand
+            names belong to their owners. HD voice: Supertonic 3 by Supertone.
+          </li>
         </ul>
       )}
 

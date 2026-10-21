@@ -4,7 +4,9 @@ import { haptic } from '../../native/platform.ts';
 import { TRIAL_DAYS } from '../../shared/plans.ts';
 import { CUSTOM_VEHICLE_ID, VEHICLES, myVehicleFromModel, type MyVehicle } from '../../shared/vehicles.ts';
 import { CarStage } from '../car/CarStage.tsx';
-import { PAINTS } from '../car/carArt.ts';
+import { FindCar } from '../car/FindCar.tsx';
+import { PaintSwatches } from '../car/PaintSwatches.tsx';
+import { paintsFor } from '../car/carDesigns.ts';
 import './onboarding.css';
 
 interface Props {
@@ -14,6 +16,8 @@ interface Props {
   paint: string;
   /** False when this account or phone already had its free week. */
   trialAvailable: boolean;
+  /** Registration-number lookup is set up on the server. */
+  lookupOn: boolean;
   onPaint: (hex: string) => void;
   onVehicle: (v: MyVehicle) => void;
   onStartTrial: (v: MyVehicle) => void;
@@ -31,7 +35,7 @@ const TRIAL_PERKS: Array<[typeof Route, string, string]> = [
   [Mic, 'Copilot in Hindi or English', 'Plan the whole trip by voice and ask anything on the way'],
 ];
 
-export function Onboarding({ stationCount, dcCount, vehicle, paint, trialAvailable, onPaint, onVehicle, onStartTrial, onFinish }: Props) {
+export function Onboarding({ stationCount, dcCount, vehicle, paint, trialAvailable, lookupOn, onPaint, onVehicle, onStartTrial, onFinish }: Props) {
   const [step, setStep] = useState<Step>('intro');
   const [modelId, setModelId] = useState(vehicle?.modelId && vehicle.modelId !== CUSTOM_VEHICLE_ID ? vehicle.modelId : 'tata-nexon-ev-45');
   const brands = useMemo(() => [...new Set(VEHICLES.map((m) => brandOf(m.name)))], []);
@@ -101,6 +105,16 @@ export function Onboarding({ stationCount, dcCount, vehicle, paint, trialAvailab
         <section class="onboard__step onboard__car">
           <p class="onboard__kicker">Step 1 of {trialAvailable ? 2 : 1}</p>
           <h1 class="onboard__title">What do you drive?</h1>
+          <FindCar
+            lookupOn={lookupOn}
+            onFound={(car) => {
+              const first = VEHICLES.find((m) => m.id === car.candidates[0]);
+              if (!first) return;
+              setModelId(first.id);
+              setBrand(brandOf(first.name));
+              if (car.colourHex) onPaint(car.colourHex);
+            }}
+          />
           <div class="onboard__hero">
             <CarStage key={modelId} modelId={modelId} paint={paint} connected driving={false} charging={false} label={`${model.name} preview`} />
           </div>
@@ -110,22 +124,7 @@ export function Onboarding({ stationCount, dcCount, vehicle, paint, trialAvailab
               {model.batteryKwh} kWh · {model.maxDcKw ? `DC ${model.maxDcKw} kW` : 'AC only'} · about {Math.round((model.batteryKwh * 1000) / model.highwayWhPerKm)} km highway
             </span>
           </p>
-          <div class="swatches" role="radiogroup" aria-label="Paint">
-            {PAINTS.map((p) => (
-              <button
-                key={p.id}
-                class="swatch"
-                role="radio"
-                aria-checked={p.hex === paint}
-                aria-label={p.name}
-                style={{ '--c': p.hex }}
-                onClick={() => {
-                  void haptic('selection');
-                  onPaint(p.hex);
-                }}
-              />
-            ))}
-          </div>
+          <PaintSwatches modelId={modelId} paint={paint} onPaint={onPaint} />
           <div class="onboard__brands" role="tablist" aria-label="Brand">
             {brands.map((b) => (
               <button key={b} role="tab" aria-selected={b === brand} class="chip" aria-pressed={b === brand} onClick={() => setBrand(b)}>
@@ -143,6 +142,7 @@ export function Onboarding({ stationCount, dcCount, vehicle, paint, trialAvailab
                 onClick={() => {
                   void haptic('selection');
                   setModelId(m.id);
+                  onPaint(paintsFor(m.id)[0].hex);
                 }}
               >
                 {m.name.replace(`${brand} `, '')}

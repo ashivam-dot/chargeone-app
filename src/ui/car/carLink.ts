@@ -2,8 +2,19 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { Coord } from '../../planner/geometry.ts';
 import type { MyVehicle } from '../../shared/vehicles.ts';
+import { decodeVin, vinPrefix, type Maker } from '../../shared/vin.ts';
 import type { DemoChargeStop, DemoScenario } from '../../vehicle/demoCar.ts';
 import type { ConnectionState, SourceKind, Telemetry, VehicleSource } from '../../vehicle/types.ts';
+
+/** What the connected car said about itself. Only the decoded facts, never the full VIN. */
+export interface DetectedCar {
+  maker: Maker;
+  year: number | null;
+  month: number | null;
+  vinPrefix: string;
+  /** App vehicle ids this VIN prefix is known for; empty when only the maker is known. */
+  modelHints: string[];
+}
 
 export interface CarLinkState {
   kind: SourceKind | null;
@@ -12,10 +23,11 @@ export interface CarLinkState {
   telemetry: Telemetry | null;
   /** Recent readings, oldest first, for the consumption chart. */
   history: Telemetry[];
+  detected: DetectedCar | null;
 }
 
 const HISTORY = 90;
-const IDLE: CarLinkState = { kind: null, state: 'idle', error: null, telemetry: null, history: [] };
+const IDLE: CarLinkState = { kind: null, state: 'idle', error: null, telemetry: null, history: [], detected: null };
 
 let current: CarLinkState = IDLE;
 let source: VehicleSource | null = null;
@@ -76,7 +88,7 @@ async function attach(next: VehicleSource) {
   await teardown();
   if (gen !== generation) return;
   source = next;
-  set({ kind: next.kind, state: 'connecting', error: null, telemetry: null, history: [] });
+  set({ kind: next.kind, state: 'connecting', error: null, telemetry: null, history: [], detected: null });
   unsubscribe = next.subscribe((t) => {
     const history = current.history.length >= HISTORY ? [...current.history.slice(1), t] : [...current.history, t];
     set({ telemetry: t, history, state: 'connected' });
@@ -129,6 +141,12 @@ export async function connectObd(vehicle: MyVehicle): Promise<void> {
         },
       }),
     watch: watchPosition,
+    onVin: (vin) => {
+      const info = decodeVin(vin);
+      if (!info) return;
+      const detected: DetectedCar = { maker: info.maker, year: info.year, month: info.month, vinPrefix: vinPrefix(info.vin), modelHints: info.modelHints };
+      if (source === obd) set({ detected });
+    },
   });
   await attach(obd);
 }

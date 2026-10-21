@@ -1,15 +1,16 @@
-import { Bluetooth, CarFront, ChevronRight, FlaskConical, Info, Lock, Navigation2, Power, Smartphone, Sparkles } from 'lucide-preact';
+import { BadgeCheck, Bluetooth, CarFront, ChevronRight, FlaskConical, Info, Lock, Navigation2, Power, Smartphone, Sparkles } from 'lucide-preact';
 import { useEffect, useState } from 'preact/hooks';
 import { haptic } from '../../native/platform.ts';
 import { TRIAL_DAYS } from '../../shared/plans.ts';
-import { baseWhPerKm, type MyVehicle } from '../../shared/vehicles.ts';
+import { VEHICLES, baseWhPerKm, myVehicleFromModel, type MyVehicle, type VehicleModel } from '../../shared/vehicles.ts';
+import { MAKER_NAMES } from '../../shared/vin.ts';
 import { efficiencyScore, sohLabel } from '../../vehicle/health.ts';
 import type { SourceKind, Telemetry } from '../../vehicle/types.ts';
 import { Page } from '../shell/Page.tsx';
 import { CarHero } from './CarHero.tsx';
 import { CarStage } from './CarStage.tsx';
-import { PAINTS } from './carArt.ts';
-import { connectDemo, connectObd, connectPhone, disconnectCar, setBatteryPct, useCarLink } from './carLink.ts';
+import { PaintSwatches } from './PaintSwatches.tsx';
+import { connectDemo, connectObd, connectPhone, disconnectCar, setBatteryPct, useCarLink, type DetectedCar } from './carLink.ts';
 import './car.css';
 import '../screens.css';
 
@@ -20,6 +21,7 @@ interface Props {
   canConnect: boolean;
   trialAvailable: boolean;
   onPaint: (hex: string) => void;
+  onVehicle: (v: MyVehicle) => void;
   onGarage: () => void;
   onUnlock: () => void;
   onStartTrial: () => void;
@@ -63,12 +65,12 @@ function Sparkline({ history }: { history: Telemetry[] }) {
     <svg class="spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label={`Consumption trend, latest ${Math.round(pts[pts.length - 1])} watt-hours per kilometre`}>
       <defs>
         <linearGradient id="spark-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#22d3ee" stop-opacity="0.35" />
-          <stop offset="1" stop-color="#22d3ee" stop-opacity="0" />
+          <stop offset="0" stop-color="#2b6bff" stop-opacity="0.35" />
+          <stop offset="1" stop-color="#2b6bff" stop-opacity="0" />
         </linearGradient>
         <linearGradient id="spark-line" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stop-color="#22d3ee" />
-          <stop offset="1" stop-color="#34d399" />
+          <stop offset="0" stop-color="#2b6bff" />
+          <stop offset="1" stop-color="#30d158" />
         </linearGradient>
       </defs>
       <path d={`${line}L${w} ${h}L0 ${h}Z`} fill="url(#spark-fill)" />
@@ -100,7 +102,45 @@ export function BatteryGauge({ soc, rangeKm, charging, measured }: { soc: number
   );
 }
 
-export function CarScreen({ vehicle, paint, canConnect, trialAvailable, onPaint, onGarage, onUnlock, onStartTrial }: Props) {
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** What the OBD-II adapter learned from the car's VIN, compared with the car the driver chose. */
+function DetectedCarNote({ detected, vehicle, onVehicle, onGarage }: { detected: DetectedCar; vehicle: MyVehicle; onVehicle: (v: MyVehicle) => void; onGarage: () => void }) {
+  const maker = MAKER_NAMES[detected.maker];
+  const built = detected.year ? `, built ${detected.month ? `${MONTHS[detected.month - 1]} ` : ''}${detected.year}` : '';
+  const chosenMaker = vehicle.modelId.split('-')[0];
+  if (detected.modelHints.includes(vehicle.modelId) || (detected.modelHints.length === 0 && chosenMaker === detected.maker)) {
+    return (
+      <p class="detected small" role="status" data-testid="car-detected">
+        <BadgeCheck size={16} aria-hidden="true" /> Recognised over OBD-II: your {maker}
+        {built}.
+      </p>
+    );
+  }
+  const options = detected.modelHints.map((id) => VEHICLES.find((m) => m.id === id)).filter((m): m is VehicleModel => Boolean(m));
+  return (
+    <section class="detected detected--ask" role="alert" data-testid="car-detected">
+      <p class="small">
+        <strong>The connected car is a {options.length ? options[0].name.replace(/ \d+(\.\d+)?$/, '') : maker}</strong>
+        {built}, not a {vehicle.name}. Plans use the car you choose, so switch to get the right range.
+      </p>
+      <div class="actions">
+        {options.map((m) => (
+          <button key={m.id} class="btn btn--primary" onClick={() => onVehicle(myVehicleFromModel(m))}>
+            Use {m.name}
+          </button>
+        ))}
+        {options.length === 0 && (
+          <button class="btn btn--primary" onClick={onGarage}>
+            Change car
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+export function CarScreen({ vehicle, paint, canConnect, trialAvailable, onPaint, onVehicle, onGarage, onUnlock, onStartTrial }: Props) {
   const link = useCarLink();
   const t = link.telemetry;
   const [busy, setBusy] = useState<SourceKind | null>(null);
@@ -113,7 +153,7 @@ export function CarScreen({ vehicle, paint, canConnect, trialAvailable, onPaint,
     return (
       <Page title="My car" testId="screen-car">
         <div class="car-empty">
-          <CarHero modelId="tata-nexon-ev-45" paint={PAINTS[2].hex} connected={false} driving={false} charging={false} label="Add your car" />
+          <CarHero modelId="tata-nexon-ev-45" paint="#5e6266" connected={false} driving={false} charging={false} label="Add your car" />
           <p class="muted center">Add your EV to see live battery, range and health, and to plan trips that match your car.</p>
           <button class="btn btn--primary btn--block btn--lg" onClick={onGarage} data-testid="car-add">
             <CarFront size={18} aria-hidden="true" /> Add my car
@@ -170,22 +210,7 @@ export function CarScreen({ vehicle, paint, canConnect, trialAvailable, onPaint,
     >
       <div class="car-stage">
         <CarStage key={vehicle.modelId} modelId={vehicle.modelId} paint={paint} connected={live} driving={driving} charging={charging} speedKmh={t?.speedKmh} label={`${vehicle.name}${live ? ', connected' : ''}`} />
-        <div class="swatches swatches--small" role="radiogroup" aria-label="Paint">
-          {PAINTS.map((p) => (
-            <button
-              key={p.id}
-              class="swatch"
-              role="radio"
-              aria-checked={p.hex === paint}
-              aria-label={p.name}
-              style={{ '--c': p.hex }}
-              onClick={() => {
-                void haptic('selection');
-                onPaint(p.hex);
-              }}
-            />
-          ))}
-        </div>
+        <PaintSwatches modelId={vehicle.modelId} paint={paint} onPaint={onPaint} small />
       </div>
 
       <BatteryGauge
@@ -250,6 +275,8 @@ export function CarScreen({ vehicle, paint, canConnect, trialAvailable, onPaint,
           <Sparkline history={link.history} />
         </section>
       )}
+
+      {link.detected && <DetectedCarNote detected={link.detected} vehicle={vehicle} onVehicle={onVehicle} onGarage={onGarage} />}
 
       {link.error && (
         <p class="notice notice--error" role="alert">

@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'preact/hooks';
 import {
   ACESFilmicToneMapping,
   AdditiveBlending,
-  Box3,
   CanvasTexture,
   Color,
   DirectionalLight,
@@ -10,21 +9,19 @@ import {
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
-  MeshPhysicalMaterial,
   PerspectiveCamera,
   PlaneGeometry,
   PMREMGenerator,
   RingGeometry,
   Scene,
   SRGBColorSpace,
-  Vector3,
   WebGLRenderer,
   type Material,
   type Object3D,
 } from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { car3dFor } from './models3d.ts';
+import { buildCar, type CarModel } from './carMesh.ts';
+import { designFor } from './carDesigns.ts';
 
 export interface Car3DProps {
   modelId: string;
@@ -39,8 +36,12 @@ export interface Car3DProps {
   onError?: () => void;
 }
 
+/** Every car is shown at the same size on the stage; real proportions are kept within it. */
 const CAR_LENGTH = 4.4;
 const ARRIVE_MS = 1700;
+const SHOWCASE_MS = 14_000;
+const RING = '#2b6bff';
+const RING_CHARGING = '#30d158';
 
 interface Live {
   paint: string;
@@ -95,7 +96,7 @@ export function Car3D(props: Car3DProps) {
     }
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.toneMapping = ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.25;
+    renderer.toneMappingExposure = 1.15;
     renderer.outputColorSpace = SRGBColorSpace;
 
     const scene = new Scene();
@@ -104,11 +105,11 @@ export function Car3D(props: Car3DProps) {
     scene.environment = pmrem.fromScene(room, 0.04).texture;
     room.dispose?.();
 
-    scene.add(new HemisphereLight('#c9f4ff', '#0b1220', 1.1));
+    scene.add(new HemisphereLight('#eef3ff', '#16181d', 1.0));
     const key = new DirectionalLight('#ffffff', 2.2);
     key.position.set(4, 7, 5);
     scene.add(key);
-    const rim = new DirectionalLight('#67e8f9', 1.4);
+    const rim = new DirectionalLight('#dbe6ff', 1.1);
     rim.position.set(-5, 3, -6);
     scene.add(rim);
 
@@ -123,8 +124,8 @@ export function Car3D(props: Car3DProps) {
     shadow.scale.set(CAR_LENGTH * 1.25, CAR_LENGTH * 0.62, 1);
     shadow.position.y = 0.005;
     stage.add(shadow);
-    const ringMat = new MeshBasicMaterial({ color: new Color('#22d3ee'), transparent: true, opacity: 0.55, blending: AdditiveBlending, depthWrite: false });
-    const ring = new Mesh(new RingGeometry(2.5, 2.56, 160), ringMat);
+    const ringMat = new MeshBasicMaterial({ color: new Color(RING), transparent: true, opacity: 0.55, blending: AdditiveBlending, depthWrite: false });
+    const ring = new Mesh(new RingGeometry(2.5, 2.54, 160), ringMat);
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.01;
     stage.add(ring);
@@ -138,81 +139,19 @@ export function Car3D(props: Car3DProps) {
     stage.add(car);
     stage.rotation.y = -0.55;
 
-    const wheels: Mesh[] = [];
-    let wheelRadius = 0.35;
-    let axle = new Vector3(0, 0, 1);
-    let paintMat: MeshPhysicalMaterial | null = null;
-    const headlights: MeshPhysicalMaterial[] = [];
-    const taillights: MeshPhysicalMaterial[] = [];
+    let model: CarModel;
+    try {
+      model = buildCar(designFor(props.modelId).design, live.current.paint);
+    } catch {
+      callbacks.current.onError?.();
+      renderer.dispose();
+      return;
+    }
+    const scale = CAR_LENGTH / model.length;
+    model.group.scale.setScalar(scale);
+    car.add(model.group);
+    const wheelRadius = model.wheelRadius * scale;
     let ready = false;
-    let disposed = false;
-    const model = car3dFor(props.modelId);
-
-    new GLTFLoader()
-      .loadAsync(model.url)
-      .then((gltf) => {
-        if (disposed) return disposeTree(gltf.scene);
-        const root = gltf.scene;
-        root.updateMatrixWorld(true);
-        const body = new Box3().setFromObject(root);
-        const size = body.getSize(new Vector3());
-        // Lay the car along x so the camera sees it in three-quarter view; the wheels turn about z.
-        if (size.z > size.x) {
-          root.rotation.y = Math.PI / 2;
-          root.updateMatrixWorld(true);
-        }
-        root.traverse((o) => {
-          const mesh = o as Mesh;
-          if (!mesh.isMesh) return;
-          const swap = (mat: Material): Material => {
-            const name = mat.name;
-            const base = mat as MeshPhysicalMaterial;
-            if (name === model.paintMaterial) {
-              paintMat ??= new MeshPhysicalMaterial({ color: new Color(live.current.paint), metalness: 0.35, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.05 });
-              return paintMat;
-            }
-            if (/window|glass/i.test(name)) return new MeshPhysicalMaterial({ color: '#0b1220', metalness: 0.2, roughness: 0.04, clearcoat: 1 });
-            if (/headlight/i.test(name)) {
-              const m = new MeshPhysicalMaterial({ color: '#f8fafc', emissive: new Color('#bdf4ff'), emissiveIntensity: 0, roughness: 0.2 });
-              headlights.push(m);
-              return m;
-            }
-            if (/tail/i.test(name)) {
-              const m = new MeshPhysicalMaterial({ color: '#7f1d1d', emissive: new Color('#ef4444'), emissiveIntensity: 0.15, roughness: 0.3 });
-              taillights.push(m);
-              return m;
-            }
-            if (/black|tyre|tire|rubber/i.test(name)) return new MeshPhysicalMaterial({ color: '#0a0a0c', roughness: 0.85 });
-            if (/grey|gray|rim|chrome/i.test(name)) return new MeshPhysicalMaterial({ color: base.color ?? '#9aa3af', metalness: 0.9, roughness: 0.28 });
-            return mat;
-          };
-          mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material);
-          if (/wheel/i.test(mesh.name)) {
-            // Move each wheel's pivot to its own centre so it spins in place.
-            mesh.geometry.computeBoundingBox();
-            const c = mesh.geometry.boundingBox!.getCenter(new Vector3());
-            mesh.geometry.translate(-c.x, -c.y, -c.z);
-            mesh.position.add(c.multiply(mesh.scale).applyQuaternion(mesh.quaternion));
-            const ws = mesh.geometry.boundingBox!.getSize(new Vector3());
-            wheelRadius = Math.max(ws.x, ws.y, ws.z) / 2 || wheelRadius;
-            wheels.push(mesh);
-          }
-        });
-        // Wheel geometry is in the root's frame, where the axle is the body's narrower horizontal axis.
-        axle = size.z > size.x ? new Vector3(1, 0, 0) : new Vector3(0, 0, 1);
-        const scale = CAR_LENGTH / Math.max(size.x, size.z);
-        root.scale.multiplyScalar(scale);
-        wheelRadius *= scale;
-        root.updateMatrixWorld(true);
-        const placed = new Box3().setFromObject(root);
-        const centre = placed.getCenter(new Vector3());
-        root.position.set(-centre.x, -placed.min.y, -centre.z);
-        car.add(root);
-        ready = true;
-        callbacks.current.onReady?.();
-        kick();
-      })
-      .catch(() => callbacks.current.onError?.());
 
     // Motion state.
     const t0 = performance.now();
@@ -242,12 +181,12 @@ export function Car3D(props: Car3DProps) {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       const l = live.current;
-      if (paintMat && l.paint !== shownPaint) {
-        paintMat.color.set(l.paint);
+      if (l.paint !== shownPaint) {
+        model.paint.color.set(l.paint);
         shownPaint = l.paint;
       }
-      for (const h of headlights) h.emissiveIntensity += ((l.connected ? 2.2 : 0) - h.emissiveIntensity) * Math.min(1, dt * 6);
-      for (const t of taillights) t.emissiveIntensity = l.driving ? 1.2 : l.connected ? 0.6 : 0.15;
+      for (const h of model.headlights) h.emissiveIntensity += ((l.connected ? 2.4 : 0.35) - h.emissiveIntensity) * Math.min(1, dt * 6);
+      for (const t of model.taillights) t.emissiveIntensity = l.driving ? 1.4 : l.connected ? 0.8 : 0.3;
 
       // Arrival: the car rolls in from the left and settles on its springs.
       const p = reduce ? 1 : Math.min(1, (now - t0) / ARRIVE_MS);
@@ -264,21 +203,27 @@ export function Car3D(props: Car3DProps) {
         car.position.y += Math.sin(now / 47) * 0.004;
       }
       spin -= roll / wheelRadius;
-      for (const w of wheels) w.setRotationFromAxisAngle(axle, spin);
+      for (const w of model.wheels) w.rotation.z = spin;
 
-      // Turntable with inertia; a drag spins it by hand.
-      if (!dragging && !reduce) velocity += ((l.driving ? 0 : 0.14) - velocity) * Math.min(1, dt * 1.5);
+      // Turntable with inertia that glides to rest after a while, so an idle screen stops drawing; a drag spins it by hand.
+      const idle = now - t0 > SHOWCASE_MS;
+      if (!dragging && !reduce) velocity += ((l.driving || idle ? 0 : 0.14) - velocity) * Math.min(1, dt * (idle ? 0.8 : 1.5));
+      if (idle && Math.abs(velocity) < 0.002) velocity = 0;
       if (!dragging) stage.rotation.y += velocity * dt;
 
       const glow = l.charging ? 0.5 + 0.5 * Math.sin(now / 320) : 0;
-      ringMat.color.set(l.charging ? '#34d399' : '#22d3ee');
-      ringMat.opacity = 0.35 + (l.connected ? 0.3 : 0) + glow * 0.3;
+      ringMat.color.set(l.charging ? RING_CHARGING : RING);
+      ringMat.opacity = 0.3 + (l.connected ? 0.3 : 0) + glow * 0.3;
       const wave = l.charging && !reduce ? ((now / 1600) % 1) : 0;
       pulse.scale.setScalar(1 + wave * 0.35);
       pulseMat.color.copy(ringMat.color);
       pulseMat.opacity = l.charging ? (1 - wave) * 0.35 : 0;
 
       renderer.render(scene, camera);
+      if (!ready) {
+        ready = true;
+        callbacks.current.onReady?.();
+      }
       const moving = !reduce && (p < 1 || Math.abs(velocity) > 0.001 || l.driving || l.charging || settle !== 0);
       if (visible && !document.hidden && (moving || dragging)) raf = requestAnimationFrame(frame);
     };
@@ -290,7 +235,6 @@ export function Car3D(props: Car3DProps) {
     };
 
     const onDown = (e: PointerEvent) => {
-      if (!ready) return;
       dragging = true;
       dragX = e.clientX;
       velocity = 0;
@@ -331,11 +275,11 @@ export function Car3D(props: Car3DProps) {
     (canvas as HTMLCanvasElement & { kick?: () => void }).kick = kick;
 
     return () => {
-      disposed = true;
       cancelAnimationFrame(raf);
       ro.disconnect();
       io.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
+      model.dispose();
       disposeTree(scene);
       scene.environment?.dispose();
       pmrem.dispose();
@@ -348,7 +292,7 @@ export function Car3D(props: Car3DProps) {
     (canvasRef.current as (HTMLCanvasElement & { kick?: () => void }) | null)?.kick?.();
   }, [props.paint, props.connected, props.driving, props.charging]);
 
-  const model = car3dFor(props.modelId);
+  const { design, exact } = designFor(props.modelId);
   return (
     <div class="car3d">
       <canvas
@@ -359,7 +303,9 @@ export function Car3D(props: Car3DProps) {
         data-testid="car-3d"
         data-motion={matchMedia('(prefers-reduced-motion: reduce)').matches ? 'still' : 'live'}
       />
-      {!model.exact && <span class="car3d__note">Generic {model.url.includes('suv') ? 'SUV' : model.url.includes('sedan') ? 'sedan' : 'hatchback'} body in your colour</span>}
+      <span class="car3d__note" data-testid="car-3d-note">
+        {exact ? `${design.name} · ChargeOne model, not an official render` : 'Generic electric SUV in your colour'}
+      </span>
     </div>
   );
 }

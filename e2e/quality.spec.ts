@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures.ts';
 import { openApp, watchErrors } from './helpers.ts';
 
 const TABS = ['explore', 'trip', 'car', 'copilot', 'you'] as const;

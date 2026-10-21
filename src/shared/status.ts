@@ -52,10 +52,10 @@ export function liveState(s: StationStatus | undefined, now: Date): LiveState {
 }
 
 export const LIVE_COLOUR: Record<LiveState, string> = {
-  working: '#16a34a',
+  working: '#22c55e',
   in_use: '#f59e0b',
-  problem: '#dc2626',
-  unknown: '#64748b',
+  problem: '#ef4444',
+  unknown: '#7c8594',
 };
 
 export const LIVE_LABEL: Record<LiveState, string> = {

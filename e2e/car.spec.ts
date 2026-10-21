@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures.ts';
 import { openApp } from './helpers.ts';
 
 test.describe('My car', () => {
@@ -29,12 +29,12 @@ test.describe('My car', () => {
     await expect(screen).toContainText('Not connected');
   });
 
-  test('paint choice is remembered', async ({ page }) => {
+  test("offers the car's own factory colours and remembers the choice", async ({ page }) => {
     await openApp(page);
     await page.getByTestId('tab-car').click();
-    await page.getByRole('radio', { name: 'Flame Red' }).click();
-    await expect(page.getByRole('radio', { name: 'Flame Red' })).toHaveAttribute('aria-checked', 'true');
-    expect(await page.evaluate(() => localStorage.getItem('chargeone:paint'))).toBe('"#b4232a"');
+    await page.getByRole('radio', { name: 'Ocean Blue' }).click();
+    await expect(page.getByRole('radio', { name: 'Ocean Blue' })).toHaveAttribute('aria-checked', 'true');
+    expect(await page.evaluate(() => localStorage.getItem('chargeone:paint'))).toBe('"#1f4e79"');
   });
 
   test('is honest about carmaker apps', async ({ page }) => {

@@ -16,8 +16,7 @@ import type { Station } from '../data/model.ts';
 import { INDIA_BBOX } from '../lib/geocode.ts';
 import type { Coord } from '../planner/geometry.ts';
 import { LIVE_COLOUR, liveState, type StationStatus } from '../shared/status.ts';
-import { setMapMoving } from '../ui/glass.ts';
-import { drawRoute, futuristicStyle, setTerrain3d, shouldPlayIntro, Tilt3dControl } from './futuristic.ts';
+import { addMapIcons, drawRoute, futuristicStyle, ROUTE_GRADIENT, setTerrain3d, shouldPlayIntro, Tilt3dControl } from './futuristic.ts';
 
 export type FlyTarget =
   | { kind: 'point'; lat: number; lng: number; zoom: number }
@@ -76,8 +75,9 @@ const STAY_COLOUR = '#8b5cf6';
 const TAP_RADIUS_PX: Record<string, number> = { 'stop-labels': 13, stops: 13, stations: 8, clusters: 20, places: 5 };
 const CLICKABLE = Object.keys(TAP_RADIUS_PX);
 const TAP_SLOP_PX = 8;
-const LIGHT_STYLE = 'https://tiles.openfreemap.org/styles/positron';
-const DARK_STYLE = 'https://tiles.openfreemap.org/styles/dark';
+// Built by scripts/map-style.ts from OpenFreeMap's Liberty style; tiles, sprites and glyphs still come from OpenFreeMap.
+const LIGHT_STYLE = new URL('/map/day.json', location.href).href;
+const DARK_STYLE = new URL('/map/night.json', location.href).href;
 const ENGLISH_NAME: ExpressionSpecification = ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name:latin'], ['get', 'name']];
 
 /** The base style labels places in Latin and local script; show one English name instead. */
@@ -96,7 +96,7 @@ function stationsGeoJson(stations: Station[], statuses: Map<string, StationStatu
     features: stations.map((s) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
-      properties: { id: s.id, dc: s.speed === 'dc', live: liveState(statuses.get(s.id), now) },
+      properties: { id: s.id, dc: s.speed === 'dc', kw: s.maxKw ? `${Math.round(s.maxKw)} kW` : '', name: s.name, live: liveState(statuses.get(s.id), now) },
     })),
   };
 }
@@ -147,7 +147,9 @@ interface LayerData {
 
 function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null, selectedPlace: number | null, dark: boolean): void {
   if (map.getSource(SOURCE)) return;
-  const halo = dark ? '#05070b' : '#ffffff';
+  const halo = dark ? '#0b0d10' : '#ffffff';
+  const ink = dark ? '#ffffff' : '#0a0a0b';
+  addMapIcons(map);
   map.addSource(SOURCE, { type: 'geojson', data: data.stations, cluster: true, clusterRadius: 46, clusterMaxZoom: 11 });
   map.addSource(ROUTE, { type: 'geojson', data: data.route, lineMetrics: true });
   map.addSource(ALT_ROUTES, { type: 'geojson', data: data.altRoutes });
@@ -160,8 +162,8 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     source: ALT_ROUTES,
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: {
-      'line-color': dark ? '#64748b' : '#94a3b8',
-      'line-opacity': 0.75,
+      'line-color': dark ? '#8e8e93' : '#8a8f98',
+      'line-opacity': 0.8,
       'line-width': ['interpolate', ['linear'], ['zoom'], 5, 3, 14, 6],
       'line-dasharray': [1.5, 1.5],
     },
@@ -171,7 +173,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     type: 'line',
     source: ROUTE,
     layout: { 'line-join': 'round', 'line-cap': 'round' },
-    paint: { 'line-color': '#22d3ee', 'line-opacity': dark ? 0.35 : 0.2, 'line-blur': 8, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 12, 14, 22] },
+    paint: { 'line-color': '#2b6bff', 'line-opacity': dark ? 0.4 : 0.18, 'line-blur': 8, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 12, 14, 22] },
   });
   map.addLayer({
     id: 'route-casing',
@@ -186,7 +188,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     source: ROUTE,
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: {
-      'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#22d3ee', 1, '#34d399'],
+      'line-gradient': ROUTE_GRADIENT,
       'line-width': ['interpolate', ['linear'], ['zoom'], 5, 3.5, 14, 7],
     },
   });
@@ -209,7 +211,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     paint: {
       'circle-color': ['match', ['get', 'cat'], 'food', FOOD_COLOUR, STAY_COLOUR],
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 3.5, 12, 5.5, 16, 8],
-      'circle-stroke-color': ['case', ['get', 'onsite'], '#22d3ee', halo],
+      'circle-stroke-color': ['case', ['get', 'onsite'], '#2b6bff', halo],
       'circle-stroke-width': ['case', ['get', 'onsite'], 2.5, 1.5],
     },
   });
@@ -239,11 +241,11 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     source: SOURCE,
     filter: ['has', 'point_count'],
     paint: {
-      'circle-color': dark ? '#0b2a33' : '#0e7490',
-      'circle-opacity': 0.92,
-      'circle-stroke-color': dark ? '#22d3ee' : '#ffffff',
-      'circle-stroke-width': 2,
-      'circle-radius': ['step', ['get', 'point_count'], 15, 10, 19, 50, 24, 200, 30],
+      'circle-color': dark ? '#f5f5f7' : '#0a0a0b',
+      'circle-opacity': 0.96,
+      'circle-stroke-color': dark ? 'rgba(255,255,255,0.28)' : 'rgba(10,10,11,0.22)',
+      'circle-stroke-width': 5,
+      'circle-radius': ['step', ['get', 'point_count'], 14, 10, 17, 50, 21, 200, 26],
     },
   });
   map.addLayer({
@@ -252,7 +254,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     source: SOURCE,
     filter: ['has', 'point_count'],
     layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-allow-overlap': true },
-    paint: { 'text-color': '#ffffff' },
+    paint: { 'text-color': dark ? '#000000' : '#ffffff' },
   });
   map.addLayer({
     id: 'station-selected',
@@ -262,7 +264,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 14, 14, 20],
       'circle-color': 'rgba(0,0,0,0)',
-      'circle-stroke-color': dark ? '#f8fafc' : '#0f172a',
+      'circle-stroke-color': ink,
       'circle-stroke-width': 3,
     },
   });
@@ -274,9 +276,9 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     filter: ['all', ['!', ['has', 'point_count']], ['in', ['get', 'live'], ['literal', ['working', 'in_use']]]],
     paint: {
       'circle-color': ['match', ['get', 'live'], 'working', LIVE_COLOUR.working, LIVE_COLOUR.in_use],
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 11, 14, 26],
-      'circle-blur': 0.85,
-      'circle-opacity': dark ? 0.6 : 0.35,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 10, 14, 22],
+      'circle-blur': 0.9,
+      'circle-opacity': dark ? 0.45 : 0.3,
     },
   });
   map.addLayer({
@@ -286,10 +288,42 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     filter: ['!', ['has', 'point_count']],
     paint: {
       'circle-color': ['match', ['get', 'live'], 'working', LIVE_COLOUR.working, 'in_use', LIVE_COLOUR.in_use, 'problem', LIVE_COLOUR.problem, LIVE_COLOUR.unknown],
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, ['case', ['get', 'dc'], 7, 5], 14, ['case', ['get', 'dc'], 12, 9]],
-      'circle-stroke-color': halo,
-      'circle-stroke-width': ['case', ['get', 'dc'], 3, 2],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, ['case', ['get', 'dc'], 7, 5.5], 10, ['case', ['get', 'dc'], 9, 7.5], 15, ['case', ['get', 'dc'], 13, 11]],
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 5, 1.5, 12, 2.5],
     },
+  });
+  // A lightning bolt inside each pin once it is big enough to read, and the charger's power and name close up.
+  map.addLayer({
+    id: 'station-bolts',
+    type: 'symbol',
+    source: SOURCE,
+    minzoom: 9,
+    filter: ['!', ['has', 'point_count']],
+    layout: {
+      'icon-image': 'co-bolt',
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.5, 15, ['case', ['get', 'dc'], 0.95, 0.8]],
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+    },
+    paint: { 'icon-color': '#ffffff' },
+  });
+  map.addLayer({
+    id: 'station-labels',
+    type: 'symbol',
+    source: SOURCE,
+    minzoom: 12,
+    filter: ['!', ['has', 'point_count']],
+    layout: {
+      'text-field': ['step', ['zoom'], ['get', 'kw'], 14.5, ['format', ['get', 'name'], {}, '\n', {}, ['get', 'kw'], { 'font-scale': 0.92 }]],
+      'text-font': ['Noto Sans Bold'],
+      'text-size': 11.5,
+      'text-offset': [0, 1.35],
+      'text-anchor': 'top',
+      'text-max-width': 10,
+      'text-optional': true,
+    },
+    paint: { 'text-color': ink, 'text-halo-color': halo, 'text-halo-width': 1.6 },
   });
   map.addLayer({
     id: 'stops',
@@ -298,7 +332,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     layout: { 'circle-sort-key': ['case', ['get', 'overnight'], 1, 0] },
     paint: {
       'circle-radius': 13,
-      'circle-color': ['case', ['get', 'overnight'], STAY_COLOUR, '#22d3ee'],
+      'circle-color': ['case', ['get', 'overnight'], STAY_COLOUR, '#2b6bff'],
       'circle-stroke-color': halo,
       'circle-stroke-width': 3,
     },
@@ -316,7 +350,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
       'text-ignore-placement': true,
       'symbol-sort-key': ['case', ['get', 'overnight'], 0, 1],
     },
-    paint: { 'text-color': ['case', ['get', 'overnight'], '#ffffff', '#021014'] },
+    paint: { 'text-color': '#ffffff' },
   });
 }
 
@@ -326,7 +360,10 @@ function applyTripMode(map: MapLibreMap, on: boolean, dark: boolean): void {
   map.setPaintProperty('clusters', 'circle-opacity', on ? 0.35 : 0.92);
   map.setPaintProperty('cluster-count', 'text-opacity', on ? 0 : 1);
   map.setPaintProperty('stations', 'circle-opacity', on ? 0.55 : 1);
-  map.setPaintProperty('stations-glow', 'circle-opacity', on ? 0 : dark ? 0.6 : 0.35);
+  map.setPaintProperty('stations', 'circle-stroke-opacity', on ? 0.55 : 1);
+  map.setPaintProperty('station-bolts', 'icon-opacity', on ? 0.4 : 1);
+  map.setPaintProperty('station-labels', 'text-opacity', on ? 0 : 1);
+  map.setPaintProperty('stations-glow', 'circle-opacity', on ? 0 : dark ? 0.45 : 0.3);
 }
 
 export function MapView(props: Props) {
@@ -373,9 +410,6 @@ export function MapView(props: Props) {
         map.fitBounds(india, { padding: fitPadding, duration: 3200, curve: 1.6, essential: false });
       });
     }
-    map.on('movestart', () => setMapMoving(true));
-    map.on('moveend', () => setMapMoving(false));
-
     map.on('style.load', () => {
       const l = latest.current;
       englishLabels(map);

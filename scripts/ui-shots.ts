@@ -12,12 +12,21 @@ mkdirSync(out, { recursive: true });
 
 const NEXON = { modelId: 'tata-nexon-ev-45', name: 'Tata Nexon EV 45', batteryKwh: 45, realRangeKm: null, maxDcKw: 60, maxAcKw: 7.2, massKg: 1500, dcConnector: 'CCS2' };
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
+// Full Chromium renders WebGL on the GPU (`npx playwright install chromium`); the headless shell falls back to SwiftShader.
+const browser = args.includes('--soft')
+  ? await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader', '--mute-audio'] })
+  : await chromium.launch({ channel: 'chromium', args: ['--ignore-gpu-blocklist', '--mute-audio'] });
 const ctx = await browser.newContext({ ...devices['Pixel 7'], colorScheme: light ? 'light' : 'dark', locale: 'en-IN', timezoneId: 'Asia/Kolkata' });
-await ctx.addInitScript((vehicle) => {
-  localStorage.setItem('chargeone:welcomed', 'true');
-  localStorage.setItem('chargeone:vehicle', JSON.stringify(vehicle));
-}, NEXON);
+await ctx.addInitScript(
+  ([vehicle, dark]) => {
+    // Chrome on macOS speaks through the system voice, which --mute-audio doesn't silence.
+    if ('speechSynthesis' in window) window.speechSynthesis.speak = () => {};
+    localStorage.setItem('chargeone:welcomed', 'true');
+    localStorage.setItem('chargeone:vehicle', JSON.stringify(vehicle));
+    localStorage.setItem('chargeone:dark', JSON.stringify(dark));
+  },
+  [NEXON, !light] as const,
+);
 const page: Page = await ctx.newPage();
 const errors: string[] = [];
 page.on('pageerror', (e) => errors.push(e.message));
@@ -31,16 +40,6 @@ const shot = async (name: string, waitMs = 2500) => {
 
 await page.goto(base);
 await page.getByTestId('app-ready').waitFor({ state: 'attached', timeout: 30_000 });
-if (args.includes('--car')) {
-  await page.getByTestId('tab-car').click();
-  await shot('04-car', 3000);
-  await shot('04b-car-turned', 3000);
-  await page.getByTestId('car-demo').click();
-  await page.getByTestId('battery-confirm').click();
-  await shot('05-car-live', 4000);
-  await browser.close();
-  process.exit(0);
-}
 if (args.includes('--car')) {
   await page.getByTestId('tab-car').click();
   await shot('04-car', 3000);

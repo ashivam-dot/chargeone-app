@@ -14,6 +14,8 @@ export interface ObdSourceOptions {
   pollMs?: number;
   elm?: Elm327Options;
   now?: () => number;
+  /** Called once on connect when the car shares its VIN (many EVs don't). */
+  onVin?: (vin: string) => void;
 }
 
 const EWMA_HALF_LIFE_KM = 8;
@@ -98,6 +100,9 @@ export class ObdSource implements VehicleSource {
       elm = new Elm327(await this.opts.openTransport(), this.opts.elm);
       await elm.init();
       this.supported = await elm.supportedPids();
+      // Identifying the car is worth it even when it won't share battery %.
+      const vin = await elm.readVin().catch(() => null);
+      if (vin) this.opts.onVin?.(vin);
       if (!this.supported.has(PID.evBatteryPct)) throw new ObdError('no_soc');
     } catch (err) {
       await elm?.close().catch(() => undefined);

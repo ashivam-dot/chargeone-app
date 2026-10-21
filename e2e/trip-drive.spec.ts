@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures.ts';
 import { openApp, signInFresh, startTrialFromYou } from './helpers.ts';
 
 async function planByText(page: Page, text: string) {
@@ -48,8 +49,10 @@ test.describe('Plus trip planning', () => {
     await expect(alert).toContainText(/more charge than planned|Charge earlier|may not reach/);
     const before = await page.locator('.drive-next strong').innerText();
     if (await page.getByTestId('alert-switch').count()) {
+      const acted = await alert.innerText();
       await page.getByTestId('alert-switch').click();
-      await expect(alert).toBeHidden();
+      // The demo keeps over-consuming, so the new leg may raise its own alert; the one acted on must go.
+      await expect.poll(async () => ((await alert.count()) ? await alert.innerText() : '')).not.toBe(acted);
       await expect.poll(() => page.locator('.drive-next strong').innerText()).not.toBe('');
       expect(typeof before).toBe('string');
     } else {
