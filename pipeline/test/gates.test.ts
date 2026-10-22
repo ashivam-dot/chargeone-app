@@ -5,6 +5,7 @@ import { baselineFrom, runGates, type GateInput } from '../gates.ts';
 import { emptyRegistry } from '../ids.ts';
 import { osmAdapter } from '../adapters/osm.ts';
 import { ocmExportAdapter } from '../adapters/ocm-export.ts';
+import { INDEX_SCHEMA, decodeIndex, type CellFile, type CompactIndex } from '../../src/data/compact.ts';
 import { buildOutputs } from '../outputs.ts';
 import { validateStations } from '../schema.ts';
 import { buildStations } from '../stations.ts';
@@ -146,6 +147,23 @@ describe('outputs', () => {
     const aliases = JSON.parse(files.get('aliases.json')!.toString());
     expect(aliases.aliases['ocm-2']).toBe(aliases.aliases['osm-n1']);
     expect(JSON.stringify([...files.values()].map((b) => b.toString('latin1')))).not.toContain('ocm-9');
+  });
+
+  it('writes a v2 index with sources and a cell file for every shard that aliases.json points to', () => {
+    const { files, manifest } = build();
+    const index = JSON.parse(files.get('index.json')!.toString()) as CompactIndex;
+    expect(index.schema).toBe(INDEX_SCHEMA);
+    expect(index.sources.map((s) => s.licence)).toEqual(['ODbL 1.0', 'CC BY 4.0']);
+    const stations = decodeIndex(index);
+    expect(stations).toHaveLength(manifest.counts.stations);
+    const aliases = JSON.parse(files.get('aliases.json')!.toString()) as { cells: Record<string, string>; legacy: Record<string, string> };
+    for (const s of stations) {
+      const cell = aliases.cells[s.c1Id!];
+      expect(manifest.shards.map((x) => x.cell)).toContain(cell);
+      const rows = (JSON.parse(files.get(`cells/${cell}.json`)!.toString()) as CellFile).rows;
+      expect(rows.find((r) => r[0] === s.c1Id)?.[1]).toBe(s.id);
+      expect(aliases.legacy[s.c1Id!]).toBe(s.id);
+    }
   });
 
   it('the ODbL zip holds the licence and the data', () => {

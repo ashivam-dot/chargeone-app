@@ -1,7 +1,8 @@
 // Everything published in public/data, built in memory first so the gates can check it before any file
 // is written. Pure: the same station layer and run date give the same bytes.
 import { createHash } from 'node:crypto';
-import type { Connector, Dataset, DatasetSource, SourceRef, Station, Vehicle } from '../src/data/model.ts';
+import { encodeCell, encodeIndex } from '../src/data/compact.ts';
+import { hasDc, type Connector, type Dataset, type DatasetSource, type SourceRef, type Station, type Vehicle } from '../src/data/model.ts';
 import { THRESHOLDS } from './config.ts';
 import { geohash } from './lib/geo.ts';
 import { GOV_COUNTS, STATES } from './lib/states.ts';
@@ -81,6 +82,7 @@ export function toDetailedStation(s: CanonicalStation, position: string) {
     vehicleFlags: s.vehicles,
     batterySwapKnown: s.batterySwap,
     membershipRequired: s.membershipRequired,
+    records: s.members.map((r) => ({ sourceId: r.sourceId, source: r.source, observedAt: r.observedAt, verified: r.verified })),
     fields: {
       name: field(s.name),
       operator: field(s.operator),
@@ -299,39 +301,26 @@ export function buildOutputs(input: BuildInput): Built {
     shardBytes.set(cell, bytes.length);
   }
 
-  // Compact index: one row per station, enough to draw the map and pick a shard.
-  const operators = [...new Set(appStations.map((s) => s.operator).filter((o): o is string => o !== null))].sort();
-  const opIndex = new Map(operators.map((o, i) => [o, i]));
-  files.set(
-    'index.json',
-    json({
-      version,
-      fields: ['id', 'c1Id', 'lat', 'lng', 'speed', 'maxKw', 'operator', 'vehicleClass', 'confidence', 'shard'],
-      operators,
-      rows: ordered.map((s) => [
-        s.legacyId,
-        s.id,
-        s.lat,
-        s.lng,
-        s.speed,
-        s.maxKw.value,
-        s.operator.value === null ? null : opIndex.get(s.operator.value),
-        s.vehicleClass,
-        s.confidence,
-        shardOf.get(s.id),
-      ]),
-    }),
-  );
+  // Compact index for the national map, and per-cell lists for the worker (src/data/compact.ts).
+  const appById = new Map(appStations.map((s) => [s.id, s]));
+  const shardOfApp = (s: Station) => shardOf.get(s.c1Id!)!;
+  files.set('index.json', json(encodeIndex({ ...dataset, version }, shardOfApp)));
+  for (const [cell, members] of cells) {
+    const list = members.map((i) => appById.get(ordered[i].legacyId)!);
+    files.set(`cells/${cell}.json`, json(encodeCell(cell, version, list, hasDc)));
+  }
 
   const aliases: Record<string, string> = {};
   const legacy: Record<string, string> = {};
+  const cellOf: Record<string, string> = {};
   for (const s of ordered) {
     legacy[s.id] = s.legacyId;
+    cellOf[s.id] = shardOf.get(s.id)!;
     aliases[s.legacyId] = s.id;
     for (const a of s.aliases) aliases[a] = s.id;
   }
   const sortObj = (o: Record<string, string>) => Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
-  files.set('aliases.json', json({ version, note: 'Any osm-/ocm- id or retired c1 id -> current c1 id; c1 id -> the id stations.json uses.', aliases: sortObj(aliases), legacy: sortObj(legacy) }));
+  files.set('aliases.json', json({ version, note: 'aliases: any osm-/ocm- id or retired c1 id -> current c1 id. legacy: c1 id -> the id stations.json uses. cells: c1 id -> its shard and cell file.', aliases: sortObj(aliases), legacy: sortObj(legacy), cells: sortObj(cellOf) }));
 
   files.set('coverage.json', Buffer.from(`${JSON.stringify(coverage(appStations, input.generatedAt), null, 2)}\n`));
   files.set('review-queue.json', Buffer.from(`${JSON.stringify({ version, generatedAt: input.generatedAt, items: input.review }, null, 2)}\n`));

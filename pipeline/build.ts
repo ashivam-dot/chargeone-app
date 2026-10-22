@@ -129,8 +129,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 0;
   }
 
-  const shardDir = join(OUT_DIR, 'shards');
-  if (existsSync(shardDir)) for (const f of await readdir(shardDir)) await rm(join(shardDir, f));
+  for (const sub of ['shards', 'cells']) {
+    const dir = join(OUT_DIR, sub);
+    if (existsSync(dir)) for (const f of await readdir(dir)) await rm(join(dir, f));
+  }
   for (const [name, bytes] of built.files) {
     const file = join(OUT_DIR, name);
     await mkdir(dirname(file), { recursive: true });
