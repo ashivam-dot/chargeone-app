@@ -241,10 +241,11 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     source: SOURCE,
     filter: ['has', 'point_count'],
     paint: {
-      'circle-color': dark ? '#f5f5f7' : '#0a0a0b',
-      'circle-opacity': 0.96,
-      'circle-stroke-color': dark ? 'rgba(255,255,255,0.28)' : 'rgba(10,10,11,0.22)',
-      'circle-stroke-width': 5,
+      // Graphite discs with an accent rim read as part of the UI, not as map labels.
+      'circle-color': dark ? '#0f1730' : '#ffffff',
+      'circle-opacity': 0.94,
+      'circle-stroke-color': dark ? 'rgba(90,140,255,0.85)' : 'rgba(31,95,224,0.7)',
+      'circle-stroke-width': 2.5,
       'circle-radius': ['step', ['get', 'point_count'], 14, 10, 17, 50, 21, 200, 26],
     },
   });
@@ -254,7 +255,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     source: SOURCE,
     filter: ['has', 'point_count'],
     layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-allow-overlap': true },
-    paint: { 'text-color': dark ? '#000000' : '#ffffff' },
+    paint: { 'text-color': dark ? '#ffffff' : '#0a0a0b' },
   });
   map.addLayer({
     id: 'station-selected',
@@ -396,6 +397,9 @@ export function MapView(props: Props) {
     });
     map.touchZoomRotate.disableRotation();
     map.addControl(new AttributionControl({ compact: true, customAttribution: attribution }), 'bottom-left');
+    // On a phone the open credit sits under "Plan a trip"; show it on load, then fold it to its (i) button
+    // after 5 s, as the OSMF attribution guidelines allow. A tap on (i) opens it again.
+    window.setTimeout(() => container.current?.querySelector('.maplibregl-compact-show')?.classList.remove('maplibregl-compact-show'), 5000);
     tilt.current = new Tilt3dControl();
     map.addControl(tilt.current, 'bottom-right');
     map.addControl(

@@ -208,7 +208,8 @@
   margin: 6px 0 20px;
   padding: 16px;
   border-radius: 22px;
-  border: 1px dashed var(--line-strong, var(--line));
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--text) 4%, transparent), transparent 70%), var(--bg-elev);
 }
 
 .chips--scroll {

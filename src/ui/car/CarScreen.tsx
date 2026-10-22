@@ -89,13 +89,16 @@ export function BatteryGauge({ soc, rangeKm, charging, measured }: { soc: number
     <div class={`battery${level}${charging ? ' battery--charging' : ''}`} style={{ '--soc': pct }} role="meter" aria-label="Battery" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
       <div class="battery__fill" />
       <div class="battery__text">
-        <span class="battery__pct">
-          {s === null ? '--' : Math.round(pct)}
-          <small>%</small>
+        <span class="battery__level">
+          Battery
+          <span class="battery__pct">
+            {s === null ? '—' : Math.round(pct)}
+            {s !== null && <small>%</small>}
+          </span>
         </span>
         <span class="battery__range">
           {charging ? 'Charging' : measured ? 'Range' : 'Est. range'}
-          <strong>{r === null ? '--' : `${Math.round(r)} km`}</strong>
+          <strong>{r === null ? '—' : `${Math.round(r)} km`}</strong>
         </span>
       </div>
     </div>

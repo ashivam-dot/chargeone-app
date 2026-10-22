@@ -53,6 +53,10 @@
 .onboard__intro {
   justify-content: flex-end;
 }
+/* The intro sits as one block above the actions, in thumb reach, instead of leaving a gap mid-screen. */
+.onboard__intro .onboard__actions {
+  margin-top: 8px;
+}
 .onboard__logo {
   position: relative;
   width: 72px;

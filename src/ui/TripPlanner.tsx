@@ -1,4 +1,4 @@
-import { BedDouble, BellRing, Bookmark, BookmarkCheck, Car, Gauge, Lightbulb, Moon, Navigation, Split, Utensils, X, Zap } from 'lucide-preact';
+import { BedDouble, BellRing, Bookmark, BookmarkCheck, Car, ChevronDown, Gauge, Lightbulb, Moon, Navigation, SlidersHorizontal, Split, Utensils, X, Zap } from 'lucide-preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Station } from '../data/model.ts';
 import type { Place, PlacesData } from '../data/places.ts';
@@ -430,8 +430,13 @@ export function TripPlanner(props: Props) {
             <PerkLock text={MULTI_DAY_LABEL} plan={cheapestWith('multiDay')} onUnlock={() => unlock('Multi-day trips', 'multiDay')} />
           )}
 
-          <button type="button" class="link" aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>
-            {showMore ? 'Fewer options' : 'More options (reserve, AC, passengers, driving style)'}
+          <button type="button" class="disclose" aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>
+            <SlidersHorizontal size={18} aria-hidden="true" />
+            <span class="disclose__text">
+              <strong>{showMore ? 'Fewer options' : 'More options'}</strong>
+              <span>Reserve, AC, passengers, driving style</span>
+            </span>
+            <ChevronDown size={18} class="disclose__chev" aria-hidden="true" />
           </button>
           {showMore && (
             <div class="trip-options">
