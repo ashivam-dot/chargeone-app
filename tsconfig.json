@@ -16,5 +16,5 @@
     "jsxImportSource": "preact",
     "types": ["node", "vite/client", "vite-plugin-pwa/client"]
   },
-  "include": ["src", "scripts", "vite.config.ts"]
+  "include": ["src", "scripts", "vite.config.ts", "vite.admin.config.ts"]
 }

@@ -99,6 +99,22 @@ npm run smoke:api -- http://127.0.0.1:8787
 SITE_URL=https://chargeone.akshshivam5.workers.dev npm run deploy   # build, remote migrations, wrangler deploy
 ```
 
+## Admin console (2026-10-23)
+
+- `/admin` = `admin.html` + `src/admin/*`, built by a second pass (`vite build -c vite.admin.config.ts`) so it
+  shares no chunk with the app (start-up stays 371.8 KB). Not linked anywhere; `noindex` + `no-store` in
+  `public/_headers`; excluded from the service worker.
+- API: `worker/admin.ts` (overview + integrations health, users, grant/revoke/reset-quota, trips, feedback,
+  reports, test sessions, probes) and `worker/adminAuth.ts` (login, cookie `co_admin` Path=/api/admin 12 h,
+  bearer for scripts, audit). Migration `0005_admin.sql`: `users.is_test`, `admin_audit`.
+- Owner action before use in production: `openssl rand -base64 32 | npx wrangler secret put ADMIN_TOKEN`
+  (24+ chars). Unset in production = 503 `not_configured`. Locally the public dev token
+  `chargeone-local-admin-dev-only` works when `ADMIN_TOKEN` is unset.
+- Test as: test accounts `test-<plan>@admin.chargeone.test` (sub `admin-test:<plan>`), wiped on each use and
+  excluded from counts. "Guest (Basic)" signs the browser out and resets today's guest allowance.
+- Tests: `worker/admin.test.ts`, `e2e/admin.spec.ts` (each device project opens a different test account; only
+  desktop tries a wrong token, because of the 5-per-15-min login limit).
+
 Demo pipeline (only when re-recording): `scripts/demo-narration.json` -> `scripts/demo-voice.py`
 (Supertonic 3 via voice-server; a temporary venv with `voice-server/requirements.txt` and `MODEL_DIR`)
 -> `scripts/demo-video.ts` (full Chromium headless on the GPU: `npx playwright install chromium`; the
@@ -143,7 +159,7 @@ Blocked or waiting on the owner:
    `@capgo/capacitor-speech-recognition`.
 5. HD voice: run `voice-server/` on a free CPU box (Oracle Always Free A1) behind HTTPS, then
    `wrangler secret put VOICE_TTS_URL` and `VOICE_TTS_TOKEN`.
-6. UPI: `UPI_VPA`, `UPI_PAYEE_NAME`, `ADMIN_TOKEN`; Play: service account + products (see README).
+6. Admin console + UPI: `ADMIN_TOKEN` (see Admin console), `UPI_VPA`, `UPI_PAYEE_NAME`; Play: service account + products (see README).
 7. Number-plate lookup: sign up at Deepvue (or Cashfree) with the personal Gmail, then
    `wrangler secret put DEEPVUE_CLIENT_ID` and `DEEPVUE_CLIENT_SECRET`. Until then the app decodes VINs only.
    3D cars are likenesses; closer fidelity means more tuning in `carDesigns.ts` against photos.

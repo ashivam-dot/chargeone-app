@@ -21,7 +21,8 @@ export const PARSES_PER_USER_PER_DAY = 60;
  * about 9 to 14 neurons a run this stays inside the free 10,000-neuron Workers AI allowance.
  */
 export const AGENT_CALLS_PER_DAY = 400;
-const GLOBAL_SLOT = 'agent-global';
+/** The rate_limits key counting model runs across everyone today (read by the admin overview). */
+export const AGENT_GLOBAL_SLOT = 'agent-global';
 const MAX_TOOL_ROUNDS = 2;
 const MAX_TOOL_CALLS_PER_ROUND = 3;
 const MAX_CHARGERS = 8;
@@ -86,7 +87,7 @@ interface RunBudget {
 async function claimAgentCall(env: Env, userSlot: string, perUser: number, limitMessage: string): Promise<RunBudget> {
   const day = indianDayStart();
   if ((await claimSlot(env.DB, userSlot, perUser, day)) === null) throw new HttpError(429, 'agent_limit', limitMessage);
-  if ((await claimSlot(env.DB, GLOBAL_SLOT, AGENT_CALLS_PER_DAY, day)) === null) {
+  if ((await claimSlot(env.DB, AGENT_GLOBAL_SLOT, AGENT_CALLS_PER_DAY, day)) === null) {
     await releaseSlot(env.DB, userSlot, day);
     throw busy();
   }
@@ -96,7 +97,7 @@ async function claimAgentCall(env: Env, userSlot: string, perUser: number, limit
 /** Tool rounds and the fallback model each cost a run, so every run after the first takes a slot. */
 async function takeRun(env: Env, budget: RunBudget): Promise<void> {
   if (budget.runs++ === 0) return;
-  if ((await claimSlot(env.DB, GLOBAL_SLOT, AGENT_CALLS_PER_DAY, indianDayStart())) === null) throw busy();
+  if ((await claimSlot(env.DB, AGENT_GLOBAL_SLOT, AGENT_CALLS_PER_DAY, indianDayStart())) === null) throw busy();
 }
 
 // ---- Model calls ----

@@ -126,11 +126,11 @@ describe('direct UPI payments', () => {
     expect(days).toBeLessThan(35.1);
   });
 
-  it('keeps the admin tools hidden without the token', async () => {
+  it('keeps the admin tools closed without the token', async () => {
     const { env } = setup();
     const stranger = client(worker, env, { Authorization: 'Bearer wrong-token-wrong-token-wrong' });
     expect((await stranger('GET', '/api/admin/upi')).status).toBe(401);
-    const off = setup({ ADMIN_TOKEN: undefined });
-    expect((await off.admin('GET', '/api/admin/upi')).status).toBe(404);
+    const off = setup({ ADMIN_TOKEN: undefined, ENVIRONMENT: 'production' });
+    expect((await off.admin('GET', '/api/admin/upi')).status).toBe(503);
   });
 });
