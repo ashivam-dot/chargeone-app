@@ -1,4 +1,20 @@
 import { BASIC, PAID_PLANS, PLANS, effectivePlan, type PlanId } from '../src/shared/plans.ts';
+import {
+  deleteReport,
+  grantUser,
+  listAudit,
+  listFeedback,
+  listReports,
+  listTrips,
+  listUsers,
+  overview,
+  probe,
+  resetQuota,
+  revokeUser,
+  testSession,
+  userDetail,
+} from './admin.ts';
+import { adminCookie, adminLogin, audit, clearAdminCookie, requireAdmin } from './adminAuth.ts';
 import { agentChat, parseTrip } from './agent.ts';
 import {
   clearSessionCookie,
@@ -20,7 +36,7 @@ import { STATION_ID, createCheckin, recentStatuses, stationReports } from './rep
 import { playEnabled, storeAccountToken, syncPlayPurchases, verifyPlayPurchase } from './play.ts';
 import { planRoute } from './routing.ts';
 import { startTrial, trialInfo } from './trial.ts';
-import { claimUpiPayment, createUpiPayment, decideUpiPayment, listUpiPayments, requireAdmin, upiEnabled } from './upi.ts';
+import { claimUpiPayment, createUpiPayment, decideUpiPayment, listUpiPayments, upiEnabled } from './upi.ts';
 import { lookupProvider, vehicleLookup } from './vehicleLookup.ts';
 import { voiceEnabled, voiceTts } from './voice.ts';
 
@@ -210,25 +226,52 @@ route('GET', '/api/billing/store-account', async (req, env) => {
 route('POST', '/api/billing/play/verify', async (req, env) => json(await verifyPlayPurchase(req, env, await requireUser(req, env))));
 route('POST', '/api/billing/play/sync', async (req, env) => json(await syncPlayPurchases(env, await requireUser(req, env))));
 
-route(
-  'GET',
-  '/api/admin/upi',
-  async (req, env) => {
+// ---- Admin console (admin.html). Every route but login needs the admin cookie or the bearer token. ----
+
+/** An admin route: checks the admin first, so nothing below runs for anyone else. */
+function admin(method: string, path: string, handler: Handler): void {
+  route(method, path, async (req, env, params) => {
     await requireAdmin(req, env);
-    return json(await listUpiPayments(env, new URL(req.url).searchParams.get('status') ?? 'claimed'));
-  },
-  true,
-);
-route(
-  'POST',
-  '/api/admin/upi/:ref/:decision',
-  async (req, env, params) => {
-    await requireAdmin(req, env);
-    if (params.decision !== 'confirm' && params.decision !== 'reject') throw new HttpError(404, 'not_found', 'Not found.');
-    return json(await decideUpiPayment(env, params.ref, params.decision));
-  },
-  true,
-);
+    return handler(req, env, params);
+  });
+}
+
+route('POST', '/api/admin/login', async (req, env) => {
+  const session = await adminLogin(req, env);
+  return json({ ok: true, expiresAt: session.expiresAt }, { headers: { 'Set-Cookie': adminCookie(session.value, secureCookies(req, env)) } });
+});
+route('POST', '/api/admin/logout', async (req, env) => {
+  if (await requireAdmin(req, env).catch(() => null)) await audit(req, env, 'logout', null);
+  return json({ ok: true }, { headers: { 'Set-Cookie': clearAdminCookie(secureCookies(req, env)) } });
+});
+admin('GET', '/api/admin/session', async () => json({ ok: true }));
+admin('GET', '/api/admin/overview', async (req, env) => json(await overview(env, new URL(req.url).origin)));
+admin('GET', '/api/admin/users', async (req, env) => json(await listUsers(env, new URL(req.url))));
+admin('GET', '/api/admin/users/:id', async (_req, env, params) => json(await userDetail(env, params.id)));
+admin('POST', '/api/admin/users/:id/grant', async (req, env, params) => json(await grantUser(req, env, params.id)));
+admin('POST', '/api/admin/users/:id/revoke', async (req, env, params) => json(await revokeUser(req, env, params.id)));
+admin('POST', '/api/admin/users/:id/reset-quota', async (req, env, params) => json(await resetQuota(req, env, params.id)));
+admin('GET', '/api/admin/trips', async (req, env) => json(await listTrips(env, new URL(req.url))));
+admin('GET', '/api/admin/feedback', async (req, env) => json(await listFeedback(env, new URL(req.url))));
+admin('GET', '/api/admin/reports', async (req, env) => json(await listReports(env, new URL(req.url))));
+admin('DELETE', '/api/admin/reports/:id', async (req, env, params) => {
+  const out = await deleteReport(req, env, params.id);
+  await edgeCache()?.delete(STATUS_CACHE_KEY);
+  return json(out);
+});
+admin('GET', '/api/admin/audit', async (req, env) => json(await listAudit(env, new URL(req.url))));
+admin('POST', '/api/admin/test-session', async (req, env) => {
+  const { body, cookie } = await testSession(req, env, secureCookies(req, env));
+  return json(body, { headers: { 'Set-Cookie': cookie } });
+});
+admin('POST', '/api/admin/probe/:name', async (req, env, params) => json(await probe(req, env, params.name)));
+admin('GET', '/api/admin/upi', async (req, env) => json(await listUpiPayments(env, new URL(req.url).searchParams.get('status') ?? 'claimed')));
+admin('POST', '/api/admin/upi/:ref/:decision', async (req, env, params) => {
+  if (params.decision !== 'confirm' && params.decision !== 'reject') throw new HttpError(404, 'not_found', 'Not found.');
+  const out = await decideUpiPayment(env, params.ref, params.decision);
+  await audit(req, env, `upi_${params.decision}`, params.ref);
+  return json(out);
+});
 
 route('POST', '/api/dev/grant', async (req, env) => {
   if (!isDev(env)) throw new HttpError(404, 'not_found', 'Not found.');
@@ -276,6 +319,12 @@ async function seoPage(req: Request, env: Env): Promise<Response> {
   });
 }
 
+/** Admin answers are never cached (json() sends no-store) and never indexed. */
+function noindexAdmin(url: URL, res: Response): Response {
+  if (url.pathname.startsWith('/api/admin/')) res.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  return res;
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
@@ -289,9 +338,9 @@ export default {
       if (req.method !== 'GET' && !match.external) requireSameOrigin(req);
       const values = url.pathname.match(match.pattern)!.slice(1);
       const params = Object.fromEntries(match.keys.map((k, i) => [k, decodeURIComponent(values[i])]));
-      return await match.handler(req, env, params);
+      return noindexAdmin(url, await match.handler(req, env, params));
     } catch (err) {
-      return errorResponse(err);
+      return noindexAdmin(url, errorResponse(err));
     }
   },
 } satisfies ExportedHandler<Env>;

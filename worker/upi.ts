@@ -1,10 +1,9 @@
 import { PLANS, isPlus, type PlanId } from '../src/shared/plans.ts';
 import type { User } from './auth.ts';
 import { assertCanBuy, parsePlan } from './billing.ts';
-import { constantTimeEqual } from './crypto.ts';
 import { getEntitlement, grantStatement } from './entitlements.ts';
 import type { Env } from './env.ts';
-import { HttpError, clientKey, enforceRateLimit, readJson, str } from './http.ts';
+import { HttpError, enforceRateLimit, readJson, str } from './http.ts';
 
 const DAY_MS = 86400_000;
 /** Access while the owner checks a claimed payment against the bank statement. */
@@ -164,17 +163,7 @@ export async function claimUpiPayment(req: Request, env: Env, user: User) {
   return { status: 'claimed', provisional };
 }
 
-/** The owner's tools: list claims and confirm or reject them. Guarded by ADMIN_TOKEN, sent as a bearer token. */
-export async function requireAdmin(req: Request, env: Env): Promise<void> {
-  const token = env.ADMIN_TOKEN;
-  if (!token || token.length < 24) throw new HttpError(404, 'not_found', 'Not found.');
-  const sent = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
-  if (!sent || !constantTimeEqual(sent, token)) {
-    await enforceRateLimit(env.DB, `admin-fail:${await clientKey(req)}`, 10, 3600);
-    throw new HttpError(401, 'unauthorized', 'Unauthorized.');
-  }
-}
-
+/** The owner's tools (guarded by requireAdmin in adminAuth.ts): list claims and confirm or reject them. */
 export async function listUpiPayments(env: Env, status: string) {
   const wanted = ['created', 'claimed', 'confirmed', 'rejected'].includes(status) ? status : 'claimed';
   const { results } = await env.DB.prepare(

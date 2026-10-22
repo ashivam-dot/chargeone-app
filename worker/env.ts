@@ -15,7 +15,7 @@ export interface Env {
   /** Business UPI ID that direct UPI payments go to, e.g. chargeone@okaxis. Unset = UPI off. */
   UPI_VPA?: string;
   UPI_PAYEE_NAME?: string;
-  /** Bearer token for the owner's payment tools (scripts/upi-admin.ts). At least 24 characters. */
+  /** The owner's admin console (/admin) and scripts/upi-admin.ts. At least 24 characters. Unset = admin off (503). */
   ADMIN_TOKEN?: string;
   /** Google Play Developer API service account key (JSON). Unset = Play billing off. */
   PLAY_SERVICE_ACCOUNT_JSON?: string;
