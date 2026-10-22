@@ -28,7 +28,7 @@ import { PlaceSheet } from './ui/PlaceSheet.tsx';
 import { Plans, type Paywall } from './ui/Plans.tsx';
 import { lazy } from './ui/shell/lazy.tsx';
 import { TabBar, type Tab } from './ui/shell/TabBar.tsx';
-import { SignIn } from './ui/SignIn.tsx';
+import { SignIn, signInReady } from './ui/SignIn.tsx';
 import { StationSheet } from './ui/StationSheet.tsx';
 import { TripPlanner, type DriveRequest, type PlannedTrip, type TripView } from './ui/TripPlanner.tsx';
 import { YouScreen } from './ui/YouScreen.tsx';
@@ -246,7 +246,9 @@ export function App() {
   const plan = PLANS[planId];
   const signedIn = Boolean(me?.user);
   const plusNow = isPlus(planId);
-  const trialAvailable = !plusNow && (signedIn ? Boolean(me?.trial?.eligible) : true);
+  const canSignIn = signInReady(config);
+  // The trial needs an account, so guests are only offered it once sign-in works here.
+  const trialAvailable = !plusNow && (signedIn ? Boolean(me?.trial?.eligible) : canSignIn);
 
   const stations = dataset?.stations ?? [];
   const byId = useMemo(() => new Map(stations.map((s) => [s.id, s])), [stations]);
@@ -551,6 +553,8 @@ export function App() {
             onPlanned={onPlanned}
             onNeedVehicle={() => setOverlay('garage')}
             onRequireSignIn={() => setOverlay('signin')}
+            signInReady={canSignIn}
+            onStartTrial={trialAvailable ? () => void beginTrial() : undefined}
             onPaywall={unlock}
             onPlans={() => unlock()}
             onShow={showTrip}
@@ -627,6 +631,7 @@ export function App() {
             refreshMe();
           }}
           onSignIn={() => setOverlay('signin')}
+          signInReady={canSignIn}
           onPlans={() => unlock()}
           onGarage={() => setOverlay('garage')}
           onAbout={() => setOverlay('about')}

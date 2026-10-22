@@ -15,6 +15,8 @@ interface Props {
   onChanged: () => void;
   onSignedOut: () => void;
   onSignIn: () => void;
+  /** Sign-in works on this server; the trial and free account are only offered then. */
+  signInReady: boolean;
   onPlans: () => void;
   onGarage: () => void;
   onAbout: () => void;
@@ -76,7 +78,7 @@ export function YouScreen(p: Props) {
   const e = me?.entitlement;
   const onTrial = e?.source === 'trial' && Boolean(me?.trial?.endsAt);
   const subscribed = e?.source === 'razorpay' && e.status === 'active' && me !== null && isPlus(me.plan);
-  const trialOpen = !onTrial && (me?.trial?.eligible ?? !signedIn) && !(me && isPlus(me.plan));
+  const trialOpen = !onTrial && (me?.trial?.eligible ?? (!signedIn && p.signInReady)) && !(me && isPlus(me.plan));
 
   const act = async (label: string, fn: () => Promise<unknown>, after: () => void) => {
     setBusy(label);
@@ -102,7 +104,7 @@ export function YouScreen(p: Props) {
         </span>
         <div class="you__who">
           <strong>{signedIn ? name : 'Using ChargeOne Basic'}</strong>
-          <span class="muted">{signedIn ? me?.user?.email : 'No sign-in needed. Sign in free for more trips.'}</span>
+          <span class="muted">{signedIn ? me?.user?.email : p.signInReady ? 'No sign-in needed. Sign in free for more trips.' : 'No sign-in needed. Free accounts are coming soon.'}</span>
         </div>
         {!signedIn && (
           <button class="btn btn--primary" onClick={p.onSignIn} data-testid="you-signin">

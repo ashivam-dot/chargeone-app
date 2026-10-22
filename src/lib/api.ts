@@ -74,7 +74,8 @@ export interface LatLng {
 export interface RouteResponse {
   tripId: string;
   counted: 'short' | 'long' | 'replan';
-  route: { coords: Coord[]; distanceKm: number; durationMin: number; hasElevation: boolean };
+  /** source: which router drew it (older servers and saved trips don't say); 'valhalla' needs OpenStreetMap credit. */
+  route: { coords: Coord[]; distanceKm: number; durationMin: number; hasElevation: boolean; source?: 'ors' | 'valhalla' | 'osrm' };
   plan: PlanId;
   usage: UsageCounts;
   /** Present when alternatives were asked for and the plan includes route compare. */

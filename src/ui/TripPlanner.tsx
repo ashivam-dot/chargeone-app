@@ -12,7 +12,7 @@ import type { Coord } from '../planner/geometry.ts';
 import { nearbyPlaces, planJourney, staysNearDestination, type DayPlan, type Journey } from '../planner/journey.ts';
 import { DEFAULT_OPTIONS, navigationUrl, planTrip, type DrivingStyle, type PlanOptions, type TripPlan } from '../planner/planner.ts';
 import { TAG_LABEL, compareRoutes, type RouteAnalysis, type RouteCandidate } from '../planner/routeCompare.ts';
-import { BASIC, FREE_TRIP_KM, PLANS, REPLAN_WINDOW_HOURS, cheapestWith, formatRupees, type Perk, type Plan, type PlanId } from '../shared/plans.ts';
+import { BASIC, FREE_TRIP_KM, PLANS, REPLAN_WINDOW_HOURS, TRIAL_DAYS, cheapestWith, formatRupees, type Perk, type Plan, type PlanId } from '../shared/plans.ts';
 import { LIVE_COLOUR, LIVE_LABEL, liveState, timeAgo, type StationStatus } from '../shared/status.ts';
 import type { MyVehicle } from '../shared/vehicles.ts';
 import { PlaceList } from './NearbyPlaces.tsx';
@@ -48,12 +48,30 @@ interface Props {
   onPlanned?: (plan: PlannedTrip) => void;
   onNeedVehicle: () => void;
   onRequireSignIn: () => void;
+  /** Sign-in works on this server; until it does, guests aren't offered it. */
+  signInReady: boolean;
+  /** Offered when a guest reaches a Basic limit. */
+  onStartTrial?: () => void;
   onPaywall: (reason: Paywall) => void;
   onPlans: () => void;
   onShow: (view: TripView | null) => void;
   onSelectStation: (id: string) => void;
   onOpenPlace: (place: Place) => void;
   onUsageChanged: () => void;
+}
+
+/** A Basic limit a guest reached, with the server's exact reason. */
+interface GuestLimit {
+  code: 'too_long' | 'daily_limit';
+  message: string;
+}
+
+/** The server's reason, in words that say what still works. */
+function tripError(e: unknown): string {
+  if (!(e instanceof ApiError)) return 'Could not plan this trip.';
+  if (e.code === 'not_configured') return "Trip planning isn't switched on yet. The charger map and live status still work.";
+  if (e.code === 'device_required') return "This browser didn't keep ChargeOne's app id. Allow site storage, or leave private browsing, and try again.";
+  return e.message;
 }
 
 interface Result {
@@ -163,9 +181,13 @@ export function TripPlanner(props: Props) {
   const [showMore, setShowMore] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [limit, setLimit] = useState<GuestLimit | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [saved, setSaved] = useState<SavedTrip[]>(loadSavedTrips);
   const plan = PLANS[props.planId];
+
+  // A limit card is about the trip it refused; a new start or destination clears it.
+  useEffect(() => setLimit(null), [from, to]);
 
   const setOpt = <K extends keyof PlanOptions>(key: K, value: PlanOptions[K]) => {
     const next = { ...options, [key]: value };
@@ -249,6 +271,7 @@ export function TripPlanner(props: Props) {
     }
     setBusy(tripId ? 'Re-planning from here…' : plan.routeCompare ? 'Comparing routes…' : 'Planning your trip…');
     setError(null);
+    setLimit(null);
     try {
       const [response, places] = await Promise.all([
         api.route({ lat: start.lat, lng: start.lng }, { lat: end.lat, lng: end.lng }, tripId, plan.routeCompare && !tripId),
@@ -258,9 +281,12 @@ export function TripPlanner(props: Props) {
       props.onUsageChanged();
       props.onPlanned?.({ journey, from: start, to: end });
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) props.onRequireSignIn();
+      if (e instanceof ApiError && e.status === 402 && !me?.user && (e.code === 'too_long' || e.code === 'daily_limit')) {
+        // Guests stay here: the reason, and what they can do instead.
+        setLimit({ code: e.code, message: e.message });
+      } else if (e instanceof ApiError && e.status === 401) props.onRequireSignIn();
       else if (e instanceof ApiError && e.status === 402) props.onPaywall({ kind: 'trip', message: e.message });
-      else setError(e instanceof Error ? e.message : 'Could not plan this trip.');
+      else setError(tripError(e));
     } finally {
       setBusy(null);
     }
@@ -319,7 +345,13 @@ export function TripPlanner(props: Props) {
     const chosen = result.routes[result.active].candidate;
     const response: RouteResponse = {
       ...result.response,
-      route: { coords: chosen.coords, distanceKm: chosen.distanceKm, durationMin: chosen.durationMin, hasElevation: result.response.route.hasElevation },
+      route: {
+        coords: chosen.coords,
+        distanceKm: chosen.distanceKm,
+        durationMin: chosen.durationMin,
+        hasElevation: result.response.route.hasElevation,
+        source: result.response.route.source,
+      },
       alternatives: undefined,
     };
     const list = saveTrip(result.from, result.to, response, result.startedAt, plan.savedTrips);
@@ -453,15 +485,29 @@ export function TripPlanner(props: Props) {
               {error}
             </p>
           )}
+          {limit && (
+            <GuestLimitCard
+              limit={limit}
+              signInReady={props.signInReady}
+              onStartTrial={props.onStartTrial}
+              onSignIn={props.onRequireSignIn}
+              onPlans={props.onPlans}
+            />
+          )}
           <button class="btn btn--primary btn--block" type="submit" disabled={!from || !to || busy !== null}>
             {busy ?? 'Plan my trip'}
           </button>
           {free && !me?.user && (
-            <p class="small muted center">
-              Basic: {BASIC.shortTripsPerDay} trip plan a day up to {BASIC.maxTripKm} km, no sign-in.{' '}
-              <button type="button" class="link link--inline" onClick={props.onRequireSignIn}>
-                Sign in free for {PLANS.free.shortTripsPerDay} a day
-              </button>
+            <p class="small muted center" data-testid="basic-hint">
+              Basic: {BASIC.shortTripsPerDay} trip plan a day up to {BASIC.maxTripKm} km, no sign-in.
+              {typeof me?.basicToday === 'number' && ` ${Math.max(0, BASIC.shortTripsPerDay - me.basicToday)} left today.`}{' '}
+              {props.signInReady ? (
+                <button type="button" class="link link--inline" onClick={props.onRequireSignIn}>
+                  Sign in free for {PLANS.free.shortTripsPerDay} a day
+                </button>
+              ) : (
+                <>Free accounts with {PLANS.free.shortTripsPerDay} a day are coming soon.</>
+              )}
             </p>
           )}
           {free && me?.user && (
@@ -522,6 +568,49 @@ export function TripPlanner(props: Props) {
         />
       )}
     </Sheet>
+  );
+}
+
+interface LimitProps {
+  limit: GuestLimit;
+  signInReady: boolean;
+  onStartTrial?: () => void;
+  onSignIn: () => void;
+  onPlans: () => void;
+}
+
+/** A guest reached a Basic limit: say exactly which, and offer only what this server can do. */
+function GuestLimitCard({ limit, signInReady, onStartTrial, onSignIn, onPlans }: LimitProps) {
+  return (
+    <div class="trip-limit" role="alert" data-testid="trip-limit">
+      <p class="trip-limit__why">{limit.message}</p>
+      <p class="small muted">
+        {limit.code === 'too_long'
+          ? `You can still plan any trip up to ${BASIC.maxTripKm} km, and the charger map works for every distance.`
+          : 'The charger map and live status still work. Plan again after midnight.'}
+      </p>
+      {signInReady ? (
+        <div class="trip-limit__actions">
+          {onStartTrial && (
+            <button type="button" class="btn btn--primary btn--block" onClick={onStartTrial} data-testid="trip-limit-trial">
+              Try Plus free for {TRIAL_DAYS} days
+            </button>
+          )}
+          {limit.code === 'daily_limit' && (
+            <button type="button" class="btn btn--block" onClick={onSignIn}>
+              Sign in free for {PLANS.free.shortTripsPerDay} trips a day
+            </button>
+          )}
+          <button type="button" class="btn btn--block btn--ghost" onClick={onPlans}>
+            See plans
+          </button>
+        </div>
+      ) : (
+        <p class="small muted" data-testid="trip-limit-soon">
+          Free accounts and longer trips need sign-in, which is coming soon.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -851,7 +940,7 @@ function JourneyResult(props: ResultProps) {
         </button>
       </div>
       <p class="small muted">
-        Estimates use your car's typical consumption, the terrain and your settings. Costs assume about ₹22/kWh for DC and ₹14/kWh for AC. Hotel
+        Estimates use your car's typical consumption, {result.response.route.hasElevation ? 'the terrain and ' : ''}your settings. Costs assume about ₹22/kWh for DC and ₹14/kWh for AC. Hotel
         prices and availability are on Booking.com.
         {result.savedAt
           ? ` Opened from your saved trips (saved ${formatDate(result.savedAt)}); it didn't use a trip.`
@@ -859,6 +948,19 @@ function JourneyResult(props: ResultProps) {
             ? ` Long trips used: ${me.usage.longInWindow} of ${me.limits.longTripQuota}.`
             : ''}
       </p>
+      {result.response.route.source === 'valhalla' && (
+        // FOSSGIS's terms for its public router: OpenStreetMap credit and a way to report map errors.
+        <p class="small muted" data-testid="route-attribution">
+          Route ©{' '}
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">
+            OpenStreetMap contributors
+          </a>{' '}
+          (ODbL) · Valhalla by FOSSGIS ·{' '}
+          <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener">
+            Report a map error
+          </a>
+        </p>
+      )}
     </div>
   );
 }

@@ -292,7 +292,7 @@ export function CopilotScreen({ signedIn, account, canUse, trialAvailable, vehic
           {trialAvailable ? <Sparkles size={18} aria-hidden="true" /> : <Lock size={18} aria-hidden="true" />}
           {trialAvailable ? `Try Plus free for ${TRIAL_DAYS} days` : 'Unlock with Plus'}
         </button>
-        {!signedIn && <p class="small muted center">You'll sign in with Google first.</p>}
+        {!signedIn && trialAvailable && <p class="small muted center">You'll sign in with Google first.</p>}
       </Page>
     );
   }
