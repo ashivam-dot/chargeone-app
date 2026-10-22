@@ -1,0 +1,2558 @@
+{
+  "version": "6931a4e7fb37",
+  "generatedAt": "2026-10-22T20:17:34.089Z",
+  "items": [
+    {
+      "kind": "possible-duplicate",
+      "score": 0.847,
+      "distanceM": 15,
+      "a": {
+        "id": "c1_o5gtv6deju56",
+        "legacyId": "osm-n11601441778",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n11601441778",
+          "osm-n11601441781"
+        ]
+      },
+      "b": {
+        "id": "c1_k3x2oht2kbnu",
+        "legacyId": "osm-n11601441779",
+        "name": "Switch Station",
+        "operator": null,
+        "sources": [
+          "osm-n11601441779"
+        ]
+      },
+      "reasons": [
+        "15 m apart",
+        "both operators unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.843,
+      "distanceM": 16,
+      "a": {
+        "id": "c1_fl3dsuun4t3s",
+        "legacyId": "osm-n10241768254",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n10241768254",
+          "osm-n10241805232"
+        ]
+      },
+      "b": {
+        "id": "c1_5krjf3nv4xyv",
+        "legacyId": "osm-n10241808063",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n10241808063"
+        ]
+      },
+      "reasons": [
+        "16 m apart",
+        "both operators unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.84,
+      "distanceM": 0,
+      "a": {
+        "id": "c1_2occk6lexfjy",
+        "legacyId": "ocm-300744",
+        "name": "Saravana Stores - Padi - Relux Electric",
+        "operator": "Relux Electric",
+        "sources": [
+          "ocm-300744"
+        ]
+      },
+      "b": {
+        "id": "c1_helbrksyyptt",
+        "legacyId": "ocm-300745",
+        "name": "Cosmopolitan Club - Relux Electric",
+        "operator": "Relux Electric",
+        "sources": [
+          "ocm-300745"
+        ]
+      },
+      "reasons": [
+        "0 m apart",
+        "same operator (Relux Electric)",
+        "name similarity 0.00",
+        "connectors overlap",
+        "same source, different names: review"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.84,
+      "distanceM": 35,
+      "a": {
+        "id": "c1_7atufeh7szxj",
+        "legacyId": "ocm-313732",
+        "name": "RG Nallanna EVCS (EVOK) - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313732"
+        ]
+      },
+      "b": {
+        "id": "c1_27zvjchj3xkw",
+        "legacyId": "ocm-313733",
+        "name": "Kuttoth Enterprises EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313733"
+        ]
+      },
+      "reasons": [
+        "35 m apart",
+        "same operator (chargeMOD)",
+        "name similarity 0.00",
+        "connectors overlap",
+        "same source, different names: review"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.84,
+      "distanceM": 79,
+      "a": {
+        "id": "c1_ahhszwcohp2u",
+        "legacyId": "ocm-480426",
+        "name": "Thiruvankulam Edifice EVCS",
+        "operator": "GO EC",
+        "sources": [
+          "ocm-480426"
+        ]
+      },
+      "b": {
+        "id": "c1_xbgayd3osolf",
+        "legacyId": "ocm-480427",
+        "name": "Thiruvankulam Thuruthiyil ECVS",
+        "operator": "GO EC",
+        "sources": [
+          "ocm-480427"
+        ]
+      },
+      "reasons": [
+        "79 m apart",
+        "same operator (GO EC)",
+        "name similarity 0.25",
+        "connectors overlap",
+        "same source, different names: review"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.834,
+      "distanceM": 64,
+      "a": {
+        "id": "c1_zt6rg46k5eca",
+        "legacyId": "osm-n11964645149",
+        "name": "EESL charging station",
+        "operator": "EESL",
+        "sources": [
+          "osm-n11964645149"
+        ]
+      },
+      "b": {
+        "id": "c1_r54yn4tnva6z",
+        "legacyId": "osm-n11964655417",
+        "name": "ANERT EESL - Ernakulam",
+        "operator": "EESL",
+        "sources": [
+          "ocm-313511",
+          "osm-n11964655417"
+        ]
+      },
+      "reasons": [
+        "64 m apart",
+        "same operator (EESL)"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.832,
+      "distanceM": 18,
+      "a": {
+        "id": "c1_3cp3ttevksaz",
+        "legacyId": "osm-n9739382794",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n9739382794"
+        ]
+      },
+      "b": {
+        "id": "c1_7jyamyqwimxa",
+        "legacyId": "osm-n9739382793",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n11891087067",
+          "osm-n11891087068",
+          "osm-n9739382793",
+          "osm-n9739382795"
+        ]
+      },
+      "reasons": [
+        "18 m apart",
+        "both operators unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.826,
+      "distanceM": 19,
+      "a": {
+        "id": "c1_qacrjkn4h7ie",
+        "legacyId": "osm-n13351067902",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n13351067902"
+        ]
+      },
+      "b": {
+        "id": "c1_lijh5r6mbrba",
+        "legacyId": "osm-n14106405348",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n14106405348"
+        ]
+      },
+      "reasons": [
+        "19 m apart",
+        "both operators unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.826,
+      "distanceM": 19,
+      "a": {
+        "id": "c1_z2dbeqntiwnk",
+        "legacyId": "osm-n10241775591",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n10241775591"
+        ]
+      },
+      "b": {
+        "id": "c1_5krjf3nv4xyv",
+        "legacyId": "osm-n10241808063",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n10241808063"
+        ]
+      },
+      "reasons": [
+        "19 m apart",
+        "both operators unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.819,
+      "distanceM": 30,
+      "a": {
+        "id": "c1_ba3mh3n4pbpf",
+        "legacyId": "osm-n10797010207",
+        "name": "Tata Power EZ Charge station",
+        "operator": "Tata Power EZ Charge",
+        "sources": [
+          "osm-n10797010207"
+        ]
+      },
+      "b": {
+        "id": "c1_qeh2nm5g7fyv",
+        "legacyId": "osm-n10797010208",
+        "name": "Tata Power EZ Charge station",
+        "operator": "Tata Power EZ Charge",
+        "sources": [
+          "osm-n10797010208"
+        ]
+      },
+      "reasons": [
+        "30 m apart",
+        "same operator (Tata Power EZ Charge)",
+        "connectors differ"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.818,
+      "distanceM": 0,
+      "a": {
+        "id": "c1_bl4gag3xknji",
+        "legacyId": "osm-n13640131586",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n13640131586"
+        ]
+      },
+      "b": {
+        "id": "c1_azl6tkyfyoeu",
+        "legacyId": "osm-n13640131587",
+        "name": "rama chandra agencies charging station",
+        "operator": "rama chandra agencies",
+        "sources": [
+          "osm-n13640131587"
+        ]
+      },
+      "reasons": [
+        "0 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.817,
+      "distanceM": 1,
+      "a": {
+        "id": "c1_hfl322arnnch",
+        "legacyId": "osm-n14058958254",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n14058958254",
+          "osm-n14058958262"
+        ]
+      },
+      "b": {
+        "id": "c1_ha5ihx7vpxud",
+        "legacyId": "osm-n14058958287",
+        "name": "Lectrix charging station",
+        "operator": "Lectrix",
+        "sources": [
+          "osm-n14058958287"
+        ]
+      },
+      "reasons": [
+        "1 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.817,
+      "distanceM": 1,
+      "a": {
+        "id": "c1_hfl322arnnch",
+        "legacyId": "osm-n14058958254",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n14058958254",
+          "osm-n14058958262"
+        ]
+      },
+      "b": {
+        "id": "c1_2tevli42zlpt",
+        "legacyId": "osm-n14058958324",
+        "name": "VinFast charging station",
+        "operator": "VinFast",
+        "sources": [
+          "osm-n14058958324"
+        ]
+      },
+      "reasons": [
+        "1 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.817,
+      "distanceM": 2,
+      "a": {
+        "id": "c1_7v5gadld3gjb",
+        "legacyId": "osm-n13633628620",
+        "name": "Ather Grid charging station",
+        "operator": "Ather Grid",
+        "sources": [
+          "osm-n13633628620"
+        ]
+      },
+      "b": {
+        "id": "c1_hfl322arnnch",
+        "legacyId": "osm-n14058958254",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n14058958254",
+          "osm-n14058958262"
+        ]
+      },
+      "reasons": [
+        "2 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.816,
+      "distanceM": 3,
+      "a": {
+        "id": "c1_q3yzbzozrvpo",
+        "legacyId": "osm-n14250100816",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n14250100816"
+        ]
+      },
+      "b": {
+        "id": "c1_b74vtxooivpu",
+        "legacyId": "ocm-311492",
+        "name": "Aasai Aasai Anandha Bhavan",
+        "operator": "Zeon Charging",
+        "sources": [
+          "ocm-311492"
+        ]
+      },
+      "reasons": [
+        "3 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.815,
+      "distanceM": 4,
+      "a": {
+        "id": "c1_6e5uuzbm3kvz",
+        "legacyId": "osm-n9952180939",
+        "name": "Autocraft charging",
+        "operator": null,
+        "sources": [
+          "osm-n9952180939"
+        ]
+      },
+      "b": {
+        "id": "c1_3zj5anwq2xhl",
+        "legacyId": "osm-w1412674423",
+        "name": "ANERT EESL - Autokast",
+        "operator": "EESL",
+        "sources": [
+          "ocm-313510",
+          "osm-w1412674423"
+        ]
+      },
+      "reasons": [
+        "4 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.813,
+      "distanceM": 5,
+      "a": {
+        "id": "c1_ftrefysxxrd7",
+        "legacyId": "osm-n14166994014",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n14166994014"
+        ]
+      },
+      "b": {
+        "id": "c1_hqlfsixfo3af",
+        "legacyId": "ocm-312046",
+        "name": "Azadpur Metro Station",
+        "operator": "Jio-bp pulse",
+        "sources": [
+          "ocm-312046"
+        ]
+      },
+      "reasons": [
+        "5 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.813,
+      "distanceM": 5,
+      "a": {
+        "id": "c1_qbutmml7qewq",
+        "legacyId": "osm-w1217492370",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-w1217492370"
+        ]
+      },
+      "b": {
+        "id": "c1_66kb66jro4da",
+        "legacyId": "ocm-313587",
+        "name": "Gandhi Nagar KSEB EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313587"
+        ]
+      },
+      "reasons": [
+        "5 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.811,
+      "distanceM": 6,
+      "a": {
+        "id": "c1_4zmaefe4s4lw",
+        "legacyId": "osm-n8893808042",
+        "name": "Electric Vehicle Charging Station",
+        "operator": null,
+        "sources": [
+          "osm-n8893808042"
+        ]
+      },
+      "b": {
+        "id": "c1_lsxifudg67no",
+        "legacyId": "ocm-313508",
+        "name": "ANERT - EESL Sangamukham - EESL",
+        "operator": "EESL",
+        "sources": [
+          "ocm-313508"
+        ]
+      },
+      "reasons": [
+        "6 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.81,
+      "distanceM": 6,
+      "a": {
+        "id": "c1_a5pc6cc24bbu",
+        "legacyId": "osm-n7083796927",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n7083796927"
+        ]
+      },
+      "b": {
+        "id": "c1_ar2cxvzf7gro",
+        "legacyId": "ocm-306982",
+        "name": "EESL Charging Station",
+        "operator": "EESL",
+        "sources": [
+          "ocm-306982"
+        ]
+      },
+      "reasons": [
+        "6 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.809,
+      "distanceM": 7,
+      "a": {
+        "id": "c1_qrf5vbbqit4p",
+        "legacyId": "osm-n10240014908",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n10240014908"
+        ]
+      },
+      "b": {
+        "id": "c1_4i6txfwat64c",
+        "legacyId": "ocm-306938",
+        "name": "EESL Charging Station",
+        "operator": "EESL",
+        "sources": [
+          "ocm-306938",
+          "ocm-306983"
+        ]
+      },
+      "reasons": [
+        "7 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.806,
+      "distanceM": 8,
+      "a": {
+        "id": "c1_2r6zms5iyknu",
+        "legacyId": "osm-n11970703533",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n11970703533"
+        ]
+      },
+      "b": {
+        "id": "c1_findd7xld44k",
+        "legacyId": "ocm-313636",
+        "name": "Steelane (EVOK) - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313636"
+        ]
+      },
+      "reasons": [
+        "8 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.805,
+      "distanceM": 101,
+      "a": {
+        "id": "c1_gjykkfaibgih",
+        "legacyId": "ocm-300747",
+        "name": "Hotel Aaryas Garden - Relux Charging Station",
+        "operator": "Relux Electric",
+        "sources": [
+          "ocm-300747"
+        ]
+      },
+      "b": {
+        "id": "c1_gljvwjhdd6ts",
+        "legacyId": "ocm-301155",
+        "name": "Hotel Aishwarya Bhavan",
+        "operator": "Relux Electric",
+        "sources": [
+          "ocm-301155"
+        ]
+      },
+      "reasons": [
+        "101 m apart",
+        "same operator (Relux Electric)",
+        "name similarity 0.20",
+        "connectors overlap"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.804,
+      "distanceM": 23,
+      "a": {
+        "id": "c1_3ht4lvngpv3u",
+        "legacyId": "osm-n11132023351",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n11132023351"
+        ]
+      },
+      "b": {
+        "id": "c1_4wm3exydx7zg",
+        "legacyId": "osm-n14016861905",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n14016861905"
+        ]
+      },
+      "reasons": [
+        "23 m apart",
+        "both operators unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.8,
+      "distanceM": 10,
+      "a": {
+        "id": "c1_slnvdswyuwlu",
+        "legacyId": "osm-n11637354348",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n11637354348"
+        ]
+      },
+      "b": {
+        "id": "c1_plpy5ht3cvlu",
+        "legacyId": "osm-n7083916144",
+        "name": "EESL Charging Station",
+        "operator": "EESL",
+        "sources": [
+          "ocm-306985",
+          "osm-n7083916144"
+        ]
+      },
+      "reasons": [
+        "10 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.797,
+      "distanceM": 10,
+      "a": {
+        "id": "c1_gwtb6doxzzmq",
+        "legacyId": "osm-n13040660047",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n13040660047"
+        ]
+      },
+      "b": {
+        "id": "c1_bs7rxmp5i4oo",
+        "legacyId": "ocm-313679",
+        "name": "Guardian EV Charging Station by Imminent Future - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313679"
+        ]
+      },
+      "reasons": [
+        "10 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.797,
+      "distanceM": 10,
+      "a": {
+        "id": "c1_qulfnprmsmc7",
+        "legacyId": "osm-n13999844996",
+        "name": "Yuma Energy charging station",
+        "operator": "Yuma Energy",
+        "sources": [
+          "osm-n13999844996"
+        ]
+      },
+      "b": {
+        "id": "c1_37skghll33b4",
+        "legacyId": "osm-n14017793416",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n14017793416"
+        ]
+      },
+      "reasons": [
+        "10 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.796,
+      "distanceM": 11,
+      "a": {
+        "id": "c1_7dhlpw5w2cc6",
+        "legacyId": "osm-n12327155403",
+        "name": "EV Point",
+        "operator": null,
+        "sources": [
+          "osm-n12327155403"
+        ]
+      },
+      "b": {
+        "id": "c1_bwsdxxqspucv",
+        "legacyId": "ocm-313659",
+        "name": "EV Point EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313659"
+        ]
+      },
+      "reasons": [
+        "11 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.796,
+      "distanceM": 11,
+      "a": {
+        "id": "c1_zc3zj7bvu5wk",
+        "legacyId": "osm-n12823839873",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n12823839873"
+        ]
+      },
+      "b": {
+        "id": "c1_53vumjwc5hat",
+        "legacyId": "ocm-306797",
+        "name": "TERRA CHARGE BSES",
+        "operator": "BSES EV",
+        "sources": [
+          "ocm-306797"
+        ]
+      },
+      "reasons": [
+        "11 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.794,
+      "distanceM": 11,
+      "a": {
+        "id": "c1_zw6de2hwpbe5",
+        "legacyId": "osm-n12509386001",
+        "name": "Electric vehicle charging station",
+        "operator": null,
+        "sources": [
+          "osm-n12509386001"
+        ]
+      },
+      "b": {
+        "id": "c1_rpupg4dmrxcs",
+        "legacyId": "ocm-313869",
+        "name": "Central Talkies EVCS - GO EC",
+        "operator": "GO EC",
+        "sources": [
+          "ocm-313869"
+        ]
+      },
+      "reasons": [
+        "11 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.793,
+      "distanceM": 11,
+      "a": {
+        "id": "c1_eskwaizl3hch",
+        "legacyId": "osm-n13805934243",
+        "name": "Uplug charging station",
+        "operator": "Uplug",
+        "sources": [
+          "osm-n13805934243",
+          "osm-w1510242804"
+        ]
+      },
+      "b": {
+        "id": "c1_zcah7qxhodjp",
+        "legacyId": "osm-n13805934247",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n13805934247"
+        ]
+      },
+      "reasons": [
+        "11 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.788,
+      "distanceM": 12,
+      "a": {
+        "id": "c1_wh2mgtee5oxq",
+        "legacyId": "osm-n6761961057",
+        "name": "EESL charging station",
+        "operator": "EESL",
+        "sources": [
+          "osm-n6761961057"
+        ]
+      },
+      "b": {
+        "id": "c1_wqdqwbd2qdo5",
+        "legacyId": "ocm-306767",
+        "name": "Near Snow White",
+        "operator": null,
+        "sources": [
+          "ocm-306767"
+        ]
+      },
+      "reasons": [
+        "12 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.784,
+      "distanceM": 13,
+      "a": {
+        "id": "c1_zc3zj7bvu5wk",
+        "legacyId": "osm-n12823839873",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n12823839873"
+        ]
+      },
+      "b": {
+        "id": "c1_d5ttnaunrvel",
+        "legacyId": "osm-w1230812469",
+        "name": "TerraCharge station",
+        "operator": "TerraCharge",
+        "sources": [
+          "osm-w1230812469"
+        ]
+      },
+      "reasons": [
+        "13 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.78,
+      "distanceM": 134,
+      "a": {
+        "id": "c1_ehhbxkj5lms2",
+        "legacyId": "ocm-313464",
+        "name": "HiLite Business Park - Zeon",
+        "operator": "Zeon Charging",
+        "sources": [
+          "ocm-313464"
+        ]
+      },
+      "b": {
+        "id": "c1_ibrbnsnmjq3x",
+        "legacyId": "ocm-313465",
+        "name": "HiLite Mall - Zeon",
+        "operator": "Zeon Charging",
+        "sources": [
+          "ocm-313465"
+        ]
+      },
+      "reasons": [
+        "134 m apart",
+        "same operator (Zeon Charging)",
+        "name similarity 0.25",
+        "connectors overlap"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.779,
+      "distanceM": 141,
+      "a": {
+        "id": "c1_4i6txfwat64c",
+        "legacyId": "ocm-306938",
+        "name": "EESL Charging Station",
+        "operator": "EESL",
+        "sources": [
+          "ocm-306938",
+          "ocm-306983"
+        ]
+      },
+      "b": {
+        "id": "c1_5imjsi7dj46p",
+        "legacyId": "ocm-469517",
+        "name": "EESL - Devinder Collections",
+        "operator": "EESL",
+        "sources": [
+          "ocm-469517"
+        ]
+      },
+      "reasons": [
+        "141 m apart",
+        "same operator (EESL)",
+        "connectors overlap"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.778,
+      "distanceM": 146,
+      "a": {
+        "id": "c1_nvisup7jk662",
+        "legacyId": "ocm-307281",
+        "name": "Volttic Charging Station",
+        "operator": "Volttic",
+        "sources": [
+          "ocm-307281"
+        ]
+      },
+      "b": {
+        "id": "c1_bu7ddzy5dqzg",
+        "legacyId": "ocm-469744",
+        "name": "Volttic LHS DME",
+        "operator": "Volttic",
+        "sources": [
+          "ocm-469744"
+        ]
+      },
+      "reasons": [
+        "146 m apart",
+        "same operator (Volttic)",
+        "connectors overlap"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.751,
+      "distanceM": 28,
+      "a": {
+        "id": "c1_zz5bogqm572g",
+        "legacyId": "osm-n9237403818",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n9237403818"
+        ]
+      },
+      "b": {
+        "id": "c1_c6gkjzddqysf",
+        "legacyId": "osm-n9237403820",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n9237403820"
+        ]
+      },
+      "reasons": [
+        "28 m apart",
+        "both operators unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.751,
+      "distanceM": 18,
+      "a": {
+        "id": "c1_ma3jsmdrs6ry",
+        "legacyId": "osm-n14133758030",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n14133758030"
+        ]
+      },
+      "b": {
+        "id": "c1_nflyuocdac5k",
+        "legacyId": "ocm-311481",
+        "name": "Sree Saravana Bhavan Veg. Treat",
+        "operator": "Zeon Charging",
+        "sources": [
+          "ocm-311481"
+        ]
+      },
+      "reasons": [
+        "18 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.748,
+      "distanceM": 33,
+      "a": {
+        "id": "c1_u6uilb2jlmb5",
+        "legacyId": "osm-n9780694390",
+        "name": "Zeon Charging station",
+        "operator": "Zeon Charging",
+        "sources": [
+          "osm-n9780694390"
+        ]
+      },
+      "b": {
+        "id": "c1_rnvslznxhtfe",
+        "legacyId": "ocm-171101",
+        "name": "Saravana Bhavan",
+        "operator": null,
+        "sources": [
+          "ocm-171101"
+        ]
+      },
+      "reasons": [
+        "33 m apart",
+        "one operator unknown",
+        "connectors overlap"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.744,
+      "distanceM": 19,
+      "a": {
+        "id": "c1_k6idxyot35ix",
+        "legacyId": "osm-n13243279486",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n13243279486"
+        ]
+      },
+      "b": {
+        "id": "c1_u7iknraawmy7",
+        "legacyId": "osm-n13246707689",
+        "name": "Mercedes-Benz charging station",
+        "operator": "Mercedes-Benz",
+        "sources": [
+          "osm-n13246707689"
+        ]
+      },
+      "reasons": [
+        "19 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.729,
+      "distanceM": 21,
+      "a": {
+        "id": "c1_hezipgnvjcex",
+        "legacyId": "osm-n12016136802",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n12016136802"
+        ]
+      },
+      "b": {
+        "id": "c1_wkkkafcu4zm6",
+        "legacyId": "ocm-308663",
+        "name": "MEI EV charging hub",
+        "operator": "Statiq",
+        "sources": [
+          "ocm-308663"
+        ]
+      },
+      "reasons": [
+        "21 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.727,
+      "distanceM": 82,
+      "a": {
+        "id": "c1_r5sj7ia2jbwd",
+        "legacyId": "osm-n11021950303",
+        "name": "Tata Power EZ Charge station",
+        "operator": "Tata Power EZ Charge",
+        "sources": [
+          "osm-n11021950303"
+        ]
+      },
+      "b": {
+        "id": "c1_7zqxez6p2c54",
+        "legacyId": "osm-n11021950304",
+        "name": "Tata Power EZ Charge station",
+        "operator": "Tata Power EZ Charge",
+        "sources": [
+          "osm-n11021950304"
+        ]
+      },
+      "reasons": [
+        "82 m apart",
+        "same operator (Tata Power EZ Charge)"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.723,
+      "distanceM": 62,
+      "a": {
+        "id": "c1_cy2bd2cfmujp",
+        "legacyId": "ocm-313496",
+        "name": "Athirampuzha",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313496"
+        ]
+      },
+      "b": {
+        "id": "c1_2imkl46cmvoz",
+        "legacyId": "ocm-313589",
+        "name": "Alpha Hangout Play World",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313589"
+        ]
+      },
+      "reasons": [
+        "62 m apart",
+        "same operator (chargeMOD)",
+        "name similarity 0.00",
+        "connectors overlap"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.722,
+      "distanceM": 31,
+      "a": {
+        "id": "c1_tieyx4532lfp",
+        "legacyId": "osm-n6988161557",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n6988161557"
+        ]
+      },
+      "b": {
+        "id": "c1_ft3r4jej3lvo",
+        "legacyId": "osm-n6988161559",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n6988161559"
+        ]
+      },
+      "reasons": [
+        "31 m apart",
+        "both operators unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.709,
+      "distanceM": 32,
+      "a": {
+        "id": "c1_6npqh2ngxsm6",
+        "legacyId": "osm-n13757728976",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n13757728976"
+        ]
+      },
+      "b": {
+        "id": "c1_o6xvbo2umhvy",
+        "legacyId": "osm-n13807361239",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n13807361239"
+        ]
+      },
+      "reasons": [
+        "32 m apart",
+        "both operators unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.694,
+      "distanceM": 24,
+      "a": {
+        "id": "c1_hqo2liwoxooq",
+        "legacyId": "osm-n13688377501",
+        "name": "Tesla Supercharger",
+        "operator": "Tesla",
+        "sources": [
+          "osm-n13688377501"
+        ]
+      },
+      "b": {
+        "id": "c1_gqnl7sdbgwm4",
+        "legacyId": "osm-n13688398203",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n13688398203"
+        ]
+      },
+      "reasons": [
+        "24 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.671,
+      "distanceM": 26,
+      "a": {
+        "id": "c1_w3phgyvudgkf",
+        "legacyId": "osm-n13955464891",
+        "name": "Tata Power EZ Charge station",
+        "operator": "Tata Power EZ Charge",
+        "sources": [
+          "osm-n13955464891"
+        ]
+      },
+      "b": {
+        "id": "c1_3zgywifkxaip",
+        "legacyId": "osm-n13955495821",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n13955495821"
+        ]
+      },
+      "reasons": [
+        "26 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.666,
+      "distanceM": 99,
+      "a": {
+        "id": "c1_a4h5ihhachtx",
+        "legacyId": "osm-n6404118987",
+        "name": "EESL charging station",
+        "operator": "EESL",
+        "sources": [
+          "osm-n6404118987",
+          "osm-n6404118988"
+        ]
+      },
+      "b": {
+        "id": "c1_wh2mgtee5oxq",
+        "legacyId": "osm-n6761961057",
+        "name": "EESL charging station",
+        "operator": "EESL",
+        "sources": [
+          "osm-n6761961057"
+        ]
+      },
+      "reasons": [
+        "99 m apart",
+        "same operator (EESL)"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.664,
+      "distanceM": 99,
+      "a": {
+        "id": "c1_klghqnk555ny",
+        "legacyId": "osm-w1150511285",
+        "name": "Shell Recharge station",
+        "operator": "Shell Recharge",
+        "sources": [
+          "osm-w1150511285"
+        ]
+      },
+      "b": {
+        "id": "c1_b7bzt7m7w3s2",
+        "legacyId": "ocm-308898",
+        "name": "Shell Recharge Bagmane Solarium",
+        "operator": "Shell Recharge",
+        "sources": [
+          "ocm-308898"
+        ]
+      },
+      "reasons": [
+        "99 m apart",
+        "same operator (Shell Recharge)"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.663,
+      "distanceM": 36,
+      "a": {
+        "id": "c1_z2dbeqntiwnk",
+        "legacyId": "osm-n10241775591",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n10241775591"
+        ]
+      },
+      "b": {
+        "id": "c1_fl3dsuun4t3s",
+        "legacyId": "osm-n10241768254",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n10241768254",
+          "osm-n10241805232"
+        ]
+      },
+      "reasons": [
+        "36 m apart",
+        "both operators unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.658,
+      "distanceM": 69,
+      "a": {
+        "id": "c1_eht5weow6aum",
+        "legacyId": "ocm-313621",
+        "name": "PPG Home EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313621"
+        ]
+      },
+      "b": {
+        "id": "c1_gzgmkzj5ssjk",
+        "legacyId": "ocm-313622",
+        "name": "Raos EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313622"
+        ]
+      },
+      "reasons": [
+        "69 m apart",
+        "same operator (chargeMOD)",
+        "name similarity 0.00",
+        "connectors overlap"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.655,
+      "distanceM": 28,
+      "a": {
+        "id": "c1_nihei6jrxrpb",
+        "legacyId": "osm-n10908485585",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n10908485585",
+          "osm-n10908485595"
+        ]
+      },
+      "b": {
+        "id": "c1_cekmv4n4yajj",
+        "legacyId": "ocm-306980",
+        "name": "GTB Nagar Metro Station Parking",
+        "operator": "Jio-bp pulse",
+        "sources": [
+          "ocm-306980"
+        ]
+      },
+      "reasons": [
+        "28 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.647,
+      "distanceM": 28,
+      "a": {
+        "id": "c1_t2m4f63vpup7",
+        "legacyId": "osm-n13688377301",
+        "name": "Tesla Supercharger",
+        "operator": "Tesla",
+        "sources": [
+          "osm-n13688377301"
+        ]
+      },
+      "b": {
+        "id": "c1_vwag7xm3lrut",
+        "legacyId": "osm-n13688398004",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n13688398004"
+        ]
+      },
+      "reasons": [
+        "28 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.617,
+      "distanceM": 31,
+      "a": {
+        "id": "c1_tamtc5b3kgag",
+        "legacyId": "osm-n13990548253",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n13990548253"
+        ]
+      },
+      "b": {
+        "id": "c1_nil2rorx72oe",
+        "legacyId": "ocm-474462",
+        "name": "EQ Future Mobility Thakkaram",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-474462"
+        ]
+      },
+      "reasons": [
+        "31 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.617,
+      "distanceM": 39,
+      "a": {
+        "id": "c1_jw6ubmrd7gra",
+        "legacyId": "osm-n6761961056",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n6761961056"
+        ]
+      },
+      "b": {
+        "id": "c1_tieyx4532lfp",
+        "legacyId": "osm-n6988161557",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n6988161557"
+        ]
+      },
+      "reasons": [
+        "39 m apart",
+        "both operators unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.604,
+      "distanceM": 16,
+      "a": {
+        "id": "c1_vpqbxkoguuvd",
+        "legacyId": "ocm-257047",
+        "name": "Capital EV Charging Station (Kalupur)",
+        "operator": null,
+        "sources": [
+          "ocm-257047"
+        ]
+      },
+      "b": {
+        "id": "c1_mjwlcxxrbuuy",
+        "legacyId": "ocm-257048",
+        "name": "Agora Mall Charging Station",
+        "operator": "Jio-bp pulse",
+        "sources": [
+          "ocm-257048"
+        ]
+      },
+      "reasons": [
+        "16 m apart",
+        "one operator unknown",
+        "name similarity 0.00",
+        "connectors overlap"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 0,
+      "a": {
+        "id": "c1_gp3lsdujxs36",
+        "legacyId": "ocm-297626",
+        "name": "chargemod 30kw Amoha hotel",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-297626"
+        ]
+      },
+      "b": {
+        "id": "c1_kvyovpjh2sv2",
+        "legacyId": "ocm-297627",
+        "name": "Relux 25KW Chidambaram",
+        "operator": "Relux Electric",
+        "sources": [
+          "ocm-297627"
+        ]
+      },
+      "reasons": [
+        "0 m apart",
+        "different operators (chargeMOD / Relux Electric)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 0,
+      "a": {
+        "id": "c1_xrunh7qobkb7",
+        "legacyId": "ocm-308970",
+        "name": "Hotel Aroma Natural Veg",
+        "operator": "ChargeZone",
+        "sources": [
+          "ocm-308970"
+        ]
+      },
+      "b": {
+        "id": "c1_dltyc2cslayp",
+        "legacyId": "ocm-308971",
+        "name": "Hotel Aroma Natural Veg",
+        "operator": "Statiq",
+        "sources": [
+          "ocm-308971"
+        ]
+      },
+      "reasons": [
+        "0 m apart",
+        "different operators (ChargeZone / Statiq)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 0,
+      "a": {
+        "id": "c1_s2m4wdnsafvu",
+        "legacyId": "ocm-309329",
+        "name": "Nexus Whitefield Jio-BP",
+        "operator": "Jio-bp pulse",
+        "sources": [
+          "ocm-309329"
+        ]
+      },
+      "b": {
+        "id": "c1_uyjmvwftwtba",
+        "legacyId": "ocm-309330",
+        "name": "Nexus Whitefield Statiq",
+        "operator": "Statiq",
+        "sources": [
+          "ocm-309330"
+        ]
+      },
+      "reasons": [
+        "0 m apart",
+        "different operators (Jio-bp pulse / Statiq)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 0,
+      "a": {
+        "id": "c1_7urhykwg44yo",
+        "legacyId": "ocm-475874",
+        "name": "Earthtron EV",
+        "operator": "CHARGE+",
+        "sources": [
+          "ocm-475874"
+        ]
+      },
+      "b": {
+        "id": "c1_fwevnaag5ky7",
+        "legacyId": "ocm-475875",
+        "name": "Earthtron EV",
+        "operator": "EarthtronEV",
+        "sources": [
+          "ocm-475875"
+        ]
+      },
+      "reasons": [
+        "0 m apart",
+        "different operators (CHARGE+ / EarthtronEV)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 0,
+      "a": {
+        "id": "c1_cedpc7dxor3e",
+        "legacyId": "osm-n11982372933",
+        "name": "One Delhi charging station",
+        "operator": "One Delhi",
+        "sources": [
+          "osm-n11982372933"
+        ]
+      },
+      "b": {
+        "id": "c1_sbgfihwcwvvq",
+        "legacyId": "osm-n11982458750",
+        "name": "CESL charging station",
+        "operator": "CESL",
+        "sources": [
+          "osm-n11982458750"
+        ]
+      },
+      "reasons": [
+        "0 m apart",
+        "different operators (One Delhi / CESL)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 2,
+      "a": {
+        "id": "c1_jrofn3bntrfd",
+        "legacyId": "osm-n9524427359",
+        "name": "TATA Charging Station",
+        "operator": "Tata Power EZ Charge",
+        "sources": [
+          "osm-n9524427359"
+        ]
+      },
+      "b": {
+        "id": "c1_jqt4oz44kpfp",
+        "legacyId": "ocm-313637",
+        "name": "EVM MG Motors Coastline Garage - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313637"
+        ]
+      },
+      "reasons": [
+        "2 m apart",
+        "different operators (Tata Power EZ Charge / chargeMOD)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 2,
+      "a": {
+        "id": "c1_zm4jhgdijk7p",
+        "legacyId": "ocm-308760",
+        "name": "Shivalli Chowki Restaurant",
+        "operator": "Zeon Charging",
+        "sources": [
+          "ocm-308760"
+        ]
+      },
+      "b": {
+        "id": "c1_cia5ypwo74lc",
+        "legacyId": "ocm-308925",
+        "name": "Shivalli Restaurant 1",
+        "operator": "Jio-bp pulse",
+        "sources": [
+          "ocm-308925"
+        ]
+      },
+      "reasons": [
+        "2 m apart",
+        "different operators (Zeon Charging / Jio-bp pulse)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 2,
+      "a": {
+        "id": "c1_5asyku24vwhd",
+        "legacyId": "osm-w1215901273",
+        "name": "KSEB charging station",
+        "operator": "KSEB",
+        "sources": [
+          "osm-w1215901273"
+        ]
+      },
+      "b": {
+        "id": "c1_anusemzficr4",
+        "legacyId": "ocm-313627",
+        "name": "Vyttila KSEB EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313627"
+        ]
+      },
+      "reasons": [
+        "2 m apart",
+        "different operators (KSEB / chargeMOD)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 3,
+      "a": {
+        "id": "c1_ha5ihx7vpxud",
+        "legacyId": "osm-n14058958287",
+        "name": "Lectrix charging station",
+        "operator": "Lectrix",
+        "sources": [
+          "osm-n14058958287"
+        ]
+      },
+      "b": {
+        "id": "c1_2tevli42zlpt",
+        "legacyId": "osm-n14058958324",
+        "name": "VinFast charging station",
+        "operator": "VinFast",
+        "sources": [
+          "osm-n14058958324"
+        ]
+      },
+      "reasons": [
+        "3 m apart",
+        "different operators (Lectrix / VinFast)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 3,
+      "a": {
+        "id": "c1_pdqf355xnwpi",
+        "legacyId": "osm-n13110034737",
+        "name": "BAAZ charging station",
+        "operator": "BAAZ",
+        "sources": [
+          "osm-n13110034737"
+        ]
+      },
+      "b": {
+        "id": "c1_kzw5npuqohoq",
+        "legacyId": "osm-n13110034738",
+        "name": "CHARJKARO charging station",
+        "operator": "CHARJKARO",
+        "sources": [
+          "osm-n13110034738"
+        ]
+      },
+      "reasons": [
+        "3 m apart",
+        "different operators (BAAZ / CHARJKARO)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 4,
+      "a": {
+        "id": "c1_g45zjaxxjutl",
+        "legacyId": "ocm-309336",
+        "name": "Nexus Shantiniketan - Statiq",
+        "operator": "Statiq",
+        "sources": [
+          "ocm-309336"
+        ]
+      },
+      "b": {
+        "id": "c1_f3e2tne6sj53",
+        "legacyId": "ocm-309337",
+        "name": "Nexus Shantiniketan Jio-BP",
+        "operator": "Jio-bp pulse",
+        "sources": [
+          "ocm-309337"
+        ]
+      },
+      "reasons": [
+        "4 m apart",
+        "different operators (Statiq / Jio-bp pulse)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 4,
+      "a": {
+        "id": "c1_cb4laivnrymm",
+        "legacyId": "osm-n14115719957",
+        "name": "VinFast charging station",
+        "operator": "VinFast",
+        "sources": [
+          "osm-n14115719957"
+        ]
+      },
+      "b": {
+        "id": "c1_oztiagvhwiua",
+        "legacyId": "osm-n14115719958",
+        "name": "Ather Grid charging station",
+        "operator": "Ather Grid",
+        "sources": [
+          "osm-n14115719958"
+        ]
+      },
+      "reasons": [
+        "4 m apart",
+        "different operators (VinFast / Ather Grid)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 4,
+      "a": {
+        "id": "c1_fs5gqb4277gd",
+        "legacyId": "osm-n14190528261",
+        "name": "Zeon",
+        "operator": "Zeon Charging",
+        "sources": [
+          "osm-n14190528261"
+        ]
+      },
+      "b": {
+        "id": "c1_7x4ng6w26idm",
+        "legacyId": "osm-n14190626710",
+        "name": "Ather",
+        "operator": "Ather Grid",
+        "sources": [
+          "osm-n14190626710"
+        ]
+      },
+      "reasons": [
+        "4 m apart",
+        "different operators (Zeon Charging / Ather Grid)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 5,
+      "a": {
+        "id": "c1_7v5gadld3gjb",
+        "legacyId": "osm-n13633628620",
+        "name": "Ather Grid charging station",
+        "operator": "Ather Grid",
+        "sources": [
+          "osm-n13633628620"
+        ]
+      },
+      "b": {
+        "id": "c1_ha5ihx7vpxud",
+        "legacyId": "osm-n14058958287",
+        "name": "Lectrix charging station",
+        "operator": "Lectrix",
+        "sources": [
+          "osm-n14058958287"
+        ]
+      },
+      "reasons": [
+        "5 m apart",
+        "different operators (Ather Grid / Lectrix)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 6,
+      "a": {
+        "id": "c1_yavqkb26xokm",
+        "legacyId": "osm-w1496159597",
+        "name": "KSEB charging station",
+        "operator": "KSEB",
+        "sources": [
+          "osm-w1496159597"
+        ]
+      },
+      "b": {
+        "id": "c1_yblc7hdab3pc",
+        "legacyId": "ocm-313736",
+        "name": "Thamarassery KESEB EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313736"
+        ]
+      },
+      "reasons": [
+        "6 m apart",
+        "different operators (KSEB / chargeMOD)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 6,
+      "a": {
+        "id": "c1_tzmz3b2stwe7",
+        "legacyId": "osm-n13775144001",
+        "name": "Zeon Charging station",
+        "operator": "Zeon Charging",
+        "sources": [
+          "osm-n13775144001",
+          "osm-n13775144101"
+        ]
+      },
+      "b": {
+        "id": "c1_hd3an7a537cf",
+        "legacyId": "osm-n13775144302",
+        "name": "Ather Grid charging station",
+        "operator": "Ather Grid",
+        "sources": [
+          "osm-n13775144302"
+        ]
+      },
+      "reasons": [
+        "6 m apart",
+        "different operators (Zeon Charging / Ather Grid)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 6,
+      "a": {
+        "id": "c1_oztiagvhwiua",
+        "legacyId": "osm-n14115719958",
+        "name": "Ather Grid charging station",
+        "operator": "Ather Grid",
+        "sources": [
+          "osm-n14115719958"
+        ]
+      },
+      "b": {
+        "id": "c1_tkjuagrltmkj",
+        "legacyId": "osm-n14115719961",
+        "name": "Lectrix charging station",
+        "operator": "Lectrix",
+        "sources": [
+          "osm-n14115719961"
+        ]
+      },
+      "reasons": [
+        "6 m apart",
+        "different operators (Ather Grid / Lectrix)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 6,
+      "a": {
+        "id": "c1_mlzc5tjhgptr",
+        "legacyId": "osm-n10290789663",
+        "name": "goEgo Network charging station",
+        "operator": "goEgo Network",
+        "sources": [
+          "osm-n10290789663"
+        ]
+      },
+      "b": {
+        "id": "c1_ajobiceohbzx",
+        "legacyId": "ocm-481493",
+        "name": "Balewadi Charge Park",
+        "operator": "GO EC",
+        "sources": [
+          "ocm-481493"
+        ]
+      },
+      "reasons": [
+        "6 m apart",
+        "different operators (goEgo Network / GO EC)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 7,
+      "a": {
+        "id": "c1_7v5gadld3gjb",
+        "legacyId": "osm-n13633628620",
+        "name": "Ather Grid charging station",
+        "operator": "Ather Grid",
+        "sources": [
+          "osm-n13633628620"
+        ]
+      },
+      "b": {
+        "id": "c1_2tevli42zlpt",
+        "legacyId": "osm-n14058958324",
+        "name": "VinFast charging station",
+        "operator": "VinFast",
+        "sources": [
+          "osm-n14058958324"
+        ]
+      },
+      "reasons": [
+        "7 m apart",
+        "different operators (Ather Grid / VinFast)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 8,
+      "a": {
+        "id": "c1_q2ug5nailb2g",
+        "legacyId": "osm-n11288409893",
+        "name": "KSEB",
+        "operator": "KSEB",
+        "sources": [
+          "osm-n11288409893"
+        ]
+      },
+      "b": {
+        "id": "c1_a3fsbw6gqsob",
+        "legacyId": "ocm-313670",
+        "name": "Irinjalakkuda KSEB EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313670"
+        ]
+      },
+      "reasons": [
+        "8 m apart",
+        "different operators (KSEB / chargeMOD)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 9,
+      "a": {
+        "id": "c1_5rrx7vxtuy3u",
+        "legacyId": "osm-n14127552402",
+        "name": "ചാർജമോഡ് ഇവി ചാർജിങ് സ്റ്റേഷൻ",
+        "operator": "KSEB",
+        "sources": [
+          "osm-n14127552402"
+        ]
+      },
+      "b": {
+        "id": "c1_dt5zvgqzcclj",
+        "legacyId": "ocm-313575",
+        "name": "V Charge Hub - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313575"
+        ]
+      },
+      "reasons": [
+        "9 m apart",
+        "different operators (KSEB / chargeMOD)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 9,
+      "a": {
+        "id": "c1_3ijgiobswcok",
+        "legacyId": "ocm-313492",
+        "name": "Best EVCS - ChargeMOD",
+        "operator": "ChargeZone",
+        "sources": [
+          "ocm-313492"
+        ]
+      },
+      "b": {
+        "id": "c1_ghazbg63ypez",
+        "legacyId": "ocm-474475",
+        "name": "Best EVCS | Karunagappalli",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-474475"
+        ]
+      },
+      "reasons": [
+        "9 m apart",
+        "different operators (ChargeZone / chargeMOD)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 9,
+      "a": {
+        "id": "c1_xylpccf6ozpf",
+        "legacyId": "osm-n12183518228",
+        "name": "KSEB EV Charging Station",
+        "operator": "KSEB",
+        "sources": [
+          "osm-n12183518228"
+        ]
+      },
+      "b": {
+        "id": "c1_ndbyqs75c4oe",
+        "legacyId": "ocm-313694",
+        "name": "Ponnani KSEB EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313694"
+        ]
+      },
+      "reasons": [
+        "9 m apart",
+        "different operators (KSEB / chargeMOD)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 10,
+      "a": {
+        "id": "c1_3kkogzhjtjrm",
+        "legacyId": "osm-n13586349702",
+        "name": "EVOK charging station",
+        "operator": "EVOK",
+        "sources": [
+          "osm-n13586349702"
+        ]
+      },
+      "b": {
+        "id": "c1_g42qiqfvw3id",
+        "legacyId": "ocm-313675",
+        "name": "Surya Hotel (EVOK) - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313675"
+        ]
+      },
+      "reasons": [
+        "10 m apart",
+        "different operators (EVOK / chargeMOD)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 10,
+      "a": {
+        "id": "c1_cb4laivnrymm",
+        "legacyId": "osm-n14115719957",
+        "name": "VinFast charging station",
+        "operator": "VinFast",
+        "sources": [
+          "osm-n14115719957"
+        ]
+      },
+      "b": {
+        "id": "c1_tkjuagrltmkj",
+        "legacyId": "osm-n14115719961",
+        "name": "Lectrix charging station",
+        "operator": "Lectrix",
+        "sources": [
+          "osm-n14115719961"
+        ]
+      },
+      "reasons": [
+        "10 m apart",
+        "different operators (VinFast / Lectrix)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 10,
+      "a": {
+        "id": "c1_gfqddnlnjzcd",
+        "legacyId": "osm-n10978384002",
+        "name": "KSEB Charging station, Kottiyam",
+        "operator": "KSEB",
+        "sources": [
+          "osm-n10978384002"
+        ]
+      },
+      "b": {
+        "id": "c1_qdccms3cqvul",
+        "legacyId": "ocm-313533",
+        "name": "Kottiyam KSEB EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313533"
+        ]
+      },
+      "reasons": [
+        "10 m apart",
+        "different operators (KSEB / chargeMOD)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 11,
+      "a": {
+        "id": "c1_57r7zjyltjbo",
+        "legacyId": "ocm-313432",
+        "name": "Phills Hub - Zeon",
+        "operator": "Zeon Charging",
+        "sources": [
+          "ocm-313432"
+        ]
+      },
+      "b": {
+        "id": "c1_i6a3un5p4rix",
+        "legacyId": "ocm-313569",
+        "name": "Phills Hub EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313569"
+        ]
+      },
+      "reasons": [
+        "11 m apart",
+        "different operators (Zeon Charging / chargeMOD)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 11,
+      "a": {
+        "id": "c1_q4nzhgo7z6c6",
+        "legacyId": "osm-n11818587530",
+        "name": "GLIDA Charging Station",
+        "operator": "Glida",
+        "sources": [
+          "osm-n11818587530"
+        ]
+      },
+      "b": {
+        "id": "c1_cqzq4popq7pc",
+        "legacyId": "ocm-309151",
+        "name": "GLIDA Charging Hub",
+        "operator": "Statiq",
+        "sources": [
+          "ocm-309151"
+        ]
+      },
+      "reasons": [
+        "11 m apart",
+        "different operators (Glida / Statiq)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 13,
+      "a": {
+        "id": "c1_5wlffl634hwd",
+        "legacyId": "osm-n13632992904",
+        "name": "Honda e:Swap charging station",
+        "operator": "Honda e:Swap",
+        "sources": [
+          "osm-n13632992904"
+        ]
+      },
+      "b": {
+        "id": "c1_yuormipl5ydx",
+        "legacyId": "osm-n13632992905",
+        "name": "Yuma Energy charging station",
+        "operator": "Yuma Energy",
+        "sources": [
+          "osm-n13632992905"
+        ]
+      },
+      "reasons": [
+        "13 m apart",
+        "different operators (Honda e:Swap / Yuma Energy)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 13,
+      "a": {
+        "id": "c1_d5ttnaunrvel",
+        "legacyId": "osm-w1230812469",
+        "name": "TerraCharge station",
+        "operator": "TerraCharge",
+        "sources": [
+          "osm-w1230812469"
+        ]
+      },
+      "b": {
+        "id": "c1_53vumjwc5hat",
+        "legacyId": "ocm-306797",
+        "name": "TERRA CHARGE BSES",
+        "operator": "BSES EV",
+        "sources": [
+          "ocm-306797"
+        ]
+      },
+      "reasons": [
+        "13 m apart",
+        "different operators (TerraCharge / BSES EV)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 16,
+      "a": {
+        "id": "c1_7tdz7xia576r",
+        "legacyId": "osm-w639223862",
+        "name": "KSEB charging station",
+        "operator": "KSEB",
+        "sources": [
+          "osm-w639223862"
+        ]
+      },
+      "b": {
+        "id": "c1_fqinrsarmoip",
+        "legacyId": "ocm-313581",
+        "name": "Punnapra KSEB EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313581"
+        ]
+      },
+      "reasons": [
+        "16 m apart",
+        "different operators (KSEB / chargeMOD)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 19,
+      "a": {
+        "id": "c1_uethlkgqikt5",
+        "legacyId": "osm-n13238855163",
+        "name": "Glida charging station",
+        "operator": "Glida",
+        "sources": [
+          "osm-n13238855163"
+        ]
+      },
+      "b": {
+        "id": "c1_2bwvniuarlwa",
+        "legacyId": "ocm-308649",
+        "name": "Hotel Harsha Grand",
+        "operator": "Statiq",
+        "sources": [
+          "ocm-308649"
+        ]
+      },
+      "reasons": [
+        "19 m apart",
+        "different operators (Glida / Statiq)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 19,
+      "a": {
+        "id": "c1_7uv7g2ctolz2",
+        "legacyId": "ocm-475873",
+        "name": "Mannat",
+        "operator": "Mahindra Charge_iN",
+        "sources": [
+          "ocm-475873"
+        ]
+      },
+      "b": {
+        "id": "c1_7urhykwg44yo",
+        "legacyId": "ocm-475874",
+        "name": "Earthtron EV",
+        "operator": "CHARGE+",
+        "sources": [
+          "ocm-475874"
+        ]
+      },
+      "reasons": [
+        "19 m apart",
+        "different operators (Mahindra Charge_iN / CHARGE+)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 19,
+      "a": {
+        "id": "c1_7uv7g2ctolz2",
+        "legacyId": "ocm-475873",
+        "name": "Mannat",
+        "operator": "Mahindra Charge_iN",
+        "sources": [
+          "ocm-475873"
+        ]
+      },
+      "b": {
+        "id": "c1_fwevnaag5ky7",
+        "legacyId": "ocm-475875",
+        "name": "Earthtron EV",
+        "operator": "EarthtronEV",
+        "sources": [
+          "ocm-475875"
+        ]
+      },
+      "reasons": [
+        "19 m apart",
+        "different operators (Mahindra Charge_iN / EarthtronEV)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 22,
+      "a": {
+        "id": "c1_gpm3daq32zkb",
+        "legacyId": "osm-w1362135033",
+        "name": "KSEB charging station",
+        "operator": "KSEB",
+        "sources": [
+          "osm-w1362135033"
+        ]
+      },
+      "b": {
+        "id": "c1_gdghs7n4jqis",
+        "legacyId": "ocm-313584",
+        "name": "Pallam KSEB EVCS - ChargeMOD",
+        "operator": "chargeMOD",
+        "sources": [
+          "ocm-313584"
+        ]
+      },
+      "reasons": [
+        "22 m apart",
+        "different operators (KSEB / chargeMOD)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 22,
+      "a": {
+        "id": "c1_mtnyjip5ultb",
+        "legacyId": "osm-n11005778506",
+        "name": "Jio-bp pulse charging station",
+        "operator": "Jio-bp pulse",
+        "sources": [
+          "osm-n11005778506"
+        ]
+      },
+      "b": {
+        "id": "c1_ibkyq5hrvzom",
+        "legacyId": "osm-n12458871181",
+        "name": "Statiq charging station",
+        "operator": "Statiq",
+        "sources": [
+          "osm-n12458871181"
+        ]
+      },
+      "reasons": [
+        "22 m apart",
+        "different operators (Jio-bp pulse / Statiq)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 24,
+      "a": {
+        "id": "c1_rqk56s74pgbg",
+        "legacyId": "osm-n9527221544",
+        "name": "veev",
+        "operator": "veev",
+        "sources": [
+          "osm-n9527221544"
+        ]
+      },
+      "b": {
+        "id": "c1_nzjpdvbuyrrw",
+        "legacyId": "ocm-308935",
+        "name": "Adyar Ananda Bhavan",
+        "operator": "Statiq",
+        "sources": [
+          "ocm-308935"
+        ]
+      },
+      "reasons": [
+        "24 m apart",
+        "different operators (veev / Statiq)"
+      ]
+    }
+  ]
+}

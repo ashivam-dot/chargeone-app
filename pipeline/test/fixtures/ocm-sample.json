@@ -1,0 +1,898 @@
+{
+ "pois": [
+  {
+   "DateLastVerified": "2026-03-01T09:25:00Z",
+   "ID": 479062,
+   "UUID": "70C1FBFA-2AC9-4E1B-9B58-8F470F2B8780",
+   "DataProviderID": 1,
+   "OperatorsReference": "Jio-bp",
+   "UsageTypeID": 5,
+   "AddressInfo": {
+    "ID": 479451,
+    "Title": "Synthetic Google-derived listing",
+    "AddressLine1": "Test Road",
+    "StateOrProvince": "Odisha",
+    "CountryID": 106,
+    "Latitude": 18.29,
+    "Longitude": 83.91,
+    "DistanceUnit": 0
+   },
+   "Connections": [
+    {
+     "ID": 804672,
+     "ConnectionTypeID": 25,
+     "StatusTypeID": 50,
+     "LevelID": 2,
+     "PowerKW": 7.4,
+     "Quantity": 1
+    }
+   ],
+   "NumberOfPoints": 1,
+   "GeneralComments": "Network: Example. Google Place ID: ChIJ_synthetic_test_value_0",
+   "StatusTypeID": 50,
+   "DateLastStatusUpdate": "2026-03-01T09:25:00Z",
+   "DateCreated": "2026-02-28T06:35:00Z",
+   "SubmissionStatusTypeID": 200
+  },
+  {
+   "UserComments": [
+    {
+     "ID": 28327,
+     "ChargePointID": 258754,
+     "CommentTypeID": 10,
+     "UserName": "kishan",
+     "Comment": "Really much needed location with highly decorated ambience",
+     "Rating": 5,
+     "DateCreated": "2023-03-26T10:01:13.667Z",
+     "User": {
+      "ID": 45377,
+      "Username": "kishan"
+     },
+     "CheckinStatusTypeID": 10,
+     "IsActionedByEditor": false
+    }
+   ],
+   "MediaItems": [
+    {
+     "ID": 37097,
+     "ChargePointID": 258754,
+     "ItemURL": "https://media.openchargemap.io/images/IN/OCM258754/OCM-258754.orig.2023032609562922.png",
+     "ItemThumbnailURL": "https://media.openchargemap.io/images/IN/OCM258754/OCM-258754.thmb.2023032609562922.png",
+     "Comment": "",
+     "IsEnabled": true,
+     "IsVideo": false,
+     "IsFeaturedItem": false,
+     "IsExternalResource": false,
+     "User": {
+      "ID": 45377,
+      "Username": "kishan"
+     },
+     "DateCreated": "2023-03-26T09:57:00Z"
+    }
+   ],
+   "DateLastVerified": "2024-08-08T12:49:00Z",
+   "ID": 258754,
+   "UUID": "31DC227F-163C-429F-A2DE-B666189D4DDE",
+   "DataProviderID": 1,
+   "OperatorID": 1,
+   "UsageTypeID": 5,
+   "AddressInfo": {
+    "ID": 259138,
+    "Title": "ChargePod Charging Station",
+    "AddressLine1": "5JGH+9H3, Urjanagar 1, Kudasan",
+    "Town": "Gandhinagar",
+    "StateOrProvince": "Gujarat",
+    "Postcode": "382421",
+    "CountryID": 106,
+    "Latitude": 23.175841,
+    "Longitude": 72.6267489,
+    "AccessComments": "Kudasan",
+    "RelatedURL": "https://necellemobility.in/",
+    "DistanceUnit": 0
+   },
+   "Connections": [
+    {
+     "ID": 567974,
+     "ConnectionTypeID": 2,
+     "StatusTypeID": 50,
+     "Quantity": 1
+    }
+   ],
+   "NumberOfPoints": 1,
+   "StatusTypeID": 100,
+   "DateLastStatusUpdate": "2024-08-08T12:49:00Z",
+   "DateCreated": "2023-03-26T09:55:00Z",
+   "SubmissionStatusTypeID": 200
+  },
+  {
+   "DateLastVerified": "2025-06-11T14:01:00Z",
+   "ID": 313490,
+   "UUID": "BEE06BED-56B9-4F15-9973-7C4F1C752DED",
+   "DataProviderID": 1,
+   "OperatorID": 3818,
+   "UsageTypeID": 4,
+   "UsageCost": "21.5/kWh",
+   "AddressInfo": {
+    "ID": 313879,
+    "Title": "Chungath Sprise Hyundai - ChargeZone",
+    "AddressLine1": "NH 744",
+    "AddressLine2": "Near Kilikolloor Juma Masjid",
+    "Town": "Kollam",
+    "StateOrProvince": "Kerala",
+    "Postcode": "691004",
+    "CountryID": 106,
+    "Latitude": 8.911104862076982,
+    "Longitude": 76.62735315845515,
+    "DistanceUnit": 0
+   },
+   "Connections": [
+    {
+     "ID": 603739,
+     "ConnectionTypeID": 33,
+     "StatusTypeID": 150,
+     "LevelID": 3,
+     "PowerKW": 30,
+     "CurrentTypeID": 30,
+     "Quantity": 1
+    },
+    {
+     "ID": 603740,
+     "ConnectionTypeID": 33,
+     "StatusTypeID": 150,
+     "LevelID": 3,
+     "PowerKW": 30,
+     "CurrentTypeID": 30,
+     "Quantity": 1
+    }
+   ],
+   "NumberOfPoints": 2,
+   "StatusTypeID": 150,
+   "DateLastStatusUpdate": "2025-06-11T14:01:00Z",
+   "DateCreated": "2025-06-10T11:00:00Z",
+   "SubmissionStatusTypeID": 200
+  },
+  {
+   "DateLastVerified": "2026-04-12T04:29:00Z",
+   "ID": 309015,
+   "UUID": "F1364D13-A876-4EEE-9A30-BAF26D17F7AA",
+   "DataProviderID": 1,
+   "OperatorID": 3779,
+   "UsageTypeID": 1,
+   "UsageCost": "14/kWh",
+   "AddressInfo": {
+    "ID": 309404,
+    "Title": "Sowkar M Baba Pai & Co",
+    "AddressLine1": "Opposite to Water Tank, Ladyhill",
+    "AddressLine2": "M G Road",
+    "Town": "Mangaluru",
+    "StateOrProvince": "Karnataka",
+    "Postcode": "575006",
+    "CountryID": 106,
+    "Latitude": 12.888069564664889,
+    "Longitude": 74.8354843185316,
+    "DistanceUnit": 0
+   },
+   "Connections": [
+    {
+     "ID": 592611,
+     "ConnectionTypeID": 33,
+     "StatusTypeID": 50,
+     "LevelID": 3,
+     "PowerKW": 30,
+     "CurrentTypeID": 30,
+     "Quantity": 1
+    }
+   ],
+   "NumberOfPoints": 1,
+   "StatusTypeID": 30,
+   "DateLastStatusUpdate": "2026-04-12T04:29:00Z",
+   "DateCreated": "2025-02-20T16:46:00Z",
+   "SubmissionStatusTypeID": 200
+  },
+  {
+   "DateLastVerified": "2025-09-22T18:40:00Z",
+   "ID": 461277,
+   "UUID": "021BF9D4-2E5F-4336-8A30-F02EDD8263E0",
+   "DataProviderID": 1,
+   "OperatorID": 1,
+   "UsageTypeID": 4,
+   "UsageCost": "10",
+   "AddressInfo": {
+    "ID": 461666,
+    "Title": "Shashtri Nagar ",
+    "AddressLine1": "Vanaz",
+    "Town": "Pune",
+    "StateOrProvince": "Maharashtra",
+    "Postcode": "411038",
+    "CountryID": 106,
+    "Latitude": 18.503925778446245,
+    "Longitude": 73.80373433483828,
+    "DistanceUnit": 0
+   },
+   "Connections": [
+    {
+     "ID": 776020,
+     "ConnectionTypeID": 33,
+     "StatusTypeID": 50,
+     "LevelID": 1,
+     "PowerKW": 1,
+     "CurrentTypeID": 10,
+     "Quantity": 1
+    }
+   ],
+   "NumberOfPoints": 1,
+   "StatusTypeID": 75,
+   "DateLastStatusUpdate": "2025-09-22T18:40:00Z",
+   "DateCreated": "2025-09-19T18:39:00Z",
+   "SubmissionStatusTypeID": 200
+  },
+  {
+   "DateLastVerified": "2024-07-27T09:56:00Z",
+   "ID": 301962,
+   "UUID": "F0B34EDF-D8E6-494E-8923-E64E88DEC696",
+   "DataProviderID": 1,
+   "OperatorID": 3777,
+   "UsageTypeID": 5,
+   "UsageCost": "Rs.15/-",
+   "AddressInfo": {
+    "ID": 302349,
+    "Title": "Marshal E Tech Station",
+    "AddressLine1": "2/119-5, Mission compound, Kottaram",
+    "Town": "Kanyakumari ",
+    "StateOrProvince": "Tamil Nadu",
+    "Postcode": "629703",
+    "CountryID": 106,
+    "Latitude": 8.115411,
+    "Longitude": 77.532217,
+    "ContactTelephone1": "98848 66993",
+    "RelatedURL": "https://reluxelectric.com/",
+    "DistanceUnit": 0
+   },
+   "Connections": [
+    {
+     "ID": 565561,
+     "ConnectionTypeID": 33,
+     "StatusTypeID": 50,
+     "LevelID": 3,
+     "PowerKW": 49,
+     "CurrentTypeID": 30,
+     "Quantity": 2
+    }
+   ],
+   "NumberOfPoints": 1,
+   "StatusTypeID": 50,
+   "DateLastStatusUpdate": "2024-07-27T09:56:00Z",
+   "DateCreated": "2024-07-27T09:56:00Z",
+   "SubmissionStatusTypeID": 200
+  },
+  {
+   "DateLastVerified": "2025-04-02T16:49:00Z",
+   "ID": 171101,
+   "UUID": "E19C746A-9783-4D46-A380-DD5F8B81B426",
+   "DataProviderID": 1,
+   "OperatorID": 1,
+   "UsageTypeID": 1,
+   "UsageCost": "Rs. 23/kWh",
+   "AddressInfo": {
+    "ID": 171460,
+    "Title": "Saravana Bhavan",
+    "AddressLine1": "Sankagiri Toll",
+    "AddressLine2": "",
+    "Town": "Vaigundam",
+    "StateOrProvince": "Tamil Nadu",
+    "Postcode": "637103",
+    "CountryID": 106,
+    "Latitude": 11.519422436107646,
+    "Longitude": 77.93477088670943,
+    "RelatedURL": "http://www.zeoncharging.com",
+    "DistanceUnit": 0
+   },
+   "Connections": [
+    {
+     "ID": 261447,
+     "ConnectionTypeID": 33,
+     "Reference": "www.zeoncharging.com",
+     "StatusTypeID": 50,
+     "LevelID": 3,
+     "PowerKW": 50,
+     "CurrentTypeID": 30,
+     "Quantity": 2
+    }
+   ],
+   "NumberOfPoints": 2,
+   "StatusTypeID": 50,
+   "DateLastStatusUpdate": "2025-04-02T16:49:00Z",
+   "DateCreated": "2020-12-20T13:41:00Z",
+   "SubmissionStatusTypeID": 200
+  },
+  {
+   "DateLastVerified": "2022-08-30T10:54:00Z",
+   "ID": 103614,
+   "UUID": "107C1D1C-6B12-4942-80DF-06BD678EF9EC",
+   "DataProviderID": 1,
+   "OperatorID": 1,
+   "UsageTypeID": 1,
+   "AddressInfo": {
+    "ID": 103960,
+    "Title": "Ather Grid Point - 6000 Miles to Isle of Man",
+    "AddressLine1": "Kasturba Road",
+    "AddressLine2": "Sampangiram Nagar Ward",
+    "Town": "Bengaluru",
+    "StateOrProvince": "Bangalore Urban",
+    "Postcode": "560053",
+    "CountryID": 106,
+    "Latitude": 12.9756828,
+    "Longitude": 77.5982326000001,
+    "AccessComments": "Motorcycle dealership",
+    "DistanceUnit": 0
+   },
+   "Connections": [
+    {
+     "ID": 146281,
+     "ConnectionTypeID": 1043,
+     "StatusTypeID": 50,
+     "LevelID": 2,
+     "Amps": 16,
+     "Voltage": 240,
+     "PowerKW": 3,
+     "CurrentTypeID": 10,
+     "Quantity": 1
+    }
+   ],
+   "NumberOfPoints": 1,
+   "StatusTypeID": 50,
+   "DateLastStatusUpdate": "2022-08-30T10:54:00Z",
+   "DateCreated": "2018-05-04T08:42:00Z",
+   "SubmissionStatusTypeID": 200
+  },
+  {
+   "UserComments": [
+    {
+     "ID": 19993,
+     "ChargePointID": 107668,
+     "CommentTypeID": 10,
+     "UserName": "vdprao",
+     "Comment": "Charged my E2O car",
+     "Rating": 5,
+     "DateCreated": "2018-08-06T10:54:20.593Z",
+     "User": {
+      "ID": 18790,
+      "Username": "vdprao"
+     },
+     "CheckinStatusTypeID": 10
+    }
+   ],
+   "MediaItems": [
+    {
+     "ID": 16168,
+     "ChargePointID": 107668,
+     "ItemURL": "https://media.openchargemap.io/images/IN/OCM107668/OCM-107668.orig.2018080610531438.jpeg",
+     "ItemThumbnailURL": "https://media.openchargemap.io/images/IN/OCM107668/OCM-107668.thmb.2018080610531438.jpeg",
+     "Comment": "1 connector + 1 generic 3-pin plug",
+     "IsEnabled": true,
+     "IsVideo": false,
+     "IsFeaturedItem": false,
+     "IsExternalResource": false,
+     "User": {
+      "ID": 18790,
+      "Username": "vdprao"
+     },
+     "DateCreated": "2018-08-06T10:53:00Z"
+    },
+    {
+     "ID": 16167,
+     "ChargePointID": 107668,
+     "ItemURL": "https://media.openchargemap.io/images/IN/OCM107668/OCM-107668.orig.2018080610521051.jpeg",
+     "ItemThumbnailURL": "https://media.openchargemap.io/images/IN/OCM107668/OCM-107668.thmb.2018080610521051.jpeg",
+     "Comment": "View from the road side",
+     "IsEnabled": true,
+     "IsVideo": false,
+     "IsFeaturedItem": false,
+     "IsExternalResource": false,
+     "User": {
+      "ID": 18790,
+      "Username": "vdprao"
+     },
+     "DateCreated": "2018-08-06T10:52:00Z"
+    }
+   ],
+   "DateLastVerified": "2018-08-06T21:39:00Z",
+   "ID": 107668,
+   "UUID": "931DF86E-A0D0-4E04-9B98-F21AFC129A5A",
+   "DataProviderID": 1,
+   "UsageTypeID": 1,
+   "UsageCost": "0",
+   "AddressInfo": {
+    "ID": 108014,
+    "Title": "AtherGrid Go Native Cafe",
+    "AddressLine1": "Go Native Cafe",
+    "AddressLine2": "Jayanagar",
+    "Town": "Bangalore",
+    "StateOrProvince": "KA",
+    "Postcode": "560041",
+    "CountryID": 106,
+    "Latitude": 12.9224636436796,
+    "Longitude": 77.5846883396955,
+    "AccessComments": "In front of Go Native Cafe on the road",
+    "DistanceUnit": 0
+   },
+   "Connections": [
+    {
+     "ID": 152011,
+     "ConnectionTypeID": 0,
+     "StatusTypeID": 50,
+     "LevelID": 1,
+     "Amps": 10,
+     "Voltage": 240,
+     "PowerKW": 2,
+     "CurrentTypeID": 10,
+     "Quantity": 1
+    }
+   ],
+   "NumberOfPoints": 1,
+   "StatusTypeID": 50,
+   "DateLastStatusUpdate": "2018-08-06T21:39:00Z",
+   "DateCreated": "2018-08-06T09:52:00Z",
+   "SubmissionStatusTypeID": 200
+  },
+  {
+   "DateLastVerified": "2024-07-27T09:56:00Z",
+   "ID": 301962,
+   "UUID": "F0B34EDF-D8E6-494E-8923-E64E88DEC696",
+   "DataProviderID": 1,
+   "OperatorID": 3777,
+   "UsageTypeID": 5,
+   "UsageCost": "Rs.15/-",
+   "AddressInfo": {
+    "ID": 302349,
+    "Title": "Marshal E Tech Station",
+    "AddressLine1": "2/119-5, Mission compound, Kottaram",
+    "Town": "Kanyakumari ",
+    "StateOrProvince": "Tamil Nadu",
+    "Postcode": "629703",
+    "CountryID": 106,
+    "Latitude": 8.115411,
+    "Longitude": 77.532217,
+    "ContactTelephone1": "98848 66993",
+    "RelatedURL": "https://reluxelectric.com/",
+    "DistanceUnit": 0
+   },
+   "Connections": [
+    {
+     "ID": 565561,
+     "ConnectionTypeID": 33,
+     "StatusTypeID": 50,
+     "LevelID": 3,
+     "PowerKW": 49,
+     "CurrentTypeID": 30,
+     "Quantity": 2
+    }
+   ],
+   "NumberOfPoints": 1,
+   "StatusTypeID": 50,
+   "DateLastStatusUpdate": "2024-07-27T09:56:00Z",
+   "DateCreated": "2024-07-27T09:56:00Z",
+   "SubmissionStatusTypeID": 200
+  }
+ ],
+ "ref": {
+  "ConnectionTypes": [
+   {
+    "ID": 7,
+    "Title": "Avcon Connector",
+    "FormalName": "Avcon SAE J1772-2001"
+   },
+   {
+    "ID": 4,
+    "Title": "Blue Commando (2P+E)",
+    "FormalName": null
+   },
+   {
+    "ID": 3,
+    "Title": "BS1363 3 Pin 13 Amp",
+    "FormalName": "BS1363 / Type G"
+   },
+   {
+    "ID": 32,
+    "Title": "CCS (Type 1)",
+    "FormalName": "IEC 62196-3 Configuration EE"
+   },
+   {
+    "ID": 33,
+    "Title": "CCS (Type 2)",
+    "FormalName": "IEC 62196-3 Configuration FF"
+   },
+   {
+    "ID": 16,
+    "Title": "CEE 3 Pin",
+    "FormalName": null
+   },
+   {
+    "ID": 17,
+    "Title": "CEE 5 Pin",
+    "FormalName": null
+   },
+   {
+    "ID": 28,
+    "Title": "CEE 7/4 - Schuko - Type F",
+    "FormalName": "CEE 7/4"
+   },
+   {
+    "ID": 23,
+    "Title": "CEE 7/5",
+    "FormalName": null
+   },
+   {
+    "ID": 18,
+    "Title": "CEE+ 7 Pin",
+    "FormalName": null
+   },
+   {
+    "ID": 2,
+    "Title": "CHAdeMO",
+    "FormalName": "IEC 62196-3 Configuration AA"
+   },
+   {
+    "ID": 1044,
+    "Title": "ChaoJi / CHAdeMO 3.x",
+    "FormalName": null
+   },
+   {
+    "ID": 13,
+    "Title": "Europlug 2-Pin (CEE 7/16)",
+    "FormalName": "Europlug 2-Pin (CEE 7/16)"
+   },
+   {
+    "ID": 1038,
+    "Title": "GB-T AC - GB/T 20234.2 (Socket)",
+    "FormalName": "GB-T AC - GB/T 20234.2 (Socket)"
+   },
+   {
+    "ID": 1039,
+    "Title": "GB-T AC - GB/T 20234.2 (Tethered Cable)",
+    "FormalName": "GB-T AC - GB/T 20234.2 (Tethered Cable)"
+   },
+   {
+    "ID": 1040,
+    "Title": "GB-T DC - GB/T 20234.3",
+    "FormalName": "GB-T DC - GB/T 20234.3"
+   },
+   {
+    "ID": 34,
+    "Title": "IEC 60309 3-pin",
+    "FormalName": "IEC 60309 3-pin"
+   },
+   {
+    "ID": 35,
+    "Title": "IEC 60309 5-pin",
+    "FormalName": "IEC 60309 5-pin"
+   },
+   {
+    "ID": 5,
+    "Title": "LP Inductive",
+    "FormalName": "Large Paddle Inductive"
+   },
+   {
+    "ID": 27,
+    "Title": "NACS / Tesla Supercharger",
+    "FormalName": "SAE J3400"
+   },
+   {
+    "ID": 10,
+    "Title": "NEMA 14-30",
+    "FormalName": null
+   },
+   {
+    "ID": 11,
+    "Title": "NEMA 14-50",
+    "FormalName": null
+   },
+   {
+    "ID": 22,
+    "Title": "NEMA 5-15R",
+    "FormalName": "NEMA 5-15R"
+   },
+   {
+    "ID": 9,
+    "Title": "NEMA 5-20R",
+    "FormalName": null
+   },
+   {
+    "ID": 15,
+    "Title": "NEMA 6-15",
+    "FormalName": null
+   },
+   {
+    "ID": 14,
+    "Title": "NEMA 6-20",
+    "FormalName": null
+   },
+   {
+    "ID": 1042,
+    "Title": "NEMA TT-30R",
+    "FormalName": null
+   },
+   {
+    "ID": 36,
+    "Title": "SCAME Type 3A (Low Power)",
+    "FormalName": null
+   },
+   {
+    "ID": 26,
+    "Title": "SCAME Type 3C (Schneider-Legrand)",
+    "FormalName": "IEC 62196-2 Type 3"
+   },
+   {
+    "ID": 6,
+    "Title": "SP Inductive",
+    "FormalName": "Small Paddle Inductive"
+   },
+   {
+    "ID": 1037,
+    "Title": "T13 - SEC1011 ( Swiss domestic 3-pin ) - Type J",
+    "FormalName": "T13/ IEC Type J"
+   },
+   {
+    "ID": 30,
+    "Title": "Tesla (Model S/X)",
+    "FormalName": null
+   },
+   {
+    "ID": 8,
+    "Title": "Tesla (Roadster)",
+    "FormalName": "Tesla Connector"
+   },
+   {
+    "ID": 31,
+    "Title": "Tesla Battery Swap",
+    "FormalName": "Tesla Battery Swap Station"
+   },
+   {
+    "ID": 1041,
+    "Title": "Three Phase 5-Pin (AS/NZ 3123)",
+    "FormalName": "AS/NZS 3123 Three Phase"
+   },
+   {
+    "ID": 1,
+    "Title": "Type 1 (J1772)",
+    "FormalName": "SAE J1772-2009"
+   },
+   {
+    "ID": 25,
+    "Title": "Type 2 (Socket Only)",
+    "FormalName": "IEC 62196-2 Type 2"
+   },
+   {
+    "ID": 1036,
+    "Title": "Type 2 (Tethered Connector) ",
+    "FormalName": "IEC 62196-2"
+   },
+   {
+    "ID": 29,
+    "Title": "Type I (AS 3112)",
+    "FormalName": "Type I/AS 3112/CPCS-CCC"
+   },
+   {
+    "ID": 1043,
+    "Title": "Type M",
+    "FormalName": "IEC Type M (SANS 164-1, IS 1293:2005)"
+   },
+   {
+    "ID": 0,
+    "Title": "Unknown",
+    "FormalName": "Not Specified"
+   },
+   {
+    "ID": 24,
+    "Title": "Wireless Charging",
+    "FormalName": null
+   },
+   {
+    "ID": 21,
+    "Title": "XLR Plug (4 pin)",
+    "FormalName": null
+   }
+  ],
+  "CurrentTypes": [
+   {
+    "ID": 10,
+    "Title": "AC (Single-Phase)"
+   },
+   {
+    "ID": 20,
+    "Title": "AC (Three-Phase)"
+   },
+   {
+    "ID": 30,
+    "Title": "DC"
+   }
+  ],
+  "Operators": [
+   {
+    "ID": 1,
+    "Title": "(Unknown Operator)",
+    "WebsiteURL": null
+   },
+   {
+    "ID": 3818,
+    "Title": "Chargezone (India)",
+    "WebsiteURL": "https://www.chargezone.co.in/"
+   },
+   {
+    "ID": 3777,
+    "Title": "Relux Electric (India)",
+    "WebsiteURL": "https://reluxelectric.com/"
+   },
+   {
+    "ID": 3779,
+    "Title": "Statiq (IN)",
+    "WebsiteURL": "https://www.statiq.in/"
+   }
+  ],
+  "StatusTypes": [
+   {
+    "ID": 0,
+    "Title": "Unknown",
+    "IsOperational": null
+   },
+   {
+    "ID": 10,
+    "Title": "Currently Available (Automated Status)",
+    "IsOperational": true
+   },
+   {
+    "ID": 20,
+    "Title": "Currently In Use (Automated Status)",
+    "IsOperational": true
+   },
+   {
+    "ID": 30,
+    "Title": "Temporarily Unavailable",
+    "IsOperational": true
+   },
+   {
+    "ID": 50,
+    "Title": "Operational",
+    "IsOperational": true
+   },
+   {
+    "ID": 75,
+    "Title": "Partly Operational (Mixed)",
+    "IsOperational": true
+   },
+   {
+    "ID": 100,
+    "Title": "Not Operational",
+    "IsOperational": false
+   },
+   {
+    "ID": 150,
+    "Title": "Planned For Future Date",
+    "IsOperational": false
+   },
+   {
+    "ID": 200,
+    "Title": "Removed (Decommissioned)",
+    "IsOperational": false
+   },
+   {
+    "ID": 210,
+    "Title": "Removed (Duplicate Listing)",
+    "IsOperational": false
+   }
+  ],
+  "UsageTypes": [
+   {
+    "ID": 0,
+    "Title": "(Unknown)",
+    "IsMembershipRequired": null
+   },
+   {
+    "ID": 6,
+    "Title": "Private - For Staff, Visitors or Customers",
+    "IsMembershipRequired": false
+   },
+   {
+    "ID": 2,
+    "Title": "Private - Restricted Access",
+    "IsMembershipRequired": true
+   },
+   {
+    "ID": 3,
+    "Title": "Privately Owned - Notice Required",
+    "IsMembershipRequired": null
+   },
+   {
+    "ID": 1,
+    "Title": "Public",
+    "IsMembershipRequired": null
+   },
+   {
+    "ID": 4,
+    "Title": "Public - Membership Required",
+    "IsMembershipRequired": true
+   },
+   {
+    "ID": 7,
+    "Title": "Public - Notice Required",
+    "IsMembershipRequired": false
+   },
+   {
+    "ID": 5,
+    "Title": "Public - Pay At Location",
+    "IsMembershipRequired": false
+   }
+  ],
+  "SubmissionStatusTypes": [
+   {
+    "ID": 1,
+    "Title": "Submission Under Review",
+    "IsLive": false
+   },
+   {
+    "ID": 50,
+    "Title": "Imported and Under Review",
+    "IsLive": false
+   },
+   {
+    "ID": 100,
+    "Title": "Imported and Published",
+    "IsLive": true
+   },
+   {
+    "ID": 200,
+    "Title": "Submission Published",
+    "IsLive": true
+   },
+   {
+    "ID": 250,
+    "Title": "Submission Rejected - Incomplete",
+    "IsLive": false
+   },
+   {
+    "ID": 1000,
+    "Title": "Delisted",
+    "IsLive": false
+   },
+   {
+    "ID": 1001,
+    "Title": "Delisted - Duplicate",
+    "IsLive": false
+   },
+   {
+    "ID": 1002,
+    "Title": "Delisted - No Longer Active/Decommissioned",
+    "IsLive": false
+   },
+   {
+    "ID": 1005,
+    "Title": "Delisted - Superseded by Update",
+    "IsLive": false
+   },
+   {
+    "ID": 1010,
+    "Title": "Delisted - Not Public Information/Is Private Residence",
+    "IsLive": false
+   },
+   {
+    "ID": 1020,
+    "Title": "Delisted - Removed by Import Data Provider",
+    "IsLive": false
+   }
+  ],
+  "DataProviders": [
+   {
+    "ID": 1,
+    "Title": "Open Charge Map Contributors",
+    "License": "Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0)"
+   }
+  ],
+  "Countries": [
+   {
+    "ID": 106,
+    "Title": "India",
+    "ISOCode": "IN"
+   }
+  ]
+ }
+}

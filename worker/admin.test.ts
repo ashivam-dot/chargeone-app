@@ -300,7 +300,7 @@ describe('test sessions', () => {
     const driver = client(worker, env, deviceHeaders(DEVICE, '198.51.100.20'));
     await driver('POST', '/api/auth/dev', { email: 'real@local.test' });
     expect((await driver('POST', '/api/checkins', { stationId: station.id, kind: 'worked', position: at, accuracy: 10 })).status).toBe(201);
-    expect((await visitor('GET', '/api/status')).body.statuses).toMatchObject([{ stationId: station.id }]);
+    expect((await visitor('GET', '/api/status')).body.statuses).toMatchObject([{ stationId: station.c1Id }]);
     expect((await visitor('GET', `/api/stations/${station.id}/reports`)).body.reports).toMatchObject([{ kind: 'worked' }]);
   });
 

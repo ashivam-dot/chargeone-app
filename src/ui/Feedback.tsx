@@ -36,7 +36,7 @@ const MAX = 1000;
 
 export function Feedback({ signedIn, screen, title = 'How was ChargeOne?', onClose }: Props) {
   const [rating, setRating] = useState(0);
-  const [category, setCategory] = useState<FeedbackCategory>(screen === 'after-trip' ? 'trip' : 'app');
+  const [category, setCategory] = useState<FeedbackCategory>(screen === 'after-trip' ? 'trip' : screen === 'missing-charger' ? 'chargers' : 'app');
   const [message, setMessage] = useState('');
   const [contactOk, setContactOk] = useState(false);
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
@@ -106,7 +106,7 @@ export function Feedback({ signedIn, screen, title = 'How was ChargeOne?', onClo
               rows={4}
               maxLength={MAX}
               value={message}
-              placeholder="What worked, what didn't, what you'd love to see"
+              placeholder={screen === 'missing-charger' ? 'Charger name, where it is (or a map link), operator and plugs' : "What worked, what didn't, what you'd love to see"}
               onInput={(e) => setMessage((e.target as HTMLTextAreaElement).value)}
             />
             <span class="small muted feedback__count">

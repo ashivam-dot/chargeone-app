@@ -2,7 +2,9 @@ import { REPORT_KINDS, STATUS_LOOKBACK_DAYS, type ReportKind, type StationStatus
 import type { User } from './auth.ts';
 import type { Env } from './env.ts';
 import { HttpError, clientKey, enforceRateLimit, latLngInIndia, num, readJson, str } from './http.ts';
-import { distanceMetres, stationIndex } from './stations.ts';
+import { STATION_ID, distanceMetres, resolveStationId, stationById } from './stations.ts';
+
+export { STATION_ID };
 
 /** GPS on phones is often off by 100-300 m near tall buildings, so allow some slack. */
 export const CHECKIN_RADIUS_M = 500;
@@ -75,7 +77,9 @@ export function summarise(rows: CheckinRow[]): StationStatus[] {
 export async function recentStatuses(env: Env, now = new Date()): Promise<StationStatus[]> {
   const since = new Date(now.getTime() - STATUS_LOOKBACK_DAYS * 86400_000).toISOString();
   const { results } = await env.DB.prepare(
-    `SELECT c.station_id, c.kind, c.kw, c.vehicle, c.created_at FROM checkins c JOIN users u ON u.id = c.user_id
+    // A report still under an old id (written before the data build that changed it) counts for the current one.
+    `SELECT COALESCE(a.station_id, c.station_id) AS station_id, c.kind, c.kw, c.vehicle, c.created_at
+     FROM checkins c JOIN users u ON u.id = c.user_id LEFT JOIN station_alias a ON a.alias = c.station_id
      WHERE c.created_at >= ?1 AND u.is_test = 0 ORDER BY c.created_at DESC LIMIT 50000`,
   )
     .bind(since)
@@ -87,17 +91,18 @@ export interface ReportRow extends CheckinRow {
   note: string | null;
 }
 
+/** Recent reports for a charger, asked for by any of its ids (stored under its stable c1_ id). */
 export async function stationReports(env: Env, stationId: string): Promise<ReportRow[]> {
+  const current = (await resolveStationId(env, stationId)) ?? stationId;
   const { results } = await env.DB.prepare(
-    `SELECT c.station_id, c.kind, c.kw, c.vehicle, c.note, c.created_at FROM checkins c JOIN users u ON u.id = c.user_id
-     WHERE c.station_id = ?1 AND u.is_test = 0 ORDER BY c.created_at DESC LIMIT 20`,
+    `SELECT ?1 AS station_id, c.kind, c.kw, c.vehicle, c.note, c.created_at FROM checkins c JOIN users u ON u.id = c.user_id
+     WHERE (c.station_id IN (?1, ?2) OR c.station_id IN (SELECT alias FROM station_alias WHERE station_id = ?1)) AND u.is_test = 0
+     ORDER BY c.created_at DESC LIMIT 20`,
   )
-    .bind(stationId)
+    .bind(current, stationId)
     .all<ReportRow>();
   return results;
 }
-
-export const STATION_ID = /^(osm-[nwr]\d{1,15}|ocm-\d{1,10})$/;
 
 function cleanText(raw: string | null, max: number): string | null {
   if (!raw) return null;
@@ -116,8 +121,10 @@ export async function createCheckin(req: Request, env: Env, user: User): Promise
   const position = latLngInIndia(body, 'position');
   const accuracy = num(body, 'accuracy', { min: 0, max: 100_000, optional: true }) ?? 0;
 
-  const station = (await stationIndex(env)).get(stationId);
+  // Stored under the stable c1_ id, whichever id the app sent, so reports survive id changes upstream.
+  const station = await stationById(env, stationId);
   if (!station) throw new HttpError(404, 'unknown_station', 'This charger is not on the map.');
+  const storedId = station.c1Id;
   if (accuracy > MAX_GPS_ACCURACY_M) {
     throw new HttpError(422, 'gps_inaccurate', 'Your location is too rough. Turn on precise location and try again.');
   }
@@ -136,7 +143,7 @@ export async function createCheckin(req: Request, env: Env, user: User): Promise
   const dup = await env.DB.prepare(
     'SELECT id FROM checkins WHERE user_id = ?1 AND station_id = ?2 AND kind = ?3 AND created_at >= ?4 LIMIT 1',
   )
-    .bind(user.id, stationId, kind, since)
+    .bind(user.id, storedId, kind, since)
     .first();
   if (dup) throw new HttpError(409, 'duplicate', 'You already reported this a few minutes ago.');
 
@@ -144,7 +151,7 @@ export async function createCheckin(req: Request, env: Env, user: User): Promise
     `INSERT INTO checkins (station_id, user_id, kind, kw, vehicle, note, created_at)
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) RETURNING id`,
   )
-    .bind(stationId, user.id, kind, kw, vehicle, note, new Date().toISOString())
+    .bind(storedId, user.id, kind, kw, vehicle, note, new Date().toISOString())
     .first<{ id: number }>();
   return { id: row!.id };
 }

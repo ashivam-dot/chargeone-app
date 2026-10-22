@@ -81,6 +81,20 @@ describe('seo pages', () => {
     expect(page.html).toContain('href="/?s=osm-n3"');
   });
 
+  it('builds charger pages only for DC and high-confidence chargers, and links the rest to the app', () => {
+    const { dataset, places } = fixture();
+    dataset.stations.push(station('osm-n4', 'Mall AC Point', { speed: 'ac', confidence: 0.3 }), station('osm-n5', 'Hotel AC Point', { speed: 'ac', confidence: 0.8 }));
+    places.area['osm-n4'] = 'New Delhi';
+    places.area['osm-n5'] = 'New Delhi';
+    const pages = buildPages({ site: 'https://example.in', dataset, places });
+    const paths = pages.map((p) => p.path);
+    expect(paths.some((p) => p.includes('osm-n4'))).toBe(false);
+    expect(paths.some((p) => p.includes('osm-n5'))).toBe(true);
+    const city = pages.find((p) => p.path === '/ev-charging/new-delhi/')!;
+    expect(city.html).toContain('Mall AC Point');
+    expect(city.html).toContain('href="/?s=osm-n4"');
+  });
+
   it('builds sitemap and robots for an https origin only', () => {
     expect(siteOrigin('https://chargeone.in/some/path')).toBe('https://chargeone.in');
     expect(siteOrigin('http://chargeone.in')).toBeNull();

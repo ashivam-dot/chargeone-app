@@ -91,6 +91,8 @@ interface Result {
   /** Every road route planned for this trip with its comparison; `active` is the one shown. */
   routes: Array<{ candidate: RouteCandidate; analysis: RouteAnalysis; destStays: Result['destStays']; tip: string | null }>;
   active: number;
+  /** The driver asked to plan at unverified chargers too (for this trip only). */
+  unverified: boolean;
 }
 
 export type Point = { name: string; lat: number; lng: number };
@@ -217,14 +219,16 @@ export function TripPlanner(props: Props) {
     end: Point,
     startedAt: Date,
     savedAt: string | null = null,
+    unverified = false,
   ) => {
     const now = new Date();
+    const planOptions: PlanOptions = { ...options, allowUnverified: unverified };
     const destStays = staysNearDestination({ stations, places }, end);
     const geometries = [{ ...response.route, via: null }, ...(response.alternatives ?? [])];
     const candidates: RouteCandidate[] = [];
     const tips: Array<string | null> = [];
     for (const g of geometries) {
-      const input = { route: { coords: g.coords, distanceKm: g.distanceKm, durationMin: g.durationMin }, stations, statuses, vehicle: car, options, now };
+      const input = { route: { coords: g.coords, distanceKm: g.distanceKm, durationMin: g.durationMin }, stations, statuses, vehicle: car, options: planOptions, now };
       const journey = planJourney({ ...input, dailyHours: plan.multiDay ? dailyHours : 0, places });
       candidates.push({ coords: g.coords, distanceKm: g.distanceKm, durationMin: g.durationMin, journey, via: g.via });
       tips.push(journey.days.length === 1 ? fullChargeTip(journey.days[0].plan, input) : null);
@@ -232,7 +236,7 @@ export function TripPlanner(props: Props) {
     const analyses = compareRoutes(candidates, stations, statuses, places, now);
     const routes = candidates.map((candidate, i) => ({ candidate, analysis: analyses[i], destStays, tip: tips[i] }));
     const journey = candidates[0].journey;
-    setResult({ response, journey, places, destStays, tip: tips[0], from: start, to: end, plannedAt: now, startedAt, savedAt, routes, active: 0 });
+    setResult({ response, journey, places, destStays, tip: tips[0], from: start, to: end, plannedAt: now, startedAt, savedAt, routes, active: 0, unverified });
     props.onShow(tripView(journey, destStays, response.route.coords, candidates.slice(1).map((c) => c.coords)));
     return journey;
   };
@@ -305,6 +309,12 @@ export function TripPlanner(props: Props) {
     }
   };
 
+  // Re-plan the same road with unverified chargers allowed: no new route request, so it costs nothing.
+  const useExtras = () => {
+    if (!result || !vehicle) return;
+    present(vehicle, result.response, result.places, result.from, result.to, result.startedAt, result.savedAt, true);
+  };
+
   const clear = () => {
     setResult(null);
     props.onShow(null);
@@ -317,7 +327,7 @@ export function TripPlanner(props: Props) {
   const startDrive = () => {
     if (!result || !props.onStartDrive) return;
     const chosen = result.routes[result.active].candidate;
-    props.onStartDrive({ route: chosen.coords, durationMin: chosen.durationMin, journey: result.journey, from: result.from, to: result.to, options });
+    props.onStartDrive({ route: chosen.coords, durationMin: chosen.durationMin, journey: result.journey, from: result.from, to: result.to, options: { ...options, allowUnverified: result.unverified } });
   };
 
   // A stop that has had a problem report since the plan was made: offer a re-plan.
@@ -582,6 +592,7 @@ export function TripPlanner(props: Props) {
           onStartDrive={props.onStartDrive ? startDrive : undefined}
           onSelectStation={props.onSelectStation}
           onOpenPlace={props.onOpenPlace}
+          onUseExtras={useExtras}
         />
       )}
     </Sheet>
@@ -654,6 +665,7 @@ interface ResultProps {
   onStartDrive?: () => void;
   onSelectStation: (id: string) => void;
   onOpenPlace: (place: Place) => void;
+  onUseExtras?: () => void;
 }
 
 function RouteCompareCards({ result, onChoose }: { result: Result; onChoose: (i: number) => void }) {
@@ -738,7 +750,9 @@ function verdictText(j: Journey): string {
 }
 
 function JourneyResult(props: ResultProps) {
-  const { result, journey, alerts, busy, error, me, plan, statuses, saveState, onSave, onUnlock, onReplan, limitCard, onClear, onChooseRoute, onStartDrive, onSelectStation, onOpenPlace } = props;
+  const { result, journey, alerts, busy, error, me, plan, statuses, saveState, onSave, onUnlock, onReplan, limitCard, onClear, onChooseRoute, onStartDrive, onSelectStation, onOpenPlace, onUseExtras } = props;
+  const extras = journey.days.flatMap((d) => d.plan.extras.map((s) => ({ s, km: d.startKm + s.alongKm })));
+  const extrasWork = journey.days.some((d) => d.plan.extras.length > 0) && journey.days.every((d) => d.plan.feasible || d.plan.extrasFeasible);
   const ends = dayEnds(journey, result.from, result.to);
   const multi = journey.days.length > 1;
   const area = (stationId: string) => result.places?.area[stationId] ?? null;
@@ -821,6 +835,33 @@ function JourneyResult(props: ResultProps) {
           {w}
         </p>
       ))}
+      {result.unverified && (
+        <p class="notice" data-testid="unverified-plan">
+          This plan includes chargers nobody has confirmed recently. Check each one before you set off, and keep the backups in mind.
+        </p>
+      )}
+      {extras.length > 0 && (
+        <section class="extras" aria-label="Extra options" data-testid="extra-options">
+          <h3>Extra options, not verified</h3>
+          <p class="small muted">
+            Chargers on this road that could fill the gap, but that nobody has confirmed recently. We don't plan stops at them unless you ask.
+          </p>
+          <ul>
+            {extras.map(({ s, km }) => (
+              <li key={s.station.id}>
+                <button class="backup" onClick={() => onSelectStation(s.station.id)}>
+                  {s.station.name} · km {Math.round(km)} · {s.mode.toUpperCase()} {s.powerKw} kW
+                </button>
+              </li>
+            ))}
+          </ul>
+          {extrasWork && onUseExtras && (
+            <button class="btn btn--glass" onClick={onUseExtras} data-testid="use-extras">
+              Plan with these chargers anyway
+            </button>
+          )}
+        </section>
+      )}
 
       {journey.days.map((d, di) => {
         const { start, end } = ends[di];
@@ -881,6 +922,7 @@ function JourneyResult(props: ResultProps) {
                             {s.backups.map((b) => (
                               <button key={b.station.id} class="backup" onClick={() => onSelectStation(b.station.id)}>
                                 {b.station.name} · km {Math.round(d.startKm + b.alongKm)} · arrive {b.arriveSocPct}% · {b.mode.toUpperCase()} {b.powerKw} kW
+                                {b.trusted ? '' : ' · unverified'}
                               </button>
                             ))}
                           </div>

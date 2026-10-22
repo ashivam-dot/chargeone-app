@@ -31,6 +31,7 @@ function station(id: string, lng: number, atKm: number): Station {
     address: null,
     website: null,
     sources: [],
+    confidence: 0.8,
   };
 }
 

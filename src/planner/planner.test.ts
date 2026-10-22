@@ -37,6 +37,7 @@ function dcStation(id: string, atKm: number, over: Partial<Station> = {}): Stati
     address: null,
     website: null,
     sources: [],
+    confidence: 0.8,
     ...over,
   };
 }
@@ -118,6 +119,77 @@ describe('planTrip', () => {
     const shortRange = { ...nexon, realRangeKm: 200 };
     const p = plan(180, [dcStation('a', 90)], new Map(), shortRange);
     expect(p.stops).toHaveLength(1);
+  });
+});
+
+describe('trusted stops only', () => {
+  const worked = (id: string): StationStatus => ({
+    stationId: id,
+    lastWorkedAt: '2026-10-19T10:00:00Z',
+    lastWorkedKw: 50,
+    lastWorkedVehicle: 'Nexon EV',
+    inUseSince: null,
+    queueAt: null,
+    problemAt: null,
+    problemKind: null,
+    problemReports: 0,
+    reports7d: 1,
+  });
+
+  it('never plans a stop below the confidence line, and lists it as an extra option', () => {
+    const p = plan(400, [dcStation('b', 190, { confidence: 0.3 }), dcStation('c', 300)]);
+    expect(p.stops.map((s) => s.station.id)).not.toContain('b');
+    expect(p.stops.every((s) => s.trusted)).toBe(true);
+    expect(p.feasible).toBe(false);
+    expect(p.extras.map((s) => s.station.id)).toContain('b');
+    expect(p.extrasFeasible).toBe(true);
+    expect(p.warnings[0]).toMatch(/only on chargers we're sure of/);
+  });
+
+  it('plans unverified chargers only when the driver allows them, and says so', () => {
+    const stations = [dcStation('b', 190, { confidence: 0.3 }), dcStation('c', 300)];
+    const p = planTrip({ route: route(400), stations, statuses: new Map(), vehicle: nexon, options: { ...DEFAULT_OPTIONS, allowUnverified: true }, now });
+    expect(p.feasible).toBe(true);
+    const b = p.stops.find((s) => s.station.id === 'b')!;
+    expect(b.trusted).toBe(false);
+    expect(b.confidence).toBe('low');
+    expect(b.notes.join(' ')).toMatch(/Unverified/);
+    expect(p.extras).toHaveLength(0);
+  });
+
+  it('counts a recent "charged fine" report towards trust', () => {
+    const p = plan(400, [dcStation('b', 190, { confidence: 0.3 }), dcStation('c', 300)], new Map([['b', worked('b')]]));
+    expect(p.feasible).toBe(true);
+    expect(p.stops.map((s) => s.station.id)).toEqual(['b', 'c']);
+  });
+
+  it('never plans a stop at a DC charger whose plug is not confirmed', () => {
+    const p = plan(400, [dcStation('b', 190, { connectors: [] }), dcStation('c', 300)]);
+    expect(p.stops.map((s) => s.station.id)).not.toContain('b');
+    expect(p.extras.map((s) => s.station.id)).toContain('b');
+  });
+
+  it('plans only DC stops for a DC car even when trusted AC is on the way', () => {
+    const ac = dcStation('ac', 190, { connectors: [{ type: 'Type 2', count: 1, kw: 7.4 }], speed: 'ac', maxKw: 7.4 });
+    const p = plan(400, [ac, dcStation('c', 300)]);
+    expect(p.stops.map((s) => s.station.id)).not.toContain('ac');
+    expect(p.stops.every((s) => s.mode === 'dc')).toBe(true);
+  });
+
+  it('gives every planned stop a backup within the remaining range', () => {
+    const p = plan(400, [dcStation('a', 150), dcStation('b', 190), dcStation('b2', 175), dcStation('c', 300), dcStation('c2', 285)]);
+    expect(p.feasible).toBe(true);
+    for (const s of p.stops) {
+      expect(s.backups.length).toBeGreaterThan(0);
+      for (const b of s.backups) expect(b.arriveSocPct).toBeGreaterThanOrEqual(5);
+    }
+  });
+
+  it('offers an unverified backup when no trusted one is in range, marked as such', () => {
+    const p = plan(400, [dcStation('b', 190), dcStation('b2', 170, { confidence: 0.2 }), dcStation('c', 300)]);
+    const b = p.stops.find((s) => s.station.id === 'b')!;
+    expect(b.backups.map((x) => x.station.id)).toContain('b2');
+    expect(b.backups.find((x) => x.station.id === 'b2')!.trusted).toBe(false);
   });
 });
 

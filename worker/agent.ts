@@ -6,7 +6,7 @@ import { currentPlan } from './entitlements.ts';
 import { isDev, type Env } from './env.ts';
 import { HttpError, claimSlot, indianDayStart, json, num, readJson, releaseSlot, str } from './http.ts';
 import { STATION_ID, recentStatuses } from './reports.ts';
-import { stationIndex, stationsNear, type StationPoint } from './stations.ts';
+import { stationById, stationsNear, type StationPoint } from './stations.ts';
 
 export const DEFAULT_MODEL = '@cf/google/gemma-4-26b-a4b-it';
 export const DEFAULT_FALLBACK_MODEL = '@cf/zai-org/glm-4.7-flash';
@@ -252,7 +252,7 @@ const TOOLS = [
       description: 'Live status of one charger from recent driver reports.',
       parameters: {
         type: 'object',
-        properties: { station_id: { type: 'string', description: 'Charger id from find_chargers, such as osm-n123.' } },
+        properties: { station_id: { type: 'string', description: 'Charger id from find_chargers, such as c1_abcdefghijkl or osm-n123.' } },
         required: ['station_id'],
       },
     },
@@ -300,14 +300,14 @@ class ToolRunner {
         const [found, statuses] = await Promise.all([stationsNear(this.env, at, radius, args.dc_only === true), this.liveStatuses()]);
         return {
           radius_km: radius,
-          chargers: found.slice(0, MAX_CHARGERS).map((s) => describeCharger(s, statuses.get(s.id), now, s.km)),
+          chargers: found.slice(0, MAX_CHARGERS).map((s) => describeCharger(s, statuses.get(s.c1Id) ?? statuses.get(s.id), now, s.km)),
         };
       }
       if (call.name === 'charger_status') {
         const id = str(args, 'station_id', { max: 32, pattern: STATION_ID })!;
-        const [station, statuses] = await Promise.all([stationIndex(this.env).then((m) => m.get(id)), this.liveStatuses()]);
+        const [station, statuses] = await Promise.all([stationById(this.env, id), this.liveStatuses()]);
         if (!station) return { error: 'No charger with this id.' };
-        return describeCharger(station, statuses.get(id), now);
+        return describeCharger(station, statuses.get(station.c1Id) ?? statuses.get(station.id), now);
       }
       return { error: 'Unknown tool.' };
     } catch (err) {

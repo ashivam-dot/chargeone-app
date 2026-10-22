@@ -1,6 +1,7 @@
 import { BedDouble, Utensils, Zap } from 'lucide-preact';
 import type { ConnectorType } from '../data/model.ts';
-import type { Filters } from '../data/filters.ts';
+import { CONNECTOR_OPTIONS, type Filters, type MapMode } from '../data/filters.ts';
+import type { MyVehicle } from '../shared/vehicles.ts';
 
 export interface MapFilters extends Filters {
   workingOnly: boolean;
@@ -13,20 +14,57 @@ interface Props {
   operators: Array<{ name: string; count: number }>;
   shown: number;
   total: number;
+  /** Chargers the mode and the customers-only setting hide. */
+  hidden?: number;
+  vehicle?: MyVehicle | null;
   onChange: (f: MapFilters) => void;
 }
 
-const QUICK_CONNECTORS: ConnectorType[] = ['CCS2', 'Type 2', 'Bharat DC'];
+const MODES: Array<{ mode: MapMode; label: string }> = [
+  { mode: 'car', label: 'Car' },
+  { mode: '2w', label: '2-wheeler' },
+  { mode: 'all', label: 'All' },
+];
 
-export function FilterBar({ filters, operators, shown, total, onChange }: Props) {
-  const toggleConnector = (c: ConnectorType) =>
-    onChange({
-      ...filters,
-      connectors: filters.connectors.includes(c) ? filters.connectors.filter((x) => x !== c) : [...filters.connectors, c],
-    });
+/** The plugs a car can charge from: its DC plug plus Type 2 AC (every Indian car has a Type 2 inlet). */
+export function plugsFor(vehicle: MyVehicle): ConnectorType[] {
+  return vehicle.dcConnector && vehicle.dcConnector !== 'Type 2' ? [vehicle.dcConnector, 'Type 2'] : ['Type 2'];
+}
+
+function hiddenWhy(f: Filters): string {
+  const why = [];
+  if (f.mode === 'car') why.push('only for 2-wheelers, 3-wheelers or buses');
+  if (f.mode === '2w') why.push('only for cars or other vehicles');
+  if (!f.showRestricted) why.push('only for customers or residents');
+  return `Hidden: ${why.join(', or ')}`;
+}
+
+const sameSet = (a: ConnectorType[], b: ConnectorType[]) => a.length === b.length && a.every((c) => b.includes(c));
+
+export function FilterBar({ filters, operators, shown, total, hidden = 0, vehicle = null, onChange }: Props) {
+  const mine = vehicle && filters.mode !== '2w' ? plugsFor(vehicle) : null;
+  const plugValue =
+    filters.connectors.length === 0
+      ? ''
+      : mine && sameSet(filters.connectors, mine)
+        ? 'mine'
+        : filters.connectors.length === 1
+          ? filters.connectors[0]
+          : 'several';
+  const pickPlug = (v: string) =>
+    onChange({ ...filters, connectors: v === '' ? [] : v === 'mine' && mine ? mine : v === 'several' ? filters.connectors : [v as ConnectorType] });
+  const listed = total - hidden;
 
   return (
     <div class="filters" role="toolbar" aria-label="Filter the map">
+      <div class="segmented" role="group" aria-label="Show chargers for">
+        {MODES.map((m) => (
+          <button key={m.mode} class="chip" aria-pressed={filters.mode === m.mode} data-testid={`mode-${m.mode}`} onClick={() => onChange({ ...filters, mode: m.mode })}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <span class="filters__sep" aria-hidden="true" />
       <button class="chip chip--food" aria-pressed={filters.showFood} onClick={() => onChange({ ...filters, showFood: !filters.showFood })}>
         <Utensils size={14} aria-hidden="true" /> Food
       </button>
@@ -40,13 +78,30 @@ export function FilterBar({ filters, operators, shown, total, onChange }: Props)
       <button class="chip" aria-pressed={filters.dcOnly} onClick={() => onChange({ ...filters, dcOnly: !filters.dcOnly })}>
         <Zap size={14} aria-hidden="true" /> DC fast
       </button>
-      {QUICK_CONNECTORS.map((c) => (
-        <button key={c} class="chip" aria-pressed={filters.connectors.includes(c)} onClick={() => toggleConnector(c)}>
-          {c}
-        </button>
-      ))}
+      <label class="chip chip--select">
+        <span class="visually-hidden">Plug</span>
+        <select value={plugValue} data-testid="plug-filter" onChange={(e) => pickPlug((e.target as HTMLSelectElement).value)}>
+          <option value="">Any plug</option>
+          {mine && vehicle && <option value="mine">Fits my {vehicle.name}</option>}
+          {CONNECTOR_OPTIONS.map((o) => (
+            <option key={o.type} value={o.type}>
+              {o.label}
+            </option>
+          ))}
+          {plugValue === 'several' && <option value="several">{filters.connectors.length} plugs</option>}
+        </select>
+      </label>
       <button class="chip" aria-pressed={filters.open24x7} onClick={() => onChange({ ...filters, open24x7: !filters.open24x7 })}>
         24×7
+      </button>
+      <button
+        class="chip"
+        aria-pressed={filters.showRestricted}
+        data-testid="show-restricted"
+        title="Chargers only for a hotel's, mall's or showroom's customers, or for residents"
+        onClick={() => onChange({ ...filters, showRestricted: !filters.showRestricted })}
+      >
+        Customers-only too
       </button>
       <label class="chip chip--select">
         <span class="visually-hidden">Operator</span>
@@ -62,8 +117,14 @@ export function FilterBar({ filters, operators, shown, total, onChange }: Props)
           ))}
         </select>
       </label>
-      <span class="filters__count" aria-live="polite">
-        {shown === total ? `${total} chargers` : `${shown} of ${total}`}
+      <span class="filters__count" aria-live="polite" data-testid="filter-count">
+        {shown === listed ? `${listed} chargers` : `${shown} of ${listed}`}
+        {hidden > 0 && (
+          <span class="muted" title={hiddenWhy(filters)}>
+            {' '}
+            · {hidden} hidden
+          </span>
+        )}
       </span>
     </div>
   );

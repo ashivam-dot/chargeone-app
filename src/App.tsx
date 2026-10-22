@@ -1,6 +1,7 @@
 import { Route } from 'lucide-preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { EMPTY_FILTERS, filterStations, operatorsByCount } from './data/filters.ts';
+import { DEFAULT_FILTERS, filterStations, hiddenBySettings, operatorsByCount, type MapMode } from './data/filters.ts';
+import { loadDataset, loadStationDetail, type DataManifest } from './data/loader.ts';
 import type { Dataset, Station } from './data/model.ts';
 import type { Place, PlacesData } from './data/places.ts';
 import { api, type Config, type Me } from './lib/api.ts';
@@ -8,13 +9,13 @@ import { setHdVoice } from './voice/hd.ts';
 import { loadPlaces } from './lib/places.ts';
 import { clearSavedTrips } from './lib/savedTrips.ts';
 import { isObject, loadJson, removeJson, saveJson } from './lib/storage.ts';
-import { MapView, type FlyTarget, type PlaceMarker, type StopMarker } from './map/MapView.tsx';
+import { MapView, type FlyTarget, type MapViewport, type PlaceMarker, type StopMarker } from './map/MapView.tsx';
 import { PLATFORM } from './native/bridge.ts';
 import { BACK_EVENT, haptic, initNativeShell, onAppResume } from './native/platform.ts';
 import { PLANS, isPlus, type PlanId } from './shared/plans.ts';
 import { liveState, type StationStatus } from './shared/status.ts';
 import type { MyVehicle } from './shared/vehicles.ts';
-import { About } from './ui/About.tsx';
+import { StateCoverage } from './ui/Coverage.tsx';
 import { DEFAULT_PAINTS } from './ui/car/carDesigns.ts';
 import { useCarLink } from './ui/car/carLink.ts';
 import type { VoiceTrip } from './ui/copilot/CopilotScreen.tsx';
@@ -36,6 +37,7 @@ import { YouScreen } from './ui/YouScreen.tsx';
 const CarScreen = lazy(() => import('./ui/car/CarScreen.tsx').then((m) => m.CarScreen));
 const CopilotScreen = lazy(() => import('./ui/copilot/CopilotScreen.tsx').then((m) => m.CopilotScreen));
 const DriveMode = lazy(() => import('./ui/drive/DriveMode.tsx').then((m) => m.DriveMode));
+const About = lazy(() => import('./ui/About.tsx').then((m) => m.About));
 
 type Overlay = 'plans' | 'signin' | 'about' | 'garage' | null;
 
@@ -49,9 +51,11 @@ const NO_ALTS: [number, number][][] = [];
 const TOAST_MS = 3800;
 /** Ask how the app is going once, after this many planned trips. */
 const FEEDBACK_AFTER_PLANS = 2;
+const CHARGER_CREDITS = ['Chargers © OpenStreetMap contributors (ODbL)', 'Contains data from Open Charge Map contributors (CC BY 4.0)'];
 const readViewport = () => ({ height: window.innerHeight, desktop: window.innerWidth >= 820 });
 const isVehicle = (v: unknown): v is MyVehicle => isObject(v) && typeof v.modelId === 'string' && typeof v.batteryKwh === 'number';
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
+const isMode = (v: unknown): v is MapMode => v === 'car' || v === '2w' || v === 'all';
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 /** Any solid colour: each model has its own official paints, and number lookup brings the car's own. */
 const isPaint = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
@@ -81,11 +85,21 @@ interface TripSeed {
 
 export function App() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
+  const [manifest, setManifest] = useState<DataManifest | null>(null);
+  /** Chargers with their shard details read, by id. */
+  const [details, setDetails] = useState<Map<string, Station | null>>(new Map());
+  const [mapView, setMapView] = useState<MapViewport | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [statuses, setStatuses] = useState<Map<string, StationStatus>>(new Map());
+  const [rawStatuses, setRawStatuses] = useState<StationStatus[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
   const [me, setMe] = useState<Me | null>(null);
-  const [filters, setFilters] = useState<MapFilters>({ ...EMPTY_FILTERS, workingOnly: false, showFood: false, showStays: false });
+  const [filters, setFilters] = useState<MapFilters>(() => ({
+    ...DEFAULT_FILTERS,
+    mode: loadJson<MapMode>('map-mode', 'car', isMode),
+    workingOnly: false,
+    showFood: false,
+    showStays: false,
+  }));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [places, setPlaces] = useState<PlacesData | null>(null);
   const [placesLoading, setPlacesLoading] = useState(false);
@@ -150,15 +164,12 @@ export function App() {
   }, [toast]);
 
   useEffect(() => {
-    fetch('/data/stations.json')
-      .then((r) => {
-        if (!r.ok) throw new Error(String(r.status));
-        return r.json() as Promise<Dataset>;
-      })
-      .then((d) => {
+    loadDataset()
+      .then(({ dataset: d, manifest: m }) => {
         setDataset(d);
+        setManifest(m);
         const id = new URLSearchParams(location.search).get('s');
-        const s = id ? d.stations.find((x) => x.id === id) : undefined;
+        const s = id ? d.stations.find((x) => x.id === id || x.c1Id === id || x.aliases?.includes(id)) : undefined;
         if (s) {
           setSelectedId(s.id);
           setFlyTarget({ kind: 'point', lat: s.lat, lng: s.lng, zoom: 14 });
@@ -209,7 +220,7 @@ export function App() {
   const refreshStatuses = useCallback(() => {
     api
       .statuses()
-      .then((r) => setStatuses(new Map(r.statuses.map((s) => [s.stationId, s]))))
+      .then((r) => setRawStatuses(r.statuses))
       .catch(() => undefined);
   }, []);
 
@@ -252,6 +263,21 @@ export function App() {
 
   const stations = dataset?.stations ?? [];
   const byId = useMemo(() => new Map(stations.map((s) => [s.id, s])), [stations]);
+  // Reports are kept under stable c1 ids (older ones under osm-/ocm- ids); the app keys stations by id.
+  const statuses = useMemo(() => {
+    const idOf = new Map<string, string>();
+    for (const s of stations) {
+      idOf.set(s.id, s.id);
+      if (s.c1Id) idOf.set(s.c1Id, s.id);
+      for (const a of s.aliases ?? []) idOf.set(a, s.id);
+    }
+    const out = new Map<string, StationStatus>();
+    for (const st of rawStatuses) {
+      const id = idOf.get(st.stationId);
+      if (id && !out.has(id)) out.set(id, { ...st, stationId: id });
+    }
+    return out;
+  }, [stations, rawStatuses]);
   const operators = useMemo(() => operatorsByCount(stations), [stations]);
   const dcCount = useMemo(() => stations.filter((s) => s.speed === 'dc').length, [stations]);
   const shown = useMemo(() => {
@@ -263,7 +289,27 @@ export function App() {
       return state === 'working' || state === 'in_use';
     });
   }, [stations, filters, statuses]);
-  const selected = selectedId ? byId.get(selectedId) ?? null : null;
+  const selectedLite = selectedId ? byId.get(selectedId) ?? null : null;
+  const selectedDetail = selectedId ? details.get(selectedId) : undefined;
+  const selected = selectedDetail ?? selectedLite;
+  const detailFailed = selectedDetail === null;
+
+  // A charger read from the index gets its hours, price, address and sources from its shard when opened.
+  useEffect(() => {
+    if (!selectedLite || selectedLite.detail !== 'pending' || details.has(selectedLite.id)) return;
+    let live = true;
+    void loadStationDetail(selectedLite, dataset?.version).then((full) => {
+      if (live) setDetails((prev) => new Map(prev).set(selectedLite.id, full));
+    });
+    return () => {
+      live = false;
+    };
+  }, [selectedLite, details, dataset]);
+  const hiddenCount = useMemo(() => hiddenBySettings(stations, filters), [stations, filters.mode, filters.showRestricted]);
+  const changeFilters = (f: MapFilters) => {
+    if (f.mode !== filters.mode) saveJson('map-mode', f.mode);
+    setFilters(f);
+  };
   const placeIndexById = useMemo(() => new Map(places?.places.map((p, i) => [p.id, i]) ?? []), [places]);
 
   // Places are a separate, larger file: fetch it only once something needs it.
@@ -433,7 +479,6 @@ export function App() {
     });
   }, [places, filters.showFood, filters.showStays, selectedId, selectedPlace, tripView, placeIndexById]);
 
-  const attribution = useMemo(() => (dataset ? dataset.sources.map((s) => s.attribution) : []), [dataset]);
   const mapTab = tab === 'explore' || tab === 'trip';
   const placeOpen = selectedPlace !== null && places !== null;
   const stationOpen = mapTab && (selected !== null || placeOpen);
@@ -474,7 +519,7 @@ export function App() {
         selectedId={selectedId}
         flyTarget={flyTarget}
         dark={dark}
-        attribution={attribution}
+        attribution={CHARGER_CREDITS}
         insets={insets}
         route={drive ? drive.route : tripView?.route ?? null}
         altRoutes={drive ? NO_ALTS : tripView?.altRoutes ?? NO_ALTS}
@@ -488,6 +533,7 @@ export function App() {
           select(id);
         }}
         onSelectPlace={(i) => selectPlace(i)}
+        onViewport={setMapView}
       />
 
       {mapTab && !drive && (
@@ -511,7 +557,7 @@ export function App() {
         </header>
       )}
 
-      {tab === 'explore' && !drive && <FilterBar filters={filters} operators={operators} shown={shown.length} total={stations.length} onChange={setFilters} />}
+      {tab === 'explore' && !drive && <FilterBar filters={filters} operators={operators} shown={shown.length} total={stations.length} hidden={hiddenCount} vehicle={vehicle} onChange={changeFilters} />}
 
       {!online && <div class="banner" role="status">You're offline. The map and saved chargers still work; status may be out of date.</div>}
       {loadError && (
@@ -519,6 +565,8 @@ export function App() {
           {loadError}
         </div>
       )}
+
+      {tab === 'explore' && !stationOpen && !drive && dataset && <StateCoverage view={mapView} stations={stations} onAddCharger={() => setFeedback({ screen: 'missing-charger', title: 'Tell us about a missing charger' })} />}
 
       {tab === 'explore' && !stationOpen && !drive && (
         <button class="fab" onClick={() => openTrip({ to: null, from: null, soc: null, autoRun: false })} data-testid="plan-trip">
@@ -579,6 +627,7 @@ export function App() {
           placesLoading={placesLoading}
           placesFailed={placesFailed}
           onOpenPlace={openPlace}
+          detailFailed={detailFailed}
         />
       )}
 
@@ -718,7 +767,17 @@ export function App() {
           }}
         />
       )}
-      {overlay === 'about' && <About dataset={dataset} onClose={() => setOverlay(null)} />}
+      {overlay === 'about' && (
+        <About
+          dataset={dataset}
+          manifest={manifest}
+          onClose={() => setOverlay(null)}
+          onAddCharger={() => {
+            setOverlay(null);
+            setFeedback({ screen: 'missing-charger', title: 'Tell us about a missing charger' });
+          }}
+        />
+      )}
 
       {feedback && <Feedback signedIn={signedIn} screen={feedback.screen} title={feedback.title} onClose={() => setFeedback(null)} />}
 
