@@ -96,7 +96,7 @@ npx playwright test          # 70 e2e (pixel-7, small-phone-360, desktop); needs
 node scripts/ui-shots.ts <dir> [--light]   # screenshots of key screens for a visual check
 # All browsers are muted (--mute-audio + speechSynthesis stub in e2e/fixtures.ts): never play sound.
 npm run smoke:api -- http://127.0.0.1:8787
-npm run deploy               # build, remote migrations, wrangler deploy (not done yet)
+SITE_URL=https://chargeone.akshshivam5.workers.dev npm run deploy   # build, remote migrations, wrangler deploy
 ```
 
 Demo pipeline (only when re-recording): `scripts/demo-narration.json` -> `scripts/demo-voice.py`
@@ -104,6 +104,15 @@ Demo pipeline (only when re-recording): `scripts/demo-narration.json` -> `script
 -> `scripts/demo-video.ts` (full Chromium headless on the GPU: `npx playwright install chromium`; the
 headless shell's SwiftShader gives 2-3 fps) -> `scripts/demo-landscape.ts` -> `scripts/demo-mix.py`
 (fails if the picture is still for 5 s or more; `--self-test`). Delete `demo/raw` and the venv afterwards.
+
+## Live (2026-10-22)
+
+Deployed to `https://chargeone.akshshivam5.workers.dev` (personal Cloudflare, D1 `chargeone`
+`1a4296a3-…`, `SESSION_SECRET` set). No iOS build exists (no Xcode on this Mac), so the owner's wife got the
+link on WhatsApp to install it as a PWA (Safari, Add to Home Screen). Without `ORS_API_KEY` production trip
+planning answers 503 `not_configured`; without `GOOGLE_CLIENT_ID` there's no sign-in, trial or copilot.
+WhatsApp Web ignores synthetic clicks on chat rows: open a chat by typing in "Search or start a new chat",
+then ArrowDown and Enter; check the composer's `aria-label` ("Type a message to <name>") before sending.
 
 ## State on 2026-10-21
 
@@ -126,9 +135,10 @@ and charger connectors, live availability, operator-app redirect, an Indian huma
 Blocked or waiting on the owner:
 1. GitHub Actions fail in 3 s: account billing. Fix billing, then `gh run rerun <id> --repo ashivam-dot/chargeone-app`.
 2. Local Android APK build failed (JDK download HTTP 403). Use the cloud `android.yml` build after billing.
-3. Needed for launch: Open Charge Map API key, Google OAuth client IDs (web, Android SHA-1s, iOS),
-   Google Play developer account ($25, closed test 12 testers x 14 days), Xcode for iOS, Cloudflare
-   deploy (`npm run deploy`), Razorpay live keys, release keystore as GitHub secrets.
+3. Needed for launch: openrouteservice key (`wrangler secret put ORS_API_KEY`, trip planning), Open Charge
+   Map API key, Google OAuth client IDs (web, Android SHA-1s, iOS), Google Play developer account ($25,
+   closed test 12 testers x 14 days), Xcode + Apple Developer account ($99/yr) for an iOS/TestFlight build,
+   Razorpay live keys, release keystore as GitHub secrets.
 4. iOS speech recognition: `@capacitor-community/speech-recognition` has no Swift package; consider
    `@capgo/capacitor-speech-recognition`.
 5. HD voice: run `voice-server/` on a free CPU box (Oracle Always Free A1) behind HTTPS, then

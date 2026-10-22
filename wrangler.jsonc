@@ -14,8 +14,7 @@
     {
       "binding": "DB",
       "database_name": "chargeone",
-      // Replace with the id printed by `npx wrangler d1 create chargeone` before the first deploy.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "1a4296a3-3f2a-4d35-85bb-b45a839369d8",
       "migrations_dir": "worker/migrations"
     }
   ],
