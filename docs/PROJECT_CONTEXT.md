@@ -132,6 +132,19 @@ SITE_URL=https://chargeone.akshshivam5.workers.dev npm run deploy   # build, rem
 - Browser REST client without the SDK: `src/lib/firebaseRest.ts`. Test phone `+91 99999 00001` / `112233`
   (Spark allows ~10 real SMS a day). Firebase console: add each app host to Authorized domains.
 - Tests: `worker/firebase.test.ts`, `worker/auth-firebase.test.ts`, `src/shared/auth.test.ts`, `src/lib/firebaseRest.test.ts`.
+- UI (lazy chunk, `src/ui/signin/`): `SignInSheet.tsx` (views signin/register/forgot/verify/username;
+  Google on top, "or", Email|Phone tabs), `EmailForms.tsx`, `PhoneForm.tsx` + `src/lib/phoneAuth.ts`
+  (Firebase SDK 13 loaded only when Phone opens, in-memory persistence, invisible reCAPTCHA),
+  `GoogleButton.tsx`, `fields.tsx`, `signin.css`. `src/ui/SignIn.tsx` is only the lazy wrapper +
+  `signInReady`. Username prompt once per account after first sign-in (`chargeone:username-asked`); a
+  username typed at registration is claimed only for that same email. Delete account sends a fresh
+  Firebase ID token (`src/lib/firebaseSession.ts`). CSP in `public/_headers` allows reCAPTCHA.
+- E2E: `e2e/signin.spec.ts` with `e2e/firebase-mock.ts` (fakes Identity Toolkit, securetoken, GSI, and
+  the Worker's 3 token-taking routes; each sign-in becomes a real session via `/api/auth/dev`; Google
+  hosts are aborted and recorded as `leaks`). Phone test mode (reCAPTCHA off) needs ALL of: devLogin,
+  localhost/127.0.0.1, `window.__CHARGEONE_E2E_PHONE__ === true`. Run against `wrangler dev` with
+  `--var ENVIRONMENT:development --var SESSION_SECRET:<random>` (no .dev.vars needed). Screenshots:
+  `node scripts/signin-shots.ts <out-dir> --base http://127.0.0.1:8787`.
 
 Demo pipeline (only when re-recording): `scripts/demo-narration.json` -> `scripts/demo-voice.py`
 (Supertonic 3 via voice-server; a temporary venv with `voice-server/requirements.txt` and `MODEL_DIR`)

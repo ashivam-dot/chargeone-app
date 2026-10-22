@@ -1,6 +1,7 @@
 import { CarFront, ChevronRight, Info, LogIn, MessageSquareHeart, Moon, Sparkles, Sun, Tag } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { api, type Me } from '../lib/api.ts';
+import { freshFirebaseToken } from '../lib/firebaseSession.ts';
 import { BASIC, FEATURE_ROWS, PLANS, TRIAL_DAYS, isPlus } from '../shared/plans.ts';
 import type { MyVehicle } from '../shared/vehicles.ts';
 import { PerkItem } from './Plans.tsx';
@@ -15,6 +16,8 @@ interface Props {
   onChanged: () => void;
   onSignedOut: () => void;
   onSignIn: () => void;
+  /** Opens "choose a username" for a signed-in account that has none. */
+  onSetUsername?: () => void;
   /** Sign-in works on this server; the trial and free account are only offered then. */
   signInReady: boolean;
   onPlans: () => void;
@@ -93,7 +96,10 @@ export function YouScreen(p: Props) {
     }
   };
 
-  const name = me?.user?.name ?? me?.user?.email ?? 'Guest';
+  const u = me?.user;
+  const name = u?.name || (u?.username ? `@${u.username}` : null) || u?.email || u?.phone || 'Guest';
+  /** Under the name: how this account signs in, e.g. "@asha · asha@example.com" or "+91•••••••001". */
+  const handle = [u?.username && u.name ? `@${u.username}` : null, u?.email ?? u?.phone].filter(Boolean).join(' · ');
   const tierName = onTrial ? 'Plus trial' : plan ? plan.name : BASIC.name;
 
   return (
@@ -104,7 +110,14 @@ export function YouScreen(p: Props) {
         </span>
         <div class="you__who">
           <strong>{signedIn ? name : 'Using ChargeOne Basic'}</strong>
-          <span class="muted">{signedIn ? me?.user?.email : p.signInReady ? 'No sign-in needed. Sign in free for more trips.' : 'No sign-in needed. Free accounts are coming soon.'}</span>
+          <span class="muted" data-testid="you-handle">
+            {signedIn ? handle : p.signInReady ? 'No sign-in needed. Sign in free for more trips.' : 'No sign-in needed. Free accounts are coming soon.'}
+          </span>
+          {signedIn && u?.username === null && p.onSetUsername && (
+            <button class="link link--inline small" onClick={p.onSetUsername} data-testid="you-set-username">
+              Choose a username
+            </button>
+          )}
         </div>
         {!signedIn && (
           <button class="btn btn--primary" onClick={p.onSignIn} data-testid="you-signin">
@@ -272,7 +285,7 @@ export function YouScreen(p: Props) {
             disabled={busy !== null}
             onClick={() => {
               if (confirm('Delete your account? Your trips are erased and any subscription is cancelled. Payment records are kept as the law requires.')) {
-                void act('delete', api.deleteAccount, p.onSignedOut);
+                void act('delete', () => api.deleteAccount(freshFirebaseToken()), p.onSignedOut);
               }
             }}
           >
