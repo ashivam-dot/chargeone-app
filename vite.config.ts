@@ -40,10 +40,11 @@ export default defineConfig({
       },
       workbox: {
         // Charger and city pages are real documents for search engines, not app routes.
-        navigateFallbackDenylist: [/^\/api\//, /^\/charger\//, /^\/ev-charging\//],
+        // The admin console is never cached or served offline.
+        navigateFallbackDenylist: [/^\/api\//, /^\/charger\//, /^\/ev-charging\//, /^\/admin/],
         globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
         // Font subsets for scripts the app never shows still load on demand, just not at install.
-        globIgnores: ['charger/**', 'ev-charging/**', 'seo.css', '**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
+        globIgnores: ['charger/**', 'ev-charging/**', 'seo.css', 'admin.html', 'assets/admin-*', '**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {

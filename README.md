@@ -173,6 +173,34 @@ For front-end work with hot reload, run `npm run dev` alongside `npm run dev:api
 port 8787 (sign-in and other POSTs must use port 8787 directly, because the API only accepts its own origin).
 Development mode routes with the public OSRM demo server when there's no ORS key. Production never uses it.
 
+## Admin console
+
+The owner's console lives at `/admin` (not linked from the app, `noindex`, never cached by the service worker,
+and built as its own bundle so the app's start-up download doesn't change). It shows sign-ups, trips, plans,
+trials, feedback, reports, pending UPI payments and copilot usage (test accounts are left out of every count),
+and lists every integration with what it still needs and a **Run test** button (routing, Workers AI, number-plate
+lookup, HD voice, Google sign-in setup). From it you can search users, grant or revoke a plan, reset a driver's
+daily quota, delete driver reports, confirm or reject UPI payments, and read the audit log of every change.
+
+**Test as** signs the browser into the real app as a fresh test account on Guest (Basic), Free, Trip Pass, Plus
+or Plus with the demo car, and opens the app in a new tab. That is the quickest way to try any plan without
+Google sign-in. Each test account starts clean every time and is tagged `test`.
+
+Access needs the Worker secret `ADMIN_TOKEN` (24 or more characters):
+
+```sh
+openssl rand -base64 32 | npx wrangler secret put ADMIN_TOKEN
+```
+
+Keep the value in your password manager. Sign in at `https://<your-site>/admin` with it; the console then
+uses its own 12-hour cookie (HttpOnly, SameSite=Strict, sent only to `/api/admin`). Sign-in attempts are limited
+to 5 per 15 minutes per network. Changing the secret signs every console out. Scripts can send the token as
+`Authorization: Bearer …` instead (as `scripts/upi-admin.ts` does). Without the secret, production answers
+`503 not_configured` for everything under `/api/admin`.
+
+Locally (`npm run dev:api`), with `ADMIN_TOKEN` unset, the console accepts the public development token
+`chargeone-local-admin-dev-only`. Production refuses that token. `npm run setup:dev` never writes a real secret.
+
 ## Tests
 
 | Command | What it checks |
@@ -214,6 +242,7 @@ Delete `../demo/raw` afterwards; it's several hundred MB of frames.
 - The Plus trial is limited to one per account and per phone (the install id is hashed), and is refused for accounts
   that have paid before. Co-pilot questions, trip parsing and feedback are rate-limited per user, device and
   network. The co-pilot only sees the trip and car data the app sends for that question.
+- The admin console uses a separate signed cookie (its key mixes the session secret, a purpose label and `ADMIN_TOKEN`, so a driver session can never pass as one), a constant-time token check, a login rate limit and an audit log. Admin responses are `no-store` and `noindex`.
 - A strict Content Security Policy, HSTS and `frame-ancestors 'none'` are set in `public/_headers`. Secrets live only in Wrangler secrets and the gitignored `.dev.vars`.
 - Privacy: no coordinates are stored with reports, trip destinations are rounded to about 1 km, and car and trip settings stay on the device.
 
