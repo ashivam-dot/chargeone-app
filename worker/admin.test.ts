@@ -315,7 +315,8 @@ describe('live self-tests', () => {
   });
 
   it('reports a routing failure instead of failing itself', async () => {
-    const { browser } = await signedIn({ ENVIRONMENT: 'production' });
+    // Production uses the public router by default since keyless routing; switch it off to force a failure.
+    const { browser } = await signedIn({ ENVIRONMENT: 'production', PUBLIC_ROUTER: 'off' });
     const res = await browser('POST', '/api/admin/probe/routing', {});
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ ok: false });
