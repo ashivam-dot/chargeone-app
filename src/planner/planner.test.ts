@@ -3,7 +3,7 @@ import type { Station } from '../data/model.ts';
 import type { StationStatus } from '../shared/status.ts';
 import { VEHICLES, myVehicleFromModel } from '../shared/vehicles.ts';
 import { RouteIndex, type Coord } from './geometry.ts';
-import { DEFAULT_OPTIONS, chargeMinutes, navigationUrl, planTrip, type PlanInput } from './planner.ts';
+import { DEFAULT_OPTIONS, chargeMinutes, cumulativeEnergy, navigationUrl, planTrip, type PlanInput } from './planner.ts';
 
 const KM_PER_DEG_LAT = 111.2;
 const LNG = 77;
@@ -137,4 +137,17 @@ it('builds a Google Maps link with stops as waypoints', () => {
   const url = new URL(navigationUrl({ lat: 20, lng: 77 }, { lat: 23.6, lng: 77 }, p.stops));
   expect(url.searchParams.get('waypoints')?.split('|')).toHaveLength(2);
   expect(url.searchParams.get('destination')).toBe('23.6,77');
+});
+
+describe('routes without elevation', () => {
+  it('plans 2-D routes (the keyless routers send none) as flat roads', () => {
+    const vehicle = myVehicleFromModel(VEHICLES[0]);
+    const flat = route(100).coords;
+    const level = flat.map(([lng, lat]) => [lng, lat, 900] as Coord);
+    const a = cumulativeEnergy(new RouteIndex(flat), flat, vehicle, DEFAULT_OPTIONS);
+    const b = cumulativeEnergy(new RouteIndex(level), level, vehicle, DEFAULT_OPTIONS);
+    expect(a.every(Number.isFinite)).toBe(true);
+    expect(a.at(-1)).toBeGreaterThan(0);
+    expect(a.at(-1)).toBeCloseTo(b.at(-1)!, 9);
+  });
 });

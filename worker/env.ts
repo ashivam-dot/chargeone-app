@@ -7,6 +7,8 @@ export interface Env {
   GOOGLE_CLIENT_ID: string;
   SESSION_SECRET?: string;
   ORS_API_KEY?: string;
+  /** Keyless router when ORS_API_KEY is unset: 'valhalla' (production default), 'osrm-demo' (development only, the default there) or 'off'. */
+  PUBLIC_ROUTER?: 'valhalla' | 'osrm-demo' | 'off';
   RAZORPAY_KEY_ID: string;
   RAZORPAY_KEY_SECRET?: string;
   RAZORPAY_WEBHOOK_SECRET?: string;

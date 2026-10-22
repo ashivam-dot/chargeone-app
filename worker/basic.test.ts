@@ -46,7 +46,8 @@ describe('Basic trips without signing in', () => {
     const second = await api('POST', '/api/route', short);
     expect(second.status).toBe(402);
     expect(second.body).toMatchObject({ error: 'daily_limit', usage: { shortToday: 1, longInWindow: 0 } });
-    expect(second.body.message).toContain('Sign in free for 3 a day');
+    expect(second.body).toMatchObject({ scope: 'device', tier: 'basic' });
+    expect(second.body.message).toBe("Basic covers 1 trip up to 100 km a day, and this phone has used today's trip. It resets at midnight, India time.");
   });
 
   it('refuses long trips before routing, and trips whose road is too long without counting them', async () => {
@@ -55,12 +56,13 @@ describe('Basic trips without signing in', () => {
     const api = guest();
     const far = await api('POST', '/api/route', { from: MG_ROAD, to: MYSURU });
     expect(far.status).toBe(402);
-    expect(far.body.error).toBe('sign_in_required');
-    expect(far.body.message).toContain('try Plus free for 7 days');
+    expect(far.body).toMatchObject({ error: 'too_long', tier: 'basic', limitKm: 100, straightLine: true });
+    expect(far.body.message).toMatch(/^Basic covers 1 trip up to 100 km a day; this trip is at least \d+ km\.$/);
     expect(stub.calls).toHaveLength(0);
 
     const winding = await api('POST', '/api/route', { from: MG_ROAD, to: TUMAKURU });
-    expect(winding.body.error).toBe('sign_in_required');
+    expect(winding.body).toMatchObject({ error: 'too_long', distanceKm: 130, straightLine: false });
+    expect(winding.body.message).toBe('Basic covers 1 trip up to 100 km a day; this trip is 130 km.');
     expect(stub.calls).toHaveLength(1);
     expect((await api('GET', '/api/me')).body.basicToday).toBe(0);
   });
@@ -81,7 +83,8 @@ describe('Basic trips without signing in', () => {
     }
     const fourth = await guest(OTHER_DEVICE)('POST', '/api/route', short);
     expect(fourth.status).toBe(402);
-    expect(fourth.body.error).toBe('daily_limit');
+    expect(fourth.body).toMatchObject({ error: 'daily_limit', scope: 'network' });
+    expect(fourth.body.message).toContain("phones on this network have used today's 3");
     expect((await guest(OTHER_DEVICE, '198.51.100.9')('POST', '/api/route', short)).status).toBe(200);
     expect((await guest(OTHER_DEVICE, '198.51.100.9')('GET', '/api/me')).body.basicToday).toBe(1);
   });
