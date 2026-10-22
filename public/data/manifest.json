@@ -1,0 +1,612 @@
+{
+  "version": "f592974caa26",
+  "generatedAt": "2026-10-23T00:00:00.000Z",
+  "schema": 1,
+  "counts": {
+    "stations": 2005,
+    "dc": 1385,
+    "ac": 122,
+    "unknownSpeed": 498,
+    "withKw": 1480,
+    "withConnectors": 1512,
+    "withOperator": 1647,
+    "twoWheeler": 114,
+    "multiSource": 31,
+    "sites": 1902,
+    "merged": 78,
+    "blockedPairs": 95,
+    "review": 93,
+    "quarantined": 370
+  },
+  "sources": [
+    {
+      "key": "osm",
+      "name": "OpenStreetMap",
+      "origin": "overpass",
+      "licence": "ODbL-1.0",
+      "attribution": "© OpenStreetMap contributors",
+      "url": "https://www.openstreetmap.org/copyright",
+      "snapshotAt": "2026-10-22T19:55:06Z",
+      "raw": 608,
+      "records": 595,
+      "rejected": {
+        "private": 13
+      },
+      "quarantined": 0
+    },
+    {
+      "key": "ocm",
+      "name": "Open Charge Map (GitHub export)",
+      "origin": "github-export",
+      "licence": "CC-BY-4.0",
+      "attribution": "Contains data from Open Charge Map contributors",
+      "url": "https://openchargemap.org/site/about/terms",
+      "snapshotAt": "2026-04-22T18:59:34+08:00",
+      "raw": 1872,
+      "records": 1488,
+      "rejected": {
+        "not-operational": 6,
+        "outside-india": 1,
+        "planned": 5,
+        "private": 2,
+        "google-derived": 370
+      },
+      "quarantined": 370
+    }
+  ],
+  "files": {
+    "aliases.json": {
+      "bytes": 133523,
+      "sha256": "d78695d6b5d4f66adde3919d5eb005434995cd54883049fcd9ed30f59e43ae44"
+    },
+    "chargeone-stations-odbl.zip": {
+      "bytes": 414081,
+      "sha256": "383a9eba187fc061af8a4eb8a213f9f30b7fa4427a80c132980dd08b55103c9a"
+    },
+    "coverage.json": {
+      "bytes": 12536,
+      "sha256": "94ae266559148aa5ba9b66380c6c85a75c02994f283b4c69a5747e2086d234f6"
+    },
+    "index.json": {
+      "bytes": 171700,
+      "sha256": "cf027849504002af207cf3894addd707cd66263a3ac00c32b64bb1a3b0b2a81a"
+    },
+    "LICENSE-data.txt": {
+      "bytes": 1058,
+      "sha256": "0d20eb7fe873f6a650c6f4662a46b2a2370e44fd424e06454de86ba1ab2299e2"
+    },
+    "review-queue.json": {
+      "bytes": 59895,
+      "sha256": "3a0d972e4a132114a436774dbfb3ecee60772f8dae3f5cb2dab1f709b2080b2c"
+    },
+    "shards/t9q.json": {
+      "bytes": 20267,
+      "sha256": "d10e87028aef3e770833a6edcd92e964cd676d853b0d602a74a4316dd076a037"
+    },
+    "shards/t9r.json": {
+      "bytes": 5920,
+      "sha256": "bff787ce3313457d49f9707597d208a1d7708d25142c3db1fdc76a82a1f81ff2"
+    },
+    "shards/t9v.json": {
+      "bytes": 58952,
+      "sha256": "d8c454b8c193fcf35fc156b4fb9f71f47ce807aeba92ee7cf1a1b0c767dd1998"
+    },
+    "shards/t9w.json": {
+      "bytes": 651406,
+      "sha256": "071e92188abc53b496790b9cd80d9a69fa64a0b8b93c1607c488b3df7a364f7d"
+    },
+    "shards/t9x.json": {
+      "bytes": 37485,
+      "sha256": "e7c2502449e15ee9d54823a31c1eff7bca3e2f36ee4cf04fd04ad74892c4d81d"
+    },
+    "shards/t9y0.json": {
+      "bytes": 20759,
+      "sha256": "a1c889032b8cf45cbad7b4f13731b0144c06c4f3f5d02ab55ed430fc23e87c8c"
+    },
+    "shards/t9y1.json": {
+      "bytes": 26100,
+      "sha256": "2292cd00ef80edbf77058c44439610dcbc543364bb63100f6a91b261f0ef6aaf"
+    },
+    "shards/t9y2.json": {
+      "bytes": 181811,
+      "sha256": "05078257b188a4734bf57fd501db97a3ef0d443e9fbc0f87174335a65c35cffd"
+    },
+    "shards/t9y3.json": {
+      "bytes": 151879,
+      "sha256": "0a293b46bdf7a65b70c06076b9cd8b232176c47530ee27818da063ce0ce29af5"
+    },
+    "shards/t9y4.json": {
+      "bytes": 20764,
+      "sha256": "a6feee99d992be1a866f33ea75837793219304e0ef182f1011d042c09e0c4366"
+    },
+    "shards/t9y5.json": {
+      "bytes": 106378,
+      "sha256": "a43ffefcadde945a9893a91d851d11f50c3dacd529f21b84a46fc7ec031deee0"
+    },
+    "shards/t9y6.json": {
+      "bytes": 40072,
+      "sha256": "ec7546c8a3d943248c7ed20a0a387440adfb046ce39923347d12bafe789bb79a"
+    },
+    "shards/t9y7.json": {
+      "bytes": 4499,
+      "sha256": "c3e011e6d31fcf7350d039008565ff716d46d4c7519035c319d1033b4ddf1969"
+    },
+    "shards/t9y8.json": {
+      "bytes": 25030,
+      "sha256": "d626c3d25c3656b80bc479468bd803ce70bcee2802eaaac30304bee2dac4e1f2"
+    },
+    "shards/t9y9.json": {
+      "bytes": 9017,
+      "sha256": "8991a89237700348a72a466e44f0c48176bcb6d26c87f4ded0d037a3d7424924"
+    },
+    "shards/t9yb.json": {
+      "bytes": 2907,
+      "sha256": "fa3624cd33f36e9c305bf7311bd2cfe6d5211dccc13f0748be9f5f1ceaa78c33"
+    },
+    "shards/t9yc.json": {
+      "bytes": 10630,
+      "sha256": "48b21fddfd183e8d9e335efeac2fadfed44be7e0a64bef676e10b7b9e8f9dad0"
+    },
+    "shards/t9yh.json": {
+      "bytes": 58760,
+      "sha256": "3c3c6b9edb67fb7638378071a3018bf6211d50443cb45ea99dd8e1139d8781ed"
+    },
+    "shards/t9yj.json": {
+      "bytes": 61408,
+      "sha256": "a4321d58fe0f18618542b73f1db10906b902874e3aa20edf3b134eae9285754f"
+    },
+    "shards/t9yk.json": {
+      "bytes": 26562,
+      "sha256": "5df070e4d9eefdcb56514dffccf1852af774d202c2519b9ce9259c3efe8db9a9"
+    },
+    "shards/t9ym.json": {
+      "bytes": 15009,
+      "sha256": "d4a26379426ad238e79979c2577aeb6f49c76a3c202b9a7022e72b30ee4c01d2"
+    },
+    "shards/t9yn.json": {
+      "bytes": 55699,
+      "sha256": "f5400db37bf63eaee703b5b65a7aa7ce7cd908b9fc669743c63a530e4a5ae878"
+    },
+    "shards/t9yp.json": {
+      "bytes": 40377,
+      "sha256": "fa1a1211b0902028f792d28c2df6f269e72814e42560ecb09fd09ccd2c88fa31"
+    },
+    "shards/t9yq.json": {
+      "bytes": 9692,
+      "sha256": "4ac4786fbeef329758802165e38ac128a009a8dad75044304a9470cc92c281fa"
+    },
+    "shards/t9ys.json": {
+      "bytes": 9663,
+      "sha256": "d070c657049b25d60fb9e62c191b99fcb3424baddc4ee3ddae4ac622aa7f9abd"
+    },
+    "shards/t9yt.json": {
+      "bytes": 58032,
+      "sha256": "79a0691e0acac96f73e8cf5aab1dee1c0bf8367e2044922a67c8152144e12d47"
+    },
+    "shards/t9yw.json": {
+      "bytes": 46309,
+      "sha256": "08e7574755ceecf144e7a358cc61fbc752621c4c6d4ed639fdb2f908606af33c"
+    },
+    "shards/t9yx.json": {
+      "bytes": 24607,
+      "sha256": "a5ad82090915ffcb11c34d4f02c06adc292b3d0bc650bc96676b0cf6cbb3ad42"
+    },
+    "shards/t9yy.json": {
+      "bytes": 29582,
+      "sha256": "206777b1e44bd304ada198ab43cb71ed57337b9bcb15676737f108b1504a819c"
+    },
+    "shards/t9yz.json": {
+      "bytes": 24020,
+      "sha256": "57fb9fc8ee00cfc866c330f11f81d14b18195827ade90b9dbdb5a05e768fd2df"
+    },
+    "shards/t9z.json": {
+      "bytes": 137479,
+      "sha256": "60655d4c6d9d2b1c851dad0b713a28e487b28184374f64bf9eae9625d2448247"
+    },
+    "shards/tc.json": {
+      "bytes": 49467,
+      "sha256": "5077b3251e20b7175c44de5cba13d30f9c73cd7e05b0cf4663793d20b32a4b19"
+    },
+    "shards/tdj.json": {
+      "bytes": 239100,
+      "sha256": "418b8b6ecfbf59bdfa856f4fb6508db7a9d1fcd3c6a02a74aa5533c674af49f5"
+    },
+    "shards/tdm.json": {
+      "bytes": 154132,
+      "sha256": "27a60d4553217f65be1abcaf6e1b2893b18f95d414cb9419f8835cf34928ccd7"
+    },
+    "shards/tdn.json": {
+      "bytes": 257662,
+      "sha256": "bde19601fc4f64d72f3f2fdfe4be490435165b9b14f6a1d4807d90d65b5d4649"
+    },
+    "shards/tdp.json": {
+      "bytes": 161584,
+      "sha256": "dfe09bc975f8584701ef78f764e1f43defb956a1e921a9e6672796fec469c67f"
+    },
+    "shards/tdq.json": {
+      "bytes": 96742,
+      "sha256": "3fed76675a79027b824afd38ff44fd2a2c057b4a2a2149e96b5547b04bc2618a"
+    },
+    "shards/tdr.json": {
+      "bytes": 636409,
+      "sha256": "f187f8ea82f2702e9094d6e2b3384a8e8b7960e846c9c7902e514eedc09854e4"
+    },
+    "shards/tds.json": {
+      "bytes": 39168,
+      "sha256": "ea01c4b912ebcf81d339b01cdb49c44598e167b7f30edbdf8e497d716420ed9f"
+    },
+    "shards/tdt.json": {
+      "bytes": 75529,
+      "sha256": "07e962ff7e4498001561fdfa7dd9f1ea92ed6ca1c2b0c0b08a8e6cc18d507f65"
+    },
+    "shards/tdu.json": {
+      "bytes": 92279,
+      "sha256": "050f6c1eeb2c1ecc6d8142d87c125722fb7c156866782007c23a89566a27be71"
+    },
+    "shards/tdv.json": {
+      "bytes": 33044,
+      "sha256": "39e4c76a201b3616f16c1e52f869aa8d029eee302e16b85c0803717024d63de5"
+    },
+    "shards/tdw.json": {
+      "bytes": 28676,
+      "sha256": "f1163a2c1374676d6b1904910a23280fbb0f7f20c424eb1451ce933ecc309ad8"
+    },
+    "shards/tdx.json": {
+      "bytes": 3252,
+      "sha256": "315c6998c941b04d6ddc729cbad3fcb8982b4568aeb9fee554576ba780bbd3b0"
+    },
+    "shards/tdy.json": {
+      "bytes": 13212,
+      "sha256": "0337b3eecda9df5572c604ed2b9a0ccab50b5ab7e28dd6b706bf1a96d4df1ea6"
+    },
+    "shards/tdz.json": {
+      "bytes": 18967,
+      "sha256": "763474dbd23593b104c2220e9d2f5c8955e8624c3f7a80c83145a3c46a752fa3"
+    },
+    "shards/te.json": {
+      "bytes": 363073,
+      "sha256": "6e62b760afa9adf3cc491567879027758e21cb68443172bdca74158c00269ed5"
+    },
+    "shards/tf.json": {
+      "bytes": 160807,
+      "sha256": "9ba0bb609112c69152db1a0c815a3bd94b974974b8bdf9fd527bf6a1b548abfc"
+    },
+    "shards/tg.json": {
+      "bytes": 73447,
+      "sha256": "11b7ae26995dd28fbb9cd15c366d257977499994531821d795378932c43d94f2"
+    },
+    "shards/ts.json": {
+      "bytes": 256029,
+      "sha256": "747e0270d80bf06dbb34cbc747bf1edcad2f9fbf6d05fe19343c1b9138a127c9"
+    },
+    "shards/tt.json": {
+      "bytes": 484625,
+      "sha256": "ebec215101d667517e29b8c24e949b4c75b5aae7b8cdbec84b9e020861620bc8"
+    },
+    "shards/tu.json": {
+      "bytes": 108048,
+      "sha256": "332da8492b4efd23211c0423d2a4bb7b86a20dfe1dc57fc7b5ea8d1f09549f21"
+    },
+    "shards/tv.json": {
+      "bytes": 37419,
+      "sha256": "aa8d66aedfe8cb06ab39068998fe55a9796a7e0fff5637b1b90673e5fefaf932"
+    },
+    "shards/tw.json": {
+      "bytes": 1749,
+      "sha256": "a231ef7638aa65a41344a8fee2e63ac85e24e5d652d7d5231a20aafcf625c84e"
+    },
+    "shards/w4.json": {
+      "bytes": 1452,
+      "sha256": "fc1dfe123020523b796e56d1cb7b7bbe118d4156560eb461a373c6c023713898"
+    },
+    "shards/wh.json": {
+      "bytes": 4952,
+      "sha256": "0fe9ef09864be50b4272b0eb1d52d9b15789a624aea7d05a2b650d9b63d8abb1"
+    },
+    "stations.json": {
+      "bytes": 1583098,
+      "sha256": "719f648d6a030fa38fb4b546ca9bd19e1f3a25564835c0b770b78ad87ee9897a"
+    }
+  },
+  "shards": [
+    {
+      "cell": "t9q",
+      "stations": 7,
+      "bytes": 20267
+    },
+    {
+      "cell": "t9r",
+      "stations": 2,
+      "bytes": 5920
+    },
+    {
+      "cell": "t9v",
+      "stations": 20,
+      "bytes": 58952
+    },
+    {
+      "cell": "t9w",
+      "stations": 223,
+      "bytes": 651406
+    },
+    {
+      "cell": "t9x",
+      "stations": 13,
+      "bytes": 37485
+    },
+    {
+      "cell": "t9y0",
+      "stations": 9,
+      "bytes": 20759
+    },
+    {
+      "cell": "t9y1",
+      "stations": 10,
+      "bytes": 26100
+    },
+    {
+      "cell": "t9y2",
+      "stations": 66,
+      "bytes": 181811
+    },
+    {
+      "cell": "t9y3",
+      "stations": 57,
+      "bytes": 151879
+    },
+    {
+      "cell": "t9y4",
+      "stations": 7,
+      "bytes": 20764
+    },
+    {
+      "cell": "t9y5",
+      "stations": 36,
+      "bytes": 106378
+    },
+    {
+      "cell": "t9y6",
+      "stations": 14,
+      "bytes": 40072
+    },
+    {
+      "cell": "t9y7",
+      "stations": 2,
+      "bytes": 4499
+    },
+    {
+      "cell": "t9y8",
+      "stations": 8,
+      "bytes": 25030
+    },
+    {
+      "cell": "t9y9",
+      "stations": 3,
+      "bytes": 9017
+    },
+    {
+      "cell": "t9yb",
+      "stations": 1,
+      "bytes": 2907
+    },
+    {
+      "cell": "t9yc",
+      "stations": 4,
+      "bytes": 10630
+    },
+    {
+      "cell": "t9yh",
+      "stations": 21,
+      "bytes": 58760
+    },
+    {
+      "cell": "t9yj",
+      "stations": 21,
+      "bytes": 61408
+    },
+    {
+      "cell": "t9yk",
+      "stations": 9,
+      "bytes": 26562
+    },
+    {
+      "cell": "t9ym",
+      "stations": 5,
+      "bytes": 15009
+    },
+    {
+      "cell": "t9yn",
+      "stations": 18,
+      "bytes": 55699
+    },
+    {
+      "cell": "t9yp",
+      "stations": 13,
+      "bytes": 40377
+    },
+    {
+      "cell": "t9yq",
+      "stations": 3,
+      "bytes": 9692
+    },
+    {
+      "cell": "t9ys",
+      "stations": 3,
+      "bytes": 9663
+    },
+    {
+      "cell": "t9yt",
+      "stations": 21,
+      "bytes": 58032
+    },
+    {
+      "cell": "t9yw",
+      "stations": 17,
+      "bytes": 46309
+    },
+    {
+      "cell": "t9yx",
+      "stations": 10,
+      "bytes": 24607
+    },
+    {
+      "cell": "t9yy",
+      "stations": 10,
+      "bytes": 29582
+    },
+    {
+      "cell": "t9yz",
+      "stations": 9,
+      "bytes": 24020
+    },
+    {
+      "cell": "t9z",
+      "stations": 47,
+      "bytes": 137479
+    },
+    {
+      "cell": "tc",
+      "stations": 18,
+      "bytes": 49467
+    },
+    {
+      "cell": "tdj",
+      "stations": 77,
+      "bytes": 239100
+    },
+    {
+      "cell": "tdm",
+      "stations": 51,
+      "bytes": 154132
+    },
+    {
+      "cell": "tdn",
+      "stations": 88,
+      "bytes": 257662
+    },
+    {
+      "cell": "tdp",
+      "stations": 59,
+      "bytes": 161584
+    },
+    {
+      "cell": "tdq",
+      "stations": 33,
+      "bytes": 96742
+    },
+    {
+      "cell": "tdr",
+      "stations": 225,
+      "bytes": 636409
+    },
+    {
+      "cell": "tds",
+      "stations": 14,
+      "bytes": 39168
+    },
+    {
+      "cell": "tdt",
+      "stations": 25,
+      "bytes": 75529
+    },
+    {
+      "cell": "tdu",
+      "stations": 30,
+      "bytes": 92279
+    },
+    {
+      "cell": "tdv",
+      "stations": 12,
+      "bytes": 33044
+    },
+    {
+      "cell": "tdw",
+      "stations": 10,
+      "bytes": 28676
+    },
+    {
+      "cell": "tdx",
+      "stations": 1,
+      "bytes": 3252
+    },
+    {
+      "cell": "tdy",
+      "stations": 5,
+      "bytes": 13212
+    },
+    {
+      "cell": "tdz",
+      "stations": 7,
+      "bytes": 18967
+    },
+    {
+      "cell": "te",
+      "stations": 148,
+      "bytes": 363073
+    },
+    {
+      "cell": "tf",
+      "stations": 63,
+      "bytes": 160807
+    },
+    {
+      "cell": "tg",
+      "stations": 38,
+      "bytes": 73447
+    },
+    {
+      "cell": "ts",
+      "stations": 99,
+      "bytes": 256029
+    },
+    {
+      "cell": "tt",
+      "stations": 246,
+      "bytes": 484625
+    },
+    {
+      "cell": "tu",
+      "stations": 50,
+      "bytes": 108048
+    },
+    {
+      "cell": "tv",
+      "stations": 13,
+      "bytes": 37419
+    },
+    {
+      "cell": "tw",
+      "stations": 1,
+      "bytes": 1749
+    },
+    {
+      "cell": "w4",
+      "stations": 1,
+      "bytes": 1452
+    },
+    {
+      "cell": "wh",
+      "stations": 2,
+      "bytes": 4952
+    }
+  ],
+  "thresholds": {
+    "sourceDrop": 0.2,
+    "movedShare": 0.05,
+    "moveMetres": 200,
+    "dcDrop": 0.1,
+    "shardBytes": 1000000,
+    "shardMaxStations": 400,
+    "autoMerge": 0.85,
+    "review": 0.6,
+    "candidateMetres": 150,
+    "distanceSigmaMetres": 40,
+    "siteMetres": 60,
+    "halfLifeDays": 182
+  },
+  "attribution": [
+    "© OpenStreetMap contributors",
+    "Contains data from Open Charge Map contributors",
+    "Government counts: Ministry of Heavy Industries, Rajya Sabha answers (via BHEL)"
+  ]
+}

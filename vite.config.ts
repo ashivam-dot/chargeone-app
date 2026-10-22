@@ -79,6 +79,6 @@ export default defineConfig({
     proxy: { '/api': 'http://localhost:8787' },
   },
   test: {
-    include: ['src/**/*.test.ts', 'worker/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'worker/**/*.test.ts', 'pipeline/**/*.test.ts'],
   },
 });
