@@ -425,8 +425,13 @@ function TestAs({ onError }: SectionProps) {
 
 interface UserRow {
   id: string;
-  email: string;
+  /** Null for phone-only accounts. */
+  email: string | null;
   name: string | null;
+  username: string | null;
+  /** Masked phone of a phone account. */
+  phone: string | null;
+  methods: Array<{ provider: 'google' | 'password' | 'phone'; display: string }>;
   createdAt: string;
   isTest: boolean;
   plan: string;
@@ -434,6 +439,11 @@ interface UserRow {
   activeUntil: string | null;
   source: string | null;
 }
+
+const METHOD_LABEL: Record<UserRow['methods'][number]['provider'], string> = { google: 'Google', password: 'Email + password', phone: 'Phone' };
+
+/** The email, else the masked phone, else the username. */
+const accountLabel = (u: Pick<UserRow, 'email' | 'phone' | 'username'>) => u.email || u.phone || (u.username ? `@${u.username}` : 'No email');
 
 function Users({ onError }: SectionProps) {
   const [q, setQ] = useState('');
@@ -457,7 +467,7 @@ function Users({ onError }: SectionProps) {
         }}
       >
         <label class="ad-field ad-inline ad-grow">
-          <span>Search by email or name</span>
+          <span>Search by email, name or username</span>
           <input type="search" value={q} onInput={(e) => setQ(e.currentTarget.value)} maxLength={100} data-testid="users-search" />
         </label>
         <button type="submit" class="ad-btn">
@@ -473,8 +483,13 @@ function Users({ onError }: SectionProps) {
               <li key={u.id} class="ad-item" data-testid="user-row">
                 <button type="button" class="ad-rowbtn" aria-expanded={open === u.id} onClick={() => setOpen(open === u.id ? null : u.id)}>
                   <span>
-                    <strong>{u.email}</strong> <TestTag on={u.isTest} />
+                    <strong>{accountLabel(u)}</strong> <TestTag on={u.isTest} />
                     <span class="ad-muted"> {u.name ?? ''}</span>
+                    {u.username ? <span class="ad-muted"> @{u.username}</span> : null}
+                    <span class="ad-muted" data-testid="user-methods">
+                      {' '}
+                      · {u.methods?.length ? u.methods.map((m) => METHOD_LABEL[m.provider] + (m.provider === 'phone' && m.display ? ` ${m.display}` : '')).join(', ') : 'no sign-in'}
+                    </span>
                   </span>
                   <span class="ad-muted">
                     {u.planName}
@@ -556,7 +571,7 @@ function UserDetail({ id, onError, onChanged }: { id: string; onError: (e: unkno
         <button type="button" class="ad-btn" onClick={() => act('grant', { plan, days }, `Granted ${PLANS[plan as keyof typeof PLANS].name} for ${days} days.`)} data-testid="grant-submit">
           Grant
         </button>
-        <button type="button" class="ad-btn ad-danger" onClick={() => act('revoke', {}, 'Plan revoked.', `End ${data.user.email}'s plan now? This does not refund or cancel a store subscription.`)}>
+        <button type="button" class="ad-btn ad-danger" onClick={() => act('revoke', {}, 'Plan revoked.', `End ${accountLabel(data.user)}'s plan now? This does not refund or cancel a store subscription.`)}>
           Revoke
         </button>
         <button type="button" class="ad-btn ad-ghost" onClick={() => act('reset-quota', {}, 'Today’s trips and limits are cleared.')}>

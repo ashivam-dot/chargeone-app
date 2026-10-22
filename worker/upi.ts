@@ -167,7 +167,7 @@ export async function claimUpiPayment(req: Request, env: Env, user: User) {
 export async function listUpiPayments(env: Env, status: string) {
   const wanted = ['created', 'claimed', 'confirmed', 'rejected'].includes(status) ? status : 'claimed';
   const { results } = await env.DB.prepare(
-    `SELECT p.ref, p.plan, p.amount_paise, p.utr, p.status, p.created_at, p.claimed_at, p.decided_at, u.email
+    `SELECT p.ref, p.plan, p.amount_paise, p.utr, p.status, p.created_at, p.claimed_at, p.decided_at, COALESCE(NULLIF(u.email, ''), (SELECT i.display FROM auth_identities i WHERE i.user_id = u.id AND i.provider = 'phone' LIMIT 1)) AS email
      FROM upi_payments p JOIN users u ON u.id = p.user_id WHERE p.status = ?1 ORDER BY COALESCE(p.claimed_at, p.created_at) DESC LIMIT 200`,
   )
     .bind(wanted)

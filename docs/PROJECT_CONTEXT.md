@@ -115,6 +115,24 @@ SITE_URL=https://chargeone.akshshivam5.workers.dev npm run deploy   # build, rem
 - Tests: `worker/admin.test.ts`, `e2e/admin.spec.ts` (each device project opens a different test account; only
   desktop tries a wrong token, because of the 5-per-15-min login limit).
 
+## Sign-in methods: Google, email + password, username, phone OTP (2026-10-23)
+
+- Firebase Auth project `chargeone-512418` (Spark). Public web config + `GOOGLE_CLIENT_ID` are plain vars
+  in `wrangler.jsonc` (public by design); `/api/config.firebase` is null when unset, which hides the options.
+- Worker: `worker/firebase.ts` (RS256 ID-token check against the securetoken JWKS, Identity Toolkit REST),
+  `worker/identities.ts` (linking, usernames, password login, forgot, deletion). Migration
+  `0007_auth_identities.sql`: `auth_identities`, `users.username`, `trial_accounts`. Phone-only users keep
+  `users.email = ''` (API says null). Only masked phones and a keyed phone hash are stored.
+- Routes: `POST /api/auth/firebase {idToken,name?}`, `POST /api/auth/password-login {username|identifier,password}`
+  (unknown usernames cost the same Firebase call, same 401), `POST /api/auth/forgot {identifier}` (always the
+  same answer), `GET /api/auth/username-available?u=`, `POST /api/auth/username {username}`,
+  `POST /api/me/delete {firebaseIdToken?}`. 429s carry `Retry-After`.
+- Linking: a verified email joins the account with that email (both ways with Google). Unverified = 403
+  `email_unverified`. Trials are keyed by every login (Google sub, email, Firebase uid, phone hash).
+- Browser REST client without the SDK: `src/lib/firebaseRest.ts`. Test phone `+91 99999 00001` / `112233`
+  (Spark allows ~10 real SMS a day). Firebase console: add each app host to Authorized domains.
+- Tests: `worker/firebase.test.ts`, `worker/auth-firebase.test.ts`, `src/shared/auth.test.ts`, `src/lib/firebaseRest.test.ts`.
+
 Demo pipeline (only when re-recording): `scripts/demo-narration.json` -> `scripts/demo-voice.py`
 (Supertonic 3 via voice-server; a temporary venv with `voice-server/requirements.txt` and `MODEL_DIR`)
 -> `scripts/demo-video.ts` (full Chromium headless on the GPU: `npx playwright install chromium`; the

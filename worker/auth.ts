@@ -19,7 +19,7 @@ interface SessionPayload {
   exp: number;
 }
 
-function requireSecret(env: Env): string {
+export function requireSecret(env: Env): string {
   const secret = env.SESSION_SECRET;
   if (!secret || secret.length < 32) {
     throw new HttpError(503, 'not_configured', 'Sign-in is not configured yet.');
@@ -119,7 +119,7 @@ interface Jwk {
 
 let jwksCache: { keys: Jwk[]; expires: number } | null = null;
 
-function maxAgeSeconds(cacheControl: string | null): number {
+export function maxAgeSeconds(cacheControl: string | null): number {
   const match = (cacheControl ?? '').match(/max-age=(\d+)/);
   return match ? Number(match[1]) : 3600;
 }
@@ -139,7 +139,7 @@ export interface GoogleIdentity {
   name: string | null;
 }
 
-function decodeJsonPart(part: string): Record<string, unknown> | null {
+export function decodeJsonPart(part: string): Record<string, unknown> | null {
   try {
     const value: unknown = JSON.parse(new TextDecoder().decode(base64UrlDecode(part)));
     return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;

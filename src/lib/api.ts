@@ -1,6 +1,7 @@
 import type { Coord } from '../planner/geometry.ts';
 import type { Plan, PlanId, UsageCounts } from '../shared/plans.ts';
 import type { ReportKind, StationStatus } from '../shared/status.ts';
+import type { FirebasePublicConfig, MeUser, UsernameProblem } from '../shared/auth.ts';
 import type { FeedbackRequest, RouteAlternativeWire, RouteRequest, TrialInfo, VehicleLookupRequest, VehicleLookupResult } from '../shared/contracts.ts';
 import { apiFetch, type ApiResponse } from './transport.ts';
 
@@ -41,6 +42,8 @@ async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown):
 
 export interface Config {
   googleClientId: string | null;
+  /** Public Firebase web config for email and phone sign-in; null or missing hides those options. */
+  firebase?: FirebasePublicConfig | null;
   paymentsEnabled: boolean;
   /** Which ways to pay the server is set up for. Older servers don't send it. */
   payments?: { razorpay: boolean; upi: boolean; play: boolean };
@@ -53,7 +56,8 @@ export interface Config {
 }
 
 export interface Me {
-  user: { email: string; name: string | null } | null;
+  /** Older servers send only email and name. */
+  user: (Partial<MeUser> & Pick<MeUser, 'email' | 'name'>) | null;
   plan: PlanId;
   entitlement: { plan: PlanId; activeUntil: string | null; status: string; source: string } | null;
   usage: UsageCounts | null;
@@ -102,7 +106,17 @@ export const api = {
   signInDev: () => request<Me>('POST', '/api/auth/dev', {}),
   signOut: () => request<{ ok: true }>('POST', '/api/auth/logout', {}),
   signOutEverywhere: () => request<{ ok: true }>('POST', '/api/auth/logout-all', {}),
-  deleteAccount: () => request<{ ok: true }>('POST', '/api/me/delete', {}),
+  /** Pass a fresh Firebase ID token so the email or phone login is deleted with the account. */
+  deleteAccount: (firebaseIdToken?: string) =>
+    request<{ ok: true; firebaseDeleted?: boolean }>('POST', '/api/me/delete', firebaseIdToken ? { firebaseIdToken } : {}),
+  /** An ID token from Firebase email or phone sign-in in the browser; name is the one typed at registration. */
+  signInFirebase: (idToken: string, name?: string) => request<Me>('POST', '/api/auth/firebase', name ? { idToken, name } : { idToken }),
+  /** Username (or email) and password, checked by the Worker. 403 email_unverified carries extra.idToken for resending. */
+  passwordLogin: (username: string, password: string) => request<Me & { firebaseIdToken: string }>('POST', '/api/auth/password-login', { username, password }),
+  forgotPassword: (identifier: string) => request<{ ok: true; message: string }>('POST', '/api/auth/forgot', { identifier }),
+  usernameAvailable: (username: string) =>
+    request<UsernameAvailability>('GET', `/api/auth/username-available?u=${encodeURIComponent(username)}`),
+  claimUsername: (username: string) => request<{ username: string }>('POST', '/api/auth/username', { username }),
   statuses: () => request<{ generatedAt: string; statuses: StationStatus[] }>('GET', '/api/status'),
   reports: (stationId: string) => request<{ reports: Report[] }>('GET', `/api/stations/${encodeURIComponent(stationId)}/reports`),
   checkin: (body: { stationId: string; kind: ReportKind; kw?: number; vehicle?: string; note?: string; position: LatLng; accuracy: number }) =>
@@ -125,6 +139,12 @@ export const api = {
   vehicleLookup: (plate: string, consent: VehicleLookupRequest['consent']) =>
     request<VehicleLookupResult>('POST', '/api/vehicle/lookup', { plate, consent } satisfies VehicleLookupRequest),
 };
+
+export interface UsernameAvailability {
+  username: string;
+  available: boolean;
+  reason: UsernameProblem | 'taken' | null;
+}
 
 export interface UpiPayment {
   ref: string;

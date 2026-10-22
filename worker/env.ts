@@ -5,6 +5,14 @@ export interface Env {
   AI?: Ai;
   ENVIRONMENT: 'production' | 'development';
   GOOGLE_CLIENT_ID: string;
+  /**
+   * Firebase Auth (email and password, phone with a one-time code). The public web config, not
+   * secrets. API key and project id both set = those sign-in options on; either empty = off.
+   */
+  FIREBASE_API_KEY?: string;
+  FIREBASE_PROJECT_ID?: string;
+  FIREBASE_AUTH_DOMAIN?: string;
+  FIREBASE_APP_ID?: string;
   SESSION_SECRET?: string;
   ORS_API_KEY?: string;
   /** Keyless router when ORS_API_KEY is unset: 'valhalla' (production default), 'osrm-demo' (development only, the default there) or 'off'. */
