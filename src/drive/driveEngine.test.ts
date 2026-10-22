@@ -40,6 +40,7 @@ function dcStation(id: string, atKm: number, over: Partial<Station> = {}): Stati
     address: null,
     website: null,
     sources: [],
+    confidence: 0.8,
     ...over,
   };
 }

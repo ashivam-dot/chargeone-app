@@ -70,6 +70,42 @@ export interface Station {
   /** Which source id supplied each shown field; only on stations merged from several records. */
   provenance?: Partial<Record<'position' | 'name' | 'operator' | 'connectors' | 'maxKw' | 'hours' | 'price' | 'address', string>>;
   flags?: string[];
+  // Only on stations read from index.json (src/data/compact.ts) and their shards.
+  /** Geohash cell of the shard that holds this station's details. */
+  shard?: string;
+  /** 'pending' until the shard is read: hours, price, address, website and sources are still empty, not unknown. */
+  detail?: 'pending';
+  /** Every field's value with the source claims behind it (from the shard). */
+  fields?: Partial<Record<DetailField, FieldDetail>>;
+  /** The source records behind the station (from the shard). */
+  records?: SourceRecordRef[];
+}
+
+export type DetailField = 'name' | 'operator' | 'connectors' | 'maxKw' | 'points' | 'hours' | 'price' | 'access' | 'address' | 'website';
+
+export interface FieldClaim {
+  value: unknown;
+  source: 'osm' | 'ocm';
+  sourceId: string;
+  observedAt: string | null;
+  licence: string;
+  /** `mapped`: the source states it. `derived`: computed from its other fields. `inferred`: guessed from the name. */
+  method: 'mapped' | 'derived' | 'inferred';
+}
+
+export interface FieldDetail {
+  value: unknown;
+  confidence: number;
+  /** Best claim first. */
+  claims: FieldClaim[];
+}
+
+export interface SourceRecordRef {
+  sourceId: string;
+  source: 'osm' | 'ocm';
+  observedAt: string | null;
+  /** True when the date is a survey or verification; false when it's only an edit or bulk-import date. */
+  verified: boolean;
 }
 
 export interface DatasetSource {
@@ -100,3 +136,8 @@ export const DC_TYPES: ReadonlySet<ConnectorType> = new Set([
 
 /** Above this, an untyped or mixed connector is treated as DC fast charging. */
 export const DC_THRESHOLD_KW = 22;
+
+/** Has DC fast charging, judged the way the data import does. */
+export function hasDc(s: Pick<Station, 'speed' | 'connectors' | 'maxKw'>): boolean {
+  return s.speed === 'dc' || s.connectors.some((c) => DC_TYPES.has(c.type)) || (s.maxKw ?? 0) > DC_THRESHOLD_KW;
+}

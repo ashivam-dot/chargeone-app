@@ -1,6 +1,6 @@
 /**
  * Writes static, crawlable pages into dist/ after `vite build`:
- * one per charger, one per city, an index, sitemap.xml and robots.txt.
+ * one per DC or high-confidence charger (see hasPage), one per city, an index, sitemap.xml and robots.txt.
  * Set SITE_URL (for example https://chargeone.in) so canonical links and the sitemap are absolute.
  * With --require-site-url (used by `npm run deploy`) a missing SITE_URL fails the build.
  */
@@ -39,4 +39,4 @@ for (const page of pages) {
 writeFileSync(join(DIST, 'sitemap.xml'), sitemap(origin, pages.map((p) => p.path), dataset.generatedAt));
 writeFileSync(join(DIST, 'robots.txt'), robots(origin));
 
-console.log(`Prerendered ${pages.length} pages for ${origin}`);
+console.log(`Prerendered ${pages.length} pages (${pages.filter((p) => p.path.startsWith('/charger/')).length} chargers) for ${origin}`);

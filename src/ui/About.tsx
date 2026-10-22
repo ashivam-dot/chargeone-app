@@ -1,11 +1,16 @@
+import type { DataManifest } from '../data/loader.ts';
 import type { Dataset } from '../data/model.ts';
+import { TRUST_LABEL } from '../data/trust.ts';
+import { CoverageTable, useCoverage } from './Coverage.tsx';
 import { formatDate } from '../lib/format.ts';
 import { LIVE_COLOUR, LIVE_LABEL, type LiveState } from '../shared/status.ts';
 import { Sheet } from './Sheet.tsx';
 
 interface Props {
   dataset: Dataset | null;
+  manifest?: DataManifest | null;
   onClose: () => void;
+  onAddCharger?: () => void;
 }
 
 const LEGEND: Array<[LiveState, string]> = [
@@ -15,7 +20,9 @@ const LEGEND: Array<[LiveState, string]> = [
   ['unknown', 'No recent reports, so it may or may not work'],
 ];
 
-export function About({ dataset, onClose }: Props) {
+export function About({ dataset, manifest, onClose, onAddCharger }: Props) {
+  const coverage = useCoverage();
+  const counts = manifest?.counts;
   return (
     <Sheet title="About ChargeOne" onClose={onClose} modal>
       <h3>What the colours mean</h3>
@@ -42,36 +49,134 @@ export function About({ dataset, onClose }: Props) {
         operator's app for their own live status and to pay.
       </p>
 
-      <h3>Charger locations</h3>
-      <p>
-        India has over 25,000 public chargers. The open map data used here covers {dataset ? dataset.stations.length.toLocaleString('en-IN') : 'only some'}{' '}
-        of them so far, so a charger missing from the map may still exist. You can add or fix chargers on OpenStreetMap, and they'll appear
-        here after the next data update.
+      <h3>How sure we are</h3>
+      <ul class="legend small">
+        <li>
+          <strong>{TRUST_LABEL.verified}</strong>
+          <span class="muted">A driver charged here in the last two weeks.</span>
+        </li>
+        <li>
+          <strong>{TRUST_LABEL.likely}</strong>
+          <span class="muted">The map sources confirmed it recently, or a driver did in the last few weeks.</span>
+        </li>
+        <li>
+          <strong>{TRUST_LABEL.unverified}</strong>
+          <span class="muted">Nobody has checked it lately, so it may not exist or work.</span>
+        </li>
+        <li>
+          <strong>{TRUST_LABEL.broken}</strong>
+          <span class="muted">A driver reported a problem in the last 24 hours.</span>
+        </li>
+        <li>
+          <strong>Speed unknown</strong>
+          <span class="muted">No source gives its power or plug type.</span>
+        </li>
+      </ul>
+      <p class="small">
+        Every detail on a charger says where it came from and how old it is. Anything no source gives shows as "Not listed" or "Unknown",
+        never as a guess. Trip plans only stop at chargers we're fairly sure of, and always show a backup.
       </p>
-      {dataset && (
-        <ul class="sources small">
-          {dataset.sources.map((s) => (
-            <li key={s.name}>
-              <a href={s.url} target="_blank" rel="noopener noreferrer">
-                {s.attribution}
-              </a>{' '}
-              · {s.licence} · {s.count.toLocaleString('en-IN')} chargers
-            </li>
-          ))}
-          <li>Data updated {formatDate(dataset.generatedAt)}</li>
-          <li>
-            Map © <a href="https://openfreemap.org" target="_blank" rel="noopener noreferrer">OpenFreeMap</a>, ©{' '}
-            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>. Place search by
-            Photon. Routes by openrouteservice, or FOSSGIS's public Valhalla server on OpenStreetMap data (
-            <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener noreferrer">report a map error</a>). Terrain ©{' '}
-            <a href="https://mapterhorn.com/attribution" target="_blank" rel="noopener noreferrer">Mapterhorn</a>.
-          </li>
-          <li>
-            3D cars are ChargeOne's own models, built from each maker's published dimensions; they are likenesses, not official renders. Brand
-            names belong to their owners. HD voice: Supertonic 3 by Supertone.
-          </li>
-        </ul>
+
+      <h3>How much of India we know</h3>
+      {coverage ? (
+        <CoverageTable data={coverage} onAddCharger={onAddCharger} />
+      ) : (
+        <p>
+          The open map data used here covers {dataset ? dataset.stations.length.toLocaleString('en-IN') : 'only some'} chargers, a small share of
+          India's public chargers, so a charger missing from the map may still exist.
+        </p>
       )}
+      {counts && (
+        <p class="small muted" data-testid="data-counts">
+          {counts.stations.toLocaleString('en-IN')} chargers: {counts.dc.toLocaleString('en-IN')} with DC fast charging,{' '}
+          {counts.withKw.toLocaleString('en-IN')} with a known power and {counts.withConnectors.toLocaleString('en-IN')} with known plugs.
+        </p>
+      )}
+      <p class="small">
+        You can add or fix chargers on OpenStreetMap or Open Charge Map (each charger links to its page there), and they'll appear here after
+        the next data update.
+      </p>
+
+      <h3>Data sources and licences</h3>
+      <ul class="sources small" data-testid="attribution">
+        <li>
+          Charger data ©{' '}
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">
+            OpenStreetMap contributors
+          </a>
+          , available under the{' '}
+          <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">
+            Open Database License (ODbL)
+          </a>
+          .
+        </li>
+        <li>
+          Contains data from{' '}
+          <a href="https://openchargemap.org" target="_blank" rel="noopener noreferrer">
+            Open Charge Map
+          </a>{' '}
+          contributors, licensed under{' '}
+          <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">
+            CC BY 4.0
+          </a>
+          . Records Open Charge Map marks as copied from Google Maps are left out.
+        </li>
+        <li>
+          Government charger counts: Ministry of Heavy Industries (Rajya Sabha answers, via BHEL), used under the{' '}
+          <a href="https://data.gov.in/government-open-data-license-india" target="_blank" rel="noopener noreferrer">
+            Government Open Data License – India (GODL)
+          </a>{' '}
+          of data.gov.in.
+        </li>
+        <li>
+          Map tiles{' '}
+          <a href="https://openfreemap.org" target="_blank" rel="noopener noreferrer">
+            OpenFreeMap
+          </a>{' '}
+          ·{' '}
+          <a href="https://openmaptiles.org" target="_blank" rel="noopener noreferrer">
+            © OpenMapTiles
+          </a>{' '}
+          · map data ©{' '}
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">
+            OpenStreetMap contributors
+          </a>
+          . Terrain ©{' '}
+          <a href="https://mapterhorn.com/attribution" target="_blank" rel="noopener noreferrer">
+            Mapterhorn
+          </a>
+          .
+        </li>
+        <li>
+          Download the merged charger database (ODbL):{' '}
+          <a href="/data/chargeone-stations-odbl.zip" download data-testid="odbl-dump">
+            chargeone-stations-odbl.zip
+          </a>{' '}
+          (GeoJSON with each field's source, date and licence;{' '}
+          <a href="/data/LICENSE-data.txt" target="_blank" rel="noopener noreferrer">
+            licence text
+          </a>
+          ).
+        </li>
+        {dataset?.sources.map((s) => (
+          <li key={s.name}>
+            {s.name} · {s.licence} · {s.count.toLocaleString('en-IN')} chargers
+            {s.snapshotAt ? ` · snapshot ${formatDate(s.snapshotAt)}` : ''}
+          </li>
+        ))}
+        {dataset && <li>Data updated {formatDate(dataset.generatedAt)}</li>}
+        <li>
+          Place search by Photon. Routes by openrouteservice, or FOSSGIS's public Valhalla server on OpenStreetMap data (
+          <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener noreferrer">
+            report a map error
+          </a>
+          ).
+        </li>
+        <li>
+          3D cars are ChargeOne's own models, built from each maker's published dimensions; they are likenesses, not official renders. Brand
+          names belong to their owners. HD voice: Supertonic 3 by Supertone.
+        </li>
+      </ul>
 
       <h3>Live battery over OBD-II (beta)</h3>
       <p class="small">
