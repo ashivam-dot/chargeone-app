@@ -10,11 +10,14 @@ import { getEntitlement, grantPlan, startOfIndianDay } from './entitlements.ts';
 import { isDev, type Env } from './env.ts';
 import { HttpError, claimSlot, clientKey, deviceKey, indianDayStart, num, readJson, releaseSlot, slotCount, str } from './http.ts';
 import { playEnabled } from './play.ts';
-import { router } from './routing.ts';
+import { publicRouterName, router } from './routing.ts';
 import { stationIndex } from './stations.ts';
 import { upiEnabled } from './upi.ts';
 import { lookupProvider, vehicleLookup } from './vehicleLookup.ts';
 import { voiceEnabled, voiceTts } from './voice.ts';
+
+/** Human names for each router, by route source or keyless router name. */
+const ROUTER_NAMES = { ors: 'openrouteservice', valhalla: 'FOSSGIS Valhalla', osrm: 'OSRM demo (development only)', 'osrm-demo': 'OSRM demo (development only)' } as const;
 
 const DAY_MS = 86400_000;
 const MAX_PAGE = 100;
@@ -77,11 +80,18 @@ export function integrations(env: Env, origin: string): Integration[] {
     probe: null,
   });
   const ors = Boolean(env.ORS_API_KEY);
+  const keyless = publicRouterName(env);
   list.push({
     id: 'routing',
     name: 'Trip routing',
-    configured: ors || isDev(env),
-    detail: ors ? 'openrouteservice.' : isDev(env) ? 'Public OSRM demo server (development only, never in production).' : 'Off: every trip plan, Basic included, fails with "not configured".',
+    configured: ors || keyless !== null,
+    detail: ors
+      ? `openrouteservice${keyless ? `, falling back to ${ROUTER_NAMES[keyless]} when busy` : ''}.`
+      : keyless === 'valhalla'
+        ? 'Stopgap: FOSSGIS public Valhalla (flat roads, shared limits; its terms rule out a substantial commercial share). Set ORS_API_KEY.'
+        : keyless === 'osrm-demo'
+          ? 'Public OSRM demo server (development only, never in production).'
+          : 'Off: every trip plan, Basic included, fails with "not configured".',
     missing: ors ? [] : ['ORS_API_KEY'],
     howTo: ors ? null : `Free key at openrouteservice.org (2,000 routes a day), then ${secret('ORS_API_KEY')}.`,
     probe: 'routing',
@@ -491,7 +501,7 @@ async function runProbe(name: Probe, req: Request, env: Env, url: URL): Promise<
   switch (name) {
     case 'routing': {
       const r = await router(env)([MUMBAI, PUNE]);
-      const via = env.ORS_API_KEY ? 'openrouteservice' : 'OSRM demo (development only)';
+      const via = r.source ? ROUTER_NAMES[r.source] : 'openrouteservice';
       return { ok: r.distanceKm > 50, detail: `Mumbai to Pune: ${Math.round(r.distanceKm)} km, ${Math.round(r.durationMin)} min via ${via}.` };
     }
     case 'ai': {

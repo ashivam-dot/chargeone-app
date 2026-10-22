@@ -202,9 +202,17 @@ async function routeWithValhalla(env: Env, points: LatLng[], caller: RouteCaller
  * rules out production). PUBLIC_ROUTER can pick one explicitly, or 'off'.
  */
 function publicRouter(env: Env, caller?: RouteCaller): RouteFn | null {
-  const choice = env.PUBLIC_ROUTER ?? (isDev(env) ? 'osrm-demo' : 'valhalla');
+  const choice = publicRouterName(env);
   if (choice === 'valhalla') return (points, signal) => routeWithValhalla(env, points, caller, signal);
-  if (choice === 'osrm-demo' && isDev(env)) return routeWithOsrmDemo;
+  if (choice === 'osrm-demo') return routeWithOsrmDemo;
+  return null;
+}
+
+/** Which keyless router publicRouter() would use, or null when it is off. */
+export function publicRouterName(env: Env): 'valhalla' | 'osrm-demo' | null {
+  const choice = env.PUBLIC_ROUTER ?? (isDev(env) ? 'osrm-demo' : 'valhalla');
+  if (choice === 'valhalla') return 'valhalla';
+  if (choice === 'osrm-demo' && isDev(env)) return 'osrm-demo';
   return null;
 }
 

@@ -171,7 +171,9 @@ npm run dev:api        # app + API on http://127.0.0.1:8787 with a test sign-in 
 
 For front-end work with hot reload, run `npm run dev` alongside `npm run dev:api`; the dev server sends `/api` to
 port 8787 (sign-in and other POSTs must use port 8787 directly, because the API only accepts its own origin).
-Development mode routes with the public OSRM demo server when there's no ORS key. Production never uses it.
+Development mode routes with the public OSRM demo server when there's no ORS key. Production never uses it; it
+falls back to FOSSGIS's public Valhalla server instead, a stopgap until `ORS_API_KEY` is set (`PUBLIC_ROUTER=off`
+turns the keyless router off).
 
 ## Admin console
 

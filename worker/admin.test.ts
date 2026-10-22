@@ -152,7 +152,8 @@ describe('admin overview', () => {
     const { bearer } = setup({ ENVIRONMENT: 'production', RAZORPAY_KEY_ID: '', RAZORPAY_KEY_SECRET: undefined, RAZORPAY_WEBHOOK_SECRET: undefined });
     const res = await bearer('GET', '/api/admin/overview');
     const byId = Object.fromEntries((res.body.integrations as Array<Record<string, any>>).map((i) => [i.id, i]));
-    expect(byId.routing).toMatchObject({ configured: false, missing: ['ORS_API_KEY'] });
+    expect(byId.routing).toMatchObject({ configured: true, missing: ['ORS_API_KEY'] });
+    expect(byId.routing.detail).toContain('Valhalla');
     expect(byId.routing.howTo).toContain('wrangler secret put ORS_API_KEY');
     expect(byId.vehicle.missing).toEqual(['DEEPVUE_CLIENT_ID', 'DEEPVUE_CLIENT_SECRET']);
     expect(byId.razorpay.missing).toEqual(expect.arrayContaining(['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET']));
@@ -315,7 +316,7 @@ describe('live self-tests', () => {
   });
 
   it('reports a routing failure instead of failing itself', async () => {
-    const { browser } = await signedIn({ ENVIRONMENT: 'production' });
+    const { browser } = await signedIn({ ENVIRONMENT: 'production', PUBLIC_ROUTER: 'off' });
     const res = await browser('POST', '/api/admin/probe/routing', {});
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ ok: false });
