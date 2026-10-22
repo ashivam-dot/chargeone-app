@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
+    "data:build": "node pipeline/build.ts",
     "import:data": "node scripts/import-data.ts",
     "import:places": "node scripts/import-places.ts",
     "icons": "node scripts/make-icons.ts",

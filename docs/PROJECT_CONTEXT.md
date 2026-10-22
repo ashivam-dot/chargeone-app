@@ -72,8 +72,13 @@ out by zoom 3.6, terrain, 3D buildings, route draw-in, `Tilt3dControl`). No cyan
   (sha256-pinned), `server.py` (bearer token, en/hi, MP3), `Dockerfile`. Worker secrets `VOICE_TTS_URL`,
   `VOICE_TTS_TOKEN` (24+ chars) switch it on; unset, the app uses the phone's voice (Indian/neural preferred).
 - `android/`, `ios/`: generated Capacitor projects. `.github/workflows/`: `ci.yml`, `android.yml`, `ios.yml`.
-- Data: `public/data/stations.json` (527 stations, only 28 tagged DC), rebuilt with
-  `node scripts/import-data.ts --from-cache`.
+- Data: `pipeline/` (see `pipeline/README.md`). `npm run data:build` writes `public/data/`:
+  - 2,005 stations, 1,385 of them DC, from OSM and the Open Charge Map export; 370 Google-derived
+    OCM records are quarantined.
+  - Shards, index, manifest, coverage, review queue, aliases and the ODbL dump.
+  - Stable `c1_` ids are kept in `pipeline/registry.json`.
+  - Quality gates refuse to publish a truncated or regressed build.
+  - `scripts/import-data.ts` is now a thin wrapper.
 
 ## Plans and rules of the product
 
@@ -91,7 +96,7 @@ out by zoom 3.6, terrain, 3D buildings, route draw-in, `Tilt3dControl`). No cyan
 npm run setup:dev            # local D1 + migrations
 npm run dev:api              # wrangler dev on 8787 (serves the built app too)
 npm run build                # typecheck, build, prerender, bundle budget (380 KB start-up)
-npm test                     # 522 unit tests (app + worker)
+npm test                     # 641 unit tests (app + worker + pipeline)
 npx playwright test          # 70 e2e (pixel-7, small-phone-360, desktop); needs `npm run build` and `npm run dev:api`
 node scripts/ui-shots.ts <dir> [--light]   # screenshots of key screens for a visual check
 # All browsers are muted (--mute-audio + speechSynthesis stub in e2e/fixtures.ts): never play sound.
