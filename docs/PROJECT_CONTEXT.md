@@ -127,8 +127,21 @@ SITE_URL=https://chargeone.akshshivam5.workers.dev npm run deploy   # build, rem
   (unknown usernames cost the same Firebase call, same 401), `POST /api/auth/forgot {identifier}` (always the
   same answer), `GET /api/auth/username-available?u=`, `POST /api/auth/username {username}`,
   `POST /api/me/delete {firebaseIdToken?}`. 429s carry `Retry-After`.
-- Linking: a verified email joins the account with that email (both ways with Google). Unverified = 403
-  `email_unverified`. Trials are keyed by every login (Google sub, email, Firebase uid, phone hash).
+- Linking is explicit only (prevents pre-verification takeover): signing in with a different method on an
+  email that already has an account answers 409 `account_exists {methods}` and creates nothing (two
+  password logins on one email still join). Add Google while signed in: `POST /api/auth/link/google
+  {credential}` (same email, else 400 `email_mismatch`; 409 `google_in_use`; only UNIQUE errors mapped).
+  Remove a method: `POST /api/auth/unlink {provider}` (409 `last_method`, 404 `not_linked`), revokes every
+  session and reissues this device's cookie; removing password also frees the username. UI: You,
+  "Sign-in methods" (`MethodsView.tsx`). Unverified = 403 `email_unverified`.
+- Usernames only for accounts with a password identity (else 409 `username_needs_password`); "@name" is
+  accepted wherever a username is typed (`stripHandle`).
+- Trials are keyed by every login (Google sub, email, canonical mailbox (gmail dots/+tags folded), Firebase
+  uid, phone hash); throwaway-inbox-only accounts (`isDisposableEmail`) get 409 `trial_not_eligible`; at
+  most 20 trial starts per network a day (`trial-ip:` rate limit; `TRIAL_NETWORK_DAILY_LIMIT` overrides, `npm run dev:api` raises it for e2e).
+- JWKS cache: in-flight fetch shared, per-caller deadline, empty answer = failure, last good keys served up
+  to 24 h past expiry while Google's endpoint fails (retry once a minute).
+- `/api/auth/dev` (development only) takes `method: password|phone` to give the test user that identity.
 - Browser REST client without the SDK: `src/lib/firebaseRest.ts`. Test phone `+91 99999 00001` / `112233`
   (Spark allows ~10 real SMS a day). Firebase console: add each app host to Authorized domains.
 - Tests: `worker/firebase.test.ts`, `worker/auth-firebase.test.ts`, `src/shared/auth.test.ts`, `src/lib/firebaseRest.test.ts`.
@@ -136,7 +149,7 @@ SITE_URL=https://chargeone.akshshivam5.workers.dev npm run deploy   # build, rem
   Google on top, "or", Email|Phone tabs), `EmailForms.tsx`, `PhoneForm.tsx` + `src/lib/phoneAuth.ts`
   (Firebase SDK 13 loaded only when Phone opens, in-memory persistence, invisible reCAPTCHA),
   `GoogleButton.tsx`, `fields.tsx`, `signin.css`. `src/ui/SignIn.tsx` is only the lazy wrapper +
-  `signInReady`. Username prompt once per account after first sign-in (`chargeone:username-asked`); a
+  `signInReady`. Focus moves to each new view's first field or heading. Username prompt once per password account after first sign-in (`chargeone:username-asked`); a
   username typed at registration is claimed only for that same email. Delete account sends a fresh
   Firebase ID token (`src/lib/firebaseSession.ts`). CSP in `public/_headers` allows reCAPTCHA.
 - E2E: `e2e/signin.spec.ts` with `e2e/firebase-mock.ts` (fakes Identity Toolkit, securetoken, GSI, and

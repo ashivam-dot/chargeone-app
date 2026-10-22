@@ -2,9 +2,12 @@
 //
 // - Google stays keyed by users.google_sub. Password and phone are keyed by the Firebase uid in
 //   auth_identities.
-// - A verified email links: a password sign-in whose verified email equals an existing account's
-//   email joins that account, and a first Google sign-in joins the password account with the same
-//   email. Plans, trials and trips carry over. Both sides have proven they own the mailbox.
+// - Accounts are never joined silently across methods. Opening a verification link only proves
+//   someone clicked it, not that they made the password, so a password sign-in whose email belongs
+//   to a Google or phone account, and a first Google sign-in whose email belongs to a password
+//   account, get 409 account_exists. Adding Google happens signed in (POST /api/auth/link/google),
+//   and any method but the last can be removed (POST /api/auth/unlink), which signs out every device.
+//   Trials still see one person through the email (canonical form) in trial.ts.
 // - A phone number that comes back under a new Firebase uid finds its account by a keyed hash.
 // - Usernames (optional) let a password account sign in without typing the email.
 // Never log emails, phone numbers, tokens or passwords from here.
@@ -13,6 +16,7 @@ import {
   maskEmail,
   maskPhone,
   normalizeUsername,
+  stripHandle,
   usernameProblem,
   USERNAME_PROBLEM_TEXT,
   type AuthProvider,
@@ -85,6 +89,11 @@ async function linkIdentity(env: Env, provider: AuthProvider, uid: string, userI
   await identityInsert(env, provider, uid, userId, extra, 'update').run();
 }
 
+/** Development login only: gives the test account a password or phone identity, as a real sign-in would. */
+export async function linkDevIdentity(env: Env, provider: 'password' | 'phone', email: string, userId: string): Promise<void> {
+  await linkIdentity(env, provider, `dev:${email}`, userId);
+}
+
 /**
  * A new account with this identity. If a parallel request linked the identity first, that account
  * wins and the one made here (which has nothing in it yet) is removed.
@@ -140,11 +149,20 @@ export async function firebaseUser(env: Env, identity: FirebaseIdentity, opts: S
       return userById(env, known);
     }
     const sameEmail = await env.DB.prepare(
-      `SELECT id FROM users WHERE LOWER(email) = ?1 AND email NOT IN ('', ?2) AND is_test = 0 ORDER BY created_at LIMIT 1`,
+      `SELECT u.id,
+         (u.google_sub IS NOT NULL OR EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id AND i.provider <> 'password')) AS other
+       FROM users u WHERE LOWER(u.email) = ?1 AND u.email NOT IN ('', ?2) AND u.is_test = 0 ORDER BY u.created_at LIMIT 1`,
     )
       .bind(email, DELETED)
-      .first<{ id: string }>();
+      .first<{ id: string; other: number }>();
+    if (sameEmail?.other) {
+      // Never joined silently: whoever opened a verification link hasn't shown they own this account.
+      const { methods } = await accountProfile(env, await userById(env, sameEmail.id));
+      const how = methods.includes('google') ? 'Continue with Google' : 'Sign in with your phone number';
+      throw new HttpError(409, 'account_exists', `This email already has a ChargeOne account. ${how} to open it.`, { methods });
+    }
     if (sameEmail) {
+      // Only password logins on that account (its old Firebase user is gone): the same mailbox, same person.
       await env.DB.batch([
         identityInsert(env, 'password', identity.uid, sameEmail.id, {}, 'update'),
         env.DB.prepare('UPDATE users SET name = ?1 WHERE id = ?2 AND name IS NULL').bind(name, sameEmail.id),
@@ -190,8 +208,13 @@ export async function firebaseSignIn(req: Request, env: Env): Promise<User> {
   return firebaseUser(env, identity, { name });
 }
 
-// ---- Google sign-in, linked to a password account with the same email ----
+// ---- Google sign-in, and adding Google to an account explicitly ----
 
+/**
+ * A first Google sign-in whose email already has a password account is refused rather than joined:
+ * that password account may have been made by someone else (they only needed its owner to open one
+ * verification link). The owner signs in with the password and adds Google from "Sign-in methods".
+ */
 export async function googleUser(env: Env, google: GoogleIdentity): Promise<User> {
   const known = await env.DB.prepare('SELECT id FROM users WHERE google_sub = ?1').bind(google.sub).first();
   if (!known) {
@@ -199,21 +222,80 @@ export async function googleUser(env: Env, google: GoogleIdentity): Promise<User
       `SELECT u.id FROM users u
        WHERE u.google_sub IS NULL AND LOWER(u.email) = LOWER(?1) AND u.email NOT IN ('', ?2) AND u.is_test = 0
          AND EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id AND i.provider = 'password')
-       ORDER BY u.created_at LIMIT 1`,
+       LIMIT 1`,
     )
       .bind(google.email, DELETED)
       .first<{ id: string }>();
     if (match) {
-      // A parallel first sign-in may have set the sub already; upsertUser below then finds it.
-      await env.DB.prepare('UPDATE users SET google_sub = ?1 WHERE id = ?2 AND google_sub IS NULL')
-        .bind(google.sub, match.id)
-        .run()
-        .catch(() => undefined);
+      throw new HttpError(
+        409,
+        'account_exists',
+        'This email already has a ChargeOne account with a password. Sign in with your email or username and password, then add Google under You, Sign-in methods.',
+        { methods: ['password'] },
+      );
     }
   }
   const user = await upsertUser(env, google.sub, google.email, google.name);
   await linkIdentity(env, 'google', google.sub, user.id);
   return user;
+}
+
+/**
+ * POST /api/auth/link/google {credential}: adds Google to the signed-in account. The Google account
+ * must have the account's email (phone-only accounts take the Google email) and no account of its own.
+ */
+export async function linkGoogle(env: Env, user: User, google: GoogleIdentity): Promise<void> {
+  const inUse = () =>
+    new HttpError(409, 'google_in_use', 'That Google account already has its own ChargeOne account. Sign in with it, or delete that account first.');
+  const row = await env.DB.prepare('SELECT google_sub, email FROM users WHERE id = ?1').bind(user.id).first<{ google_sub: string | null; email: string }>();
+  if (!row || row.email === DELETED) throw new HttpError(401, 'signed_out', 'Please sign in first.');
+  if (row.google_sub === google.sub) return;
+  if (row.google_sub) throw new HttpError(409, 'google_linked', 'This account already signs in with another Google account. Remove it first.');
+  if (row.email && row.email.toLowerCase() !== google.email.toLowerCase()) {
+    throw new HttpError(400, 'email_mismatch', `Choose the Google account for ${maskEmail(row.email)}.`);
+  }
+  if (await env.DB.prepare('SELECT 1 FROM users WHERE google_sub = ?1').bind(google.sub).first()) throw inUse();
+  let changes = 0;
+  try {
+    const res = await env.DB.prepare(
+      `UPDATE users SET google_sub = ?1, email = CASE WHEN email = '' THEN ?3 ELSE email END
+       WHERE id = ?2 AND google_sub IS NULL`,
+    )
+      .bind(google.sub, user.id, google.email.toLowerCase())
+      .run();
+    changes = res.meta.changes ?? 0;
+  } catch (err) {
+    // Only the unique index on google_sub (a parallel sign-in with that Google account) is expected.
+    if (String(err).includes('UNIQUE')) throw inUse();
+    throw err;
+  }
+  if (!changes) throw new HttpError(409, 'google_linked', 'This account already signs in with another Google account. Remove it first.');
+  await linkIdentity(env, 'google', google.sub, user.id);
+}
+
+/**
+ * POST /api/auth/unlink {provider}: removes one sign-in method, never the last one. The caller then
+ * signs every other device out, so a method that was added by someone else loses its session too.
+ */
+export async function unlinkMethod(req: Request, env: Env, user: User): Promise<AuthProvider> {
+  const body = await readJson(req, 256);
+  const provider = body.provider;
+  if (provider !== 'google' && provider !== 'password' && provider !== 'phone') {
+    throw new HttpError(400, 'invalid', 'Choose google, password or phone.');
+  }
+  const { methods } = await accountProfile(env, user);
+  if (!methods.includes(provider)) throw new HttpError(404, 'not_linked', 'This account does not sign in that way.');
+  if (methods.length < 2) throw new HttpError(409, 'last_method', 'This is the only way to sign in to this account. Add another before removing it.');
+  const remove = env.DB.prepare('DELETE FROM auth_identities WHERE user_id = ?1 AND provider = ?2').bind(user.id, provider);
+  const extra =
+    provider === 'google'
+      ? [env.DB.prepare("UPDATE users SET google_sub = NULL WHERE id = ?1 AND google_sub NOT LIKE '%:%'").bind(user.id)]
+      : provider === 'password'
+        ? // A username only signs in with a password.
+          [env.DB.prepare('UPDATE users SET username = NULL WHERE id = ?1').bind(user.id)]
+        : [];
+  await env.DB.batch([remove, ...extra]);
+  return provider;
 }
 
 // ---- Profile ----
@@ -262,7 +344,7 @@ async function emailForUsername(env: Env, username: string): Promise<string | nu
 
 /** An email typed in, or the email behind a username; null when there's no such password account. */
 async function resolveIdentifier(env: Env, identifier: string): Promise<string | null> {
-  const value = identifier.trim().toLowerCase();
+  const value = stripHandle(identifier).toLowerCase();
   if (value.includes('@')) return isEmail(value) ? value : null;
   return usernameProblem(value) ? null : emailForUsername(env, value);
 }
@@ -281,6 +363,11 @@ export async function usernameAvailability(req: Request, env: Env): Promise<{ us
 export async function claimUsername(req: Request, env: Env, user: User): Promise<{ username: string }> {
   const body = await readJson(req, 512);
   const username = parseUsername(body.username);
+  // A username stands in for the email at password sign-in, so it is only for accounts with a password.
+  const hasPassword = await env.DB.prepare("SELECT 1 FROM auth_identities WHERE user_id = ?1 AND provider = 'password'").bind(user.id).first();
+  if (!hasPassword) {
+    throw new HttpError(409, 'username_needs_password', 'Usernames are for signing in with a password. This account signs in with Google or a phone number.');
+  }
   await enforceRateLimitRetry(env.DB, `uname-set:${user.id}`, USERNAME_SET_LIMIT, 86400, 'You have changed your username too often today. Try again tomorrow.');
   const taken = () => new HttpError(409, 'username_taken', USERNAME_PROBLEM_TEXT.taken, { reason: 'taken' });
   let changes = 0;
@@ -306,7 +393,10 @@ export async function claimUsername(req: Request, env: Env, user: User): Promise
 function readIdentifier(body: Record<string, unknown>): string {
   const raw = body.username ?? body.identifier;
   if (typeof raw !== 'string' || !raw.trim() || raw.length > 254) throw new HttpError(400, 'invalid', 'Enter your email or username.');
-  return raw.trim().toLowerCase();
+  // "@asha" is how the app shows a username; the rate-limit keys use the same form as the lookup.
+  const value = stripHandle(raw).toLowerCase();
+  if (!value) throw new HttpError(400, 'invalid', 'Enter your email or username.');
+  return value;
 }
 
 /**

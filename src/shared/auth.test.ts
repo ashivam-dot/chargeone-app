@@ -3,7 +3,10 @@ import {
   AUTH_ERROR_TEXT,
   authErrorCode,
   authErrorText,
+  canonicalEmail,
+  isDisposableEmail,
   isEmail,
+  stripHandle,
   maskEmail,
   maskPhone,
   normalizePhone,
@@ -64,6 +67,24 @@ describe('email', () => {
     expect(isEmail('spa ce@example.com')).toBe(false);
     expect(maskEmail('akash@gmail.com')).toBe('a•••@gmail.com');
     expect(maskEmail('nonsense')).toBe('•••');
+  });
+
+  it('reads "@name" as the username and leaves emails alone', () => {
+    expect(stripHandle('@asha')).toBe('asha');
+    expect(stripHandle('  @Asha_1 ')).toBe('Asha_1');
+    expect(stripHandle('asha')).toBe('asha');
+    expect(stripHandle('asha@example.com')).toBe('asha@example.com');
+    expect(stripHandle('@asha@example.com')).toBe('@asha@example.com');
+    expect(stripHandle('@')).toBe('');
+  });
+
+  it('gives one canonical form per mailbox for trial keys', () => {
+    expect(canonicalEmail('A.Sha.K+promo@Gmail.com')).toBe('ashak@gmail.com');
+    expect(canonicalEmail('ashak@googlemail.com')).toBe('ashak@gmail.com');
+    expect(canonicalEmail('first.last+x@example.com')).toBe('first.last@example.com');
+    expect(canonicalEmail('+only@example.com')).toBe('+only@example.com');
+    expect(isDisposableEmail('x@Mailinator.com')).toBe(true);
+    expect(isDisposableEmail('x@gmail.com')).toBe(false);
   });
 });
 

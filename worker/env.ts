@@ -44,6 +44,8 @@ export interface Env {
   CASHFREE_SANDBOX?: string;
   AGENT_MODEL?: string;
   AGENT_FALLBACK_MODEL?: string;
+  /** Free Plus weeks one network may start a day (default 20). Raised for local end-to-end runs. */
+  TRIAL_NETWORK_DAILY_LIMIT?: string;
 }
 
 export const isDev = (env: Env) => env.ENVIRONMENT === 'development';

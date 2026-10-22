@@ -8,6 +8,7 @@ import {
   isEmail,
   normalizeUsername,
   passwordProblems,
+  stripHandle,
 } from "../../shared/auth.ts";
 import {
   Field,
@@ -111,7 +112,8 @@ export function EmailSignIn({
 
   const submit = async (e: Event) => {
     e.preventDefault();
-    const id = identifier.trim();
+    // "@asha", as the app shows usernames, is the username "asha".
+    const id = stripHandle(identifier);
     const errs = {
       id: !id
         ? "Enter your email or username."
@@ -469,8 +471,10 @@ export function VerifyEmail({ state, onVerified, onBack }: VerifyProps) {
       <div class="auth-verify__icon" aria-hidden="true">
         <MailCheck size={30} />
       </div>
-      <h3 class="auth-verify__title">Check your inbox</h3>
-      <p class="auth-verify__text">
+      <h3 class="auth-verify__title" tabIndex={-1} data-autofocus>
+        Check your inbox
+      </h3>
+      <p class="auth-verify__text" role="status">
         {state.sentNow
           ? "We sent a verification link to"
           : "Verify your email to sign in. The link went to"}{" "}
@@ -541,7 +545,7 @@ export function ForgotPassword({ initial, onSend, onBack }: ForgotProps) {
 
   const submit = async (e: Event) => {
     e.preventDefault();
-    const id = identifier.trim();
+    const id = stripHandle(identifier);
     if (!id) return setFieldError("Enter your email or username.");
     if (id.includes("@") && !isEmail(id))
       return setFieldError("Enter a valid email address.");

@@ -388,10 +388,15 @@ export class FakeFirebase {
     extra: Record<string, unknown> = {},
     method?: string,
   ): Promise<void> {
+    const kind = method ?? (u.phone ? "phone" : "password");
     const res = await route.fetch({
       url: new URL("/api/auth/dev", route.request().url()).toString(),
       method: "POST",
-      postData: JSON.stringify({ email: devEmail(u) }),
+      // The Worker learns how this account signs in (a username needs a password).
+      postData: JSON.stringify({
+        email: devEmail(u),
+        ...(kind === "google" ? {} : { method: kind }),
+      }),
       headers: {
         ...route.request().headers(),
         "content-type": "application/json",
@@ -402,7 +407,7 @@ export class FakeFirebase {
     this.me = {
       email: u.email ?? null,
       phone: u.phone ? maskPhone(u.phone) : null,
-      methods: [method ?? (u.phone ? "phone" : "password")],
+      methods: [kind],
       name: u.displayName ?? (u.phone ? null : String(body.user.name ?? "")),
     };
     return route.fulfill({

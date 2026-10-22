@@ -1,7 +1,7 @@
 import type { Coord } from '../planner/geometry.ts';
 import type { Plan, PlanId, UsageCounts } from '../shared/plans.ts';
 import type { ReportKind, StationStatus } from '../shared/status.ts';
-import type { FirebasePublicConfig, MeUser, UsernameProblem } from '../shared/auth.ts';
+import type { AuthProvider, FirebasePublicConfig, MeUser, UsernameProblem } from '../shared/auth.ts';
 import type { FeedbackRequest, RouteAlternativeWire, RouteRequest, TrialInfo, VehicleLookupRequest, VehicleLookupResult } from '../shared/contracts.ts';
 import { apiFetch, type ApiResponse } from './transport.ts';
 
@@ -117,6 +117,10 @@ export const api = {
   usernameAvailable: (username: string) =>
     request<UsernameAvailability>('GET', `/api/auth/username-available?u=${encodeURIComponent(username)}`),
   claimUsername: (username: string) => request<{ username: string }>('POST', '/api/auth/username', { username }),
+  /** Adds Google to the signed-in account (the Google account must have the account's email). */
+  linkGoogle: (credential: string) => request<Me>('POST', '/api/auth/link/google', { credential }),
+  /** Removes a sign-in method (never the last); every other device is signed out. */
+  unlinkMethod: (provider: AuthProvider) => request<Me>('POST', '/api/auth/unlink', { provider }),
   statuses: () => request<{ generatedAt: string; statuses: StationStatus[] }>('GET', '/api/status'),
   reports: (stationId: string) => request<{ reports: Report[] }>('GET', `/api/stations/${encodeURIComponent(stationId)}/reports`),
   checkin: (body: { stationId: string; kind: ReportKind; kw?: number; vehicle?: string; note?: string; position: LatLng; accuracy: number }) =>

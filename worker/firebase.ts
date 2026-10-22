@@ -45,29 +45,86 @@ interface Jwk {
   e: string;
 }
 
-let keyCache: { keys: Jwk[]; expires: number; fetchedAt: number } | null = null;
+/**
+ * keys: the last good set. expires: when to fetch again. fetchedAt: the last fetch attempt (good or
+ * not), which spaces out refetches. staleUntil: how long the set may still be used while Google's
+ * key endpoint is failing (keys rotate over days, so yesterday's set still verifies today's tokens).
+ */
+let keyCache: { keys: Jwk[]; expires: number; fetchedAt: number; staleUntil: number } | null = null;
+/** The fetch in progress, shared by every request that needs it (no pile-up of 8 s timeouts). */
+let inflight: Promise<Jwk[]> | null = null;
+let inflightAt = 0;
+
+/** After a failed fetch with usable stale keys, try the endpoint again only this often. */
+const RETRY_AFTER_FAILURE_MS = 60_000;
+/** Stale keys are used for at most this long past their expiry. */
+const STALE_GRACE_MS = 24 * 3600_000;
+
+const unavailable = () => new HttpError(502, 'firebase_unavailable', 'Sign-in is unavailable right now. Try again, or use Google.');
 
 async function fetchKeys(fetchImpl: typeof fetch, nowMs: number): Promise<Jwk[]> {
   let res: Response;
   try {
     res = await fetchImpl(FIREBASE_KEYS_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   } catch {
-    throw new HttpError(502, 'firebase_unavailable', 'Sign-in is unavailable right now. Try again, or use Google.');
+    throw unavailable();
   }
-  if (!res.ok) throw new HttpError(502, 'firebase_unavailable', 'Sign-in is unavailable right now. Try again, or use Google.');
+  if (!res.ok) throw unavailable();
   const body = (await res.json().catch(() => null)) as { keys?: unknown } | null;
   const keys = Array.isArray(body?.keys) ? (body.keys as Jwk[]).filter((k) => k && typeof k.kid === 'string' && k.kty === 'RSA') : [];
-  keyCache = { keys, fetchedAt: nowMs, expires: nowMs + Math.min(maxAgeSeconds(res.headers.get('Cache-Control')), 86400) * 1000 };
+  // An empty or garbled answer is a failure too, not a key set to cache for a day.
+  if (!keys.length) throw unavailable();
+  const expires = nowMs + Math.min(maxAgeSeconds(res.headers.get('Cache-Control')), 86400) * 1000;
+  keyCache = { keys, fetchedAt: nowMs, expires, staleUntil: expires + STALE_GRACE_MS };
   return keys;
+}
+
+/** Fresh keys, or the last good ones (within the grace period) when the endpoint is down. */
+function refreshKeys(fetchImpl: typeof fetch, nowMs: number): Promise<Jwk[]> {
+  // A fetch that never settled (its request was cancelled) must not block every later refresh.
+  if (inflight && nowMs - inflightAt <= TIMEOUT_MS * 2) return inflight;
+  inflightAt = nowMs;
+  const p: Promise<Jwk[]> = fetchKeys(fetchImpl, nowMs)
+    .catch((err: unknown) => {
+      const cached = keyCache;
+      if (!cached || nowMs >= cached.staleUntil) throw err;
+      // Keep signing people in with the keys we have; look again in a minute, not on every request.
+      keyCache = { ...cached, fetchedAt: nowMs, expires: Math.min(nowMs + RETRY_AFTER_FAILURE_MS, cached.staleUntil) };
+      return cached.keys;
+    })
+    .finally(() => {
+      if (inflight === p) inflight = null;
+    });
+  inflight = p;
+  return p;
+}
+
+/**
+ * Waits for the shared fetch, but never longer than its own timeout and a little: on Workers the
+ * fetch belongs to the request that started it, and if that request is cancelled the others must
+ * not hang. Past the deadline, stale keys (within grace) or 502.
+ */
+function sharedKeys(fetchImpl: typeof fetch, nowMs: number): Promise<Jwk[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<Jwk[]>((resolve, reject) => {
+    timer = setTimeout(() => {
+      const cached = keyCache;
+      if (cached && nowMs < cached.staleUntil) resolve(cached.keys);
+      else reject(unavailable());
+    }, TIMEOUT_MS + 1000);
+  });
+  return Promise.race([refreshKeys(fetchImpl, nowMs), deadline]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
 }
 
 async function keyFor(kid: string, fetchImpl: typeof fetch, nowMs: number): Promise<Jwk | undefined> {
   const fresh = keyCache && keyCache.expires > nowMs;
-  const keys = fresh ? keyCache!.keys : await fetchKeys(fetchImpl, nowMs);
+  const keys = fresh ? keyCache!.keys : await sharedKeys(fetchImpl, nowMs);
   const found = keys.find((k) => k.kid === kid);
   if (found || !fresh || nowMs - keyCache!.fetchedAt < REFETCH_MS) return found;
   // Google may have rotated in a new key since the cached set was fetched.
-  return (await fetchKeys(fetchImpl, nowMs)).find((k) => k.kid === kid);
+  return (await sharedKeys(fetchImpl, nowMs)).find((k) => k.kid === kid);
 }
 
 export interface FirebaseIdentity {
@@ -136,6 +193,7 @@ export async function verifyFirebaseIdToken(
 /** Test hook so cached keys don't leak between tests. */
 export function resetFirebaseKeyCache(): void {
   keyCache = null;
+  inflight = null;
 }
 
 // ---- Identity Toolkit REST, called by the Worker ----

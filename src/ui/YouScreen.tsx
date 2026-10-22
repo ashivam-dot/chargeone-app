@@ -18,6 +18,8 @@ interface Props {
   onSignIn: () => void;
   /** Opens "choose a username" for a signed-in account that has none. */
   onSetUsername?: () => void;
+  /** Opens "Sign-in methods": add Google, remove a method. */
+  onSignInMethods?: () => void;
   /** Sign-in works on this server; the trial and free account are only offered then. */
   signInReady: boolean;
   onPlans: () => void;
@@ -113,9 +115,15 @@ export function YouScreen(p: Props) {
           <span class="muted" data-testid="you-handle">
             {signedIn ? handle : p.signInReady ? 'No sign-in needed. Sign in free for more trips.' : 'No sign-in needed. Free accounts are coming soon.'}
           </span>
-          {signedIn && u?.username === null && p.onSetUsername && (
+          {/* A username stands in for the email at password sign-in, so only password accounts get one. */}
+          {signedIn && u?.username === null && u.methods?.includes('password') && p.onSetUsername && (
             <button class="link link--inline small" onClick={p.onSetUsername} data-testid="you-set-username">
               Choose a username
+            </button>
+          )}
+          {signedIn && p.signInReady && p.onSignInMethods && (
+            <button class="link link--inline small" onClick={p.onSignInMethods} data-testid="you-signin-methods">
+              Sign-in methods
             </button>
           )}
         </div>

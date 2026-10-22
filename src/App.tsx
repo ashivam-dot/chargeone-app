@@ -38,7 +38,7 @@ const CarScreen = lazy(() => import('./ui/car/CarScreen.tsx').then((m) => m.CarS
 const CopilotScreen = lazy(() => import('./ui/copilot/CopilotScreen.tsx').then((m) => m.CopilotScreen));
 const DriveMode = lazy(() => import('./ui/drive/DriveMode.tsx').then((m) => m.DriveMode));
 
-type Overlay = 'plans' | 'signin' | 'username' | 'about' | 'garage' | null;
+type Overlay = 'plans' | 'signin' | 'username' | 'methods' | 'about' | 'garage' | null;
 
 const STATUS_POLL_MS = 60_000;
 /** Must match the side panel width plus margin in styles.css (min-width: 820px). */
@@ -634,6 +634,7 @@ export function App() {
           }}
           onSignIn={() => setOverlay('signin')}
           onSetUsername={() => setOverlay('username')}
+          onSignInMethods={() => setOverlay('methods')}
           signInReady={canSignIn}
           onPlans={() => unlock()}
           onGarage={() => setOverlay('garage')}
@@ -663,11 +664,11 @@ export function App() {
         />
       )}
 
-      {(overlay === 'signin' || overlay === 'username') && (
+      {(overlay === 'signin' || overlay === 'username' || overlay === 'methods') && (
         <SignIn
           config={config}
           dark={dark}
-          start={overlay === 'username' ? 'username' : undefined}
+          start={overlay === 'signin' ? undefined : overlay}
           me={me}
           onClose={() => {
             trialWanted.current = false;

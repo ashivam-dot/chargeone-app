@@ -134,4 +134,61 @@ describe('Firebase ID token verification', () => {
     await expect(verifyFirebaseIdToken(token, PROJECT_ID, offline, now)).rejects.toMatchObject({ status: 502 });
     await expect(verifyFirebaseIdToken(token, '', down, now)).rejects.toMatchObject({ status: 503 });
   });
+
+  describe('when the key endpoint fails after the cache expired', () => {
+    const HOUR = 3600_000;
+    let mode: 'up' | 'down' | 'timeout' | 'empty' = 'up';
+    let fetches = 0;
+    let keysUp: typeof fetch;
+    const flaky = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      fetches++;
+      if (mode === 'timeout') throw new DOMException('The operation timed out.', 'TimeoutError');
+      if (mode === 'down') return new Response('unavailable', { status: 503 });
+      if (mode === 'empty') return new Response('{"keys":[]}', { headers: { 'Cache-Control': 'max-age=3600' } });
+      return keysUp(input, init);
+    }) as typeof fetch;
+
+    beforeEach(async () => {
+      mode = 'up';
+      fetches = 0;
+      keysUp = (await fetchWith()).fetchImpl;
+      // Primes the cache; the fake serves max-age=3600, so it expires an hour after `now`.
+      await verifyFirebaseIdToken(await signJwt(idClaims({}, now), pair.privateKey), PROJECT_ID, flaky, now);
+      fetches = 0;
+    });
+
+    it.each(['down', 'timeout', 'empty'] as const)('keeps verifying with the stale keys (%s), and retries at most once a minute', async (m) => {
+      mode = m;
+      const later = now + 2 * HOUR;
+      const token = await signJwt(idClaims({}, later), pair.privateKey);
+      expect((await verifyFirebaseIdToken(token, PROJECT_ID, flaky, later)).uid).toBe('fb-uid-1');
+      expect(fetches).toBe(1);
+      expect((await verifyFirebaseIdToken(token, PROJECT_ID, flaky, later + 30_000)).uid).toBe('fb-uid-1');
+      expect(fetches).toBe(1);
+      // A minute on it looks again, and once the endpoint is back the fresh keys are used.
+      mode = 'up';
+      expect((await verifyFirebaseIdToken(token, PROJECT_ID, flaky, later + 61_000)).uid).toBe('fb-uid-1');
+      expect(fetches).toBe(2);
+    });
+
+    it('gives up on stale keys a day past their expiry', async () => {
+      mode = 'down';
+      const muchLater = now + HOUR + 25 * HOUR;
+      const token = await signJwt(idClaims({}, muchLater), pair.privateKey);
+      await expect(verifyFirebaseIdToken(token, PROJECT_ID, flaky, muchLater)).rejects.toMatchObject({ status: 502, code: 'firebase_unavailable' });
+    });
+
+    it('shares one fetch between requests that arrive together', async () => {
+      const later = now + 2 * HOUR;
+      const token = await signJwt(idClaims({}, later), pair.privateKey);
+      const results = await Promise.all(Array.from({ length: 5 }, () => verifyFirebaseIdToken(token, PROJECT_ID, flaky, later)));
+      expect(results.map((r) => r.uid)).toEqual(Array(5).fill('fb-uid-1'));
+      expect(fetches).toBe(1);
+      mode = 'timeout';
+      const t2 = now + 4 * HOUR;
+      const token2 = await signJwt(idClaims({}, t2), pair.privateKey);
+      await Promise.all(Array.from({ length: 5 }, () => verifyFirebaseIdToken(token2, PROJECT_ID, flaky, t2)));
+      expect(fetches).toBe(2);
+    });
+  });
 });

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "dev:api": "wrangler dev --port 8787",
+    "dev:api": "wrangler dev --port 8787 --var TRIAL_NETWORK_DAILY_LIMIT:100000",
     "setup:dev": "node scripts/setup-dev.ts && wrangler d1 migrations apply chargeone --local",
     "build": "npm run typecheck && vite build && vite build -c vite.admin.config.ts && node scripts/prerender.ts && node scripts/bundle-budget.ts",
     "preview": "vite preview",

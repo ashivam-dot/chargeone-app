@@ -5,9 +5,30 @@ import type { User } from './auth.ts';
 import { getEntitlement, grantStatement } from './entitlements.ts';
 import { hmacSha256, toHex } from './crypto.ts';
 import type { Env } from './env.ts';
-import { HttpError, enforceRateLimit, readJson, requireDevice, str } from './http.ts';
+import { HttpError, clientKey, enforceRateLimit, readJson, requireDevice, str } from './http.ts';
+import { canonicalEmail, isDisposableEmail } from '../src/shared/auth.ts';
 
 const DAY_MS = 86400_000;
+/** Free Plus weeks started from one network in a day (mobile networks share addresses, so not 1). */
+export const TRIAL_STARTS_PER_NETWORK_DAY = 20;
+
+/** The daily per-network limit; TRIAL_NETWORK_DAILY_LIMIT overrides it (local end-to-end runs share one address). */
+function trialNetworkLimit(env: Env): number {
+  const n = Number(env.TRIAL_NETWORK_DAILY_LIMIT);
+  return Number.isInteger(n) && n > 0 ? n : TRIAL_STARTS_PER_NETWORK_DAY;
+}
+
+/** A password account on a throwaway inbox with no Google or phone login behind it. */
+async function usesThrowawayEmailOnly(env: Env, userId: string): Promise<boolean> {
+  const row = await env.DB.prepare(
+    `SELECT u.email, u.google_sub,
+       EXISTS (SELECT 1 FROM auth_identities i WHERE i.user_id = u.id AND i.provider = 'phone') AS phone
+     FROM users u WHERE u.id = ?1`,
+  )
+    .bind(userId)
+    .first<{ email: string; google_sub: string | null; phone: number }>();
+  return Boolean(row && !row.google_sub && !row.phone && row.email && isDisposableEmail(row.email));
+}
 
 /**
  * Identifies the person behind the account across deletion and sign-up again (which gives a new
@@ -26,7 +47,11 @@ export async function accountHashes(env: Env, userId: string): Promise<string[]>
   ]);
   const labels: string[] = [];
   if (row?.google_sub) labels.push(`trial-account:${row.google_sub}`);
-  if (row?.email && row.email !== 'deleted') labels.push(`trial-account:email:${row.email.toLowerCase()}`);
+  if (row?.email && row.email !== 'deleted') {
+    labels.push(`trial-account:email:${row.email.toLowerCase()}`);
+    // a.b+1@gmail.com and ab@gmail.com are one inbox, so one trial.
+    labels.push(`trial-account:mailbox:${canonicalEmail(row.email)}`);
+  }
   for (const id of ids.results) {
     labels.push(`trial-account:firebase:${id.provider_uid}`);
     if (id.phone_hash) labels.push(`trial-account:phone:${id.phone_hash}`);
@@ -61,8 +86,8 @@ async function history(env: Env, userId: string, device: string | null, accounts
 export async function trialInfo(env: Env, userId: string, device: string | null, e: (Entitlement & { source: string }) | null, now = new Date()): Promise<TrialInfo> {
   const plan = effectivePlan(e, now);
   const running = e?.source === 'trial' && isPlus(plan);
-  const h = await history(env, userId, device, await accountHashes(env, userId));
-  return { eligible: plan === 'free' && !h.trial && !h.paid, endsAt: running ? e.activeUntil : null };
+  const [h, throwaway] = await Promise.all([history(env, userId, device, await accountHashes(env, userId)), usesThrowawayEmailOnly(env, userId)]);
+  return { eligible: plan === 'free' && !h.trial && !h.paid && !throwaway, endsAt: running ? e.activeUntil : null };
 }
 
 export async function startTrial(req: Request, env: Env, user: User): Promise<void> {
@@ -85,6 +110,12 @@ export async function startTrial(req: Request, env: Env, user: User): Promise<vo
   if (h.paid || plan !== 'free') {
     throw new HttpError(409, 'trial_not_eligible', 'The free Plus week is for drivers who have not had a paid plan yet.');
   }
+  // The install id is chosen by the app, so it can't be the only brake: a throwaway inbox gets no
+  // trial, and one network starts only a few a day (counted only for requests that got this far).
+  if (await usesThrowawayEmailOnly(env, user.id)) {
+    throw new HttpError(409, 'trial_not_eligible', 'The free Plus week needs Google, a phone number or a regular email address.');
+  }
+  await enforceRateLimit(env.DB, `trial-ip:${await clientKey(req)}`, trialNetworkLimit(env), 86400);
 
   const endsAt = new Date(now.getTime() + TRIAL_DAYS * DAY_MS);
   // The trial row is the claim: the account, its first login key and the phone are each unique, so

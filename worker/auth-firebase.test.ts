@@ -6,6 +6,7 @@ import { base64UrlEncode } from './crypto.ts';
 import { resetFirebaseKeyCache } from './firebase.ts';
 import { PASSWORD_LOGIN_LIMIT, FORGOT_MESSAGE } from './identities.ts';
 import worker from './index.ts';
+import { TRIAL_STARTS_PER_NETWORK_DAY } from './trial.ts';
 import { client, deviceHeaders, fakeEnv } from './test-support/fake-env.ts';
 import {
   FIREBASE_ENV,
@@ -133,22 +134,91 @@ describe('POST /api/auth/firebase (email and password)', () => {
     expect((await api('POST', '/api/auth/firebase', { idToken: otherProject })).body.error).toBe('bad_firebase_token');
   });
 
-  it('links a verified email to the existing Google account with that email', async () => {
+  it("won't join a verified password sign-in to someone's Google account (a victim may have opened the link)", async () => {
     const { browser, sqlite } = setup();
-    const g = await browser()('POST', '/api/auth/google', { credential: await googleCredential('g-sub-1', 'linked@gmail.com') });
+    const g = await browser()('POST', '/api/auth/google', { credential: await googleCredential('g-sub-1', 'victim@gmail.com') });
     expect(g.status).toBe(200);
-    const pw = await browser()('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-link', 'Linked@gmail.com', true)) });
-    expect(pw.status).toBe(200);
-    expect(pw.body.user.methods).toEqual(['google', 'password']);
+    const attacker = browser();
+    const pw = await attacker('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-attacker', 'Victim@gmail.com', true)) });
+    expect(pw.status).toBe(409);
+    expect(pw.body).toMatchObject({ error: 'account_exists', methods: ['google'] });
+    expect(pw.headers.get('Set-Cookie')).toBeNull();
+    expect((await attacker('GET', '/api/me')).body.user).toBeNull();
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM users').get()).toMatchObject({ n: 1 });
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM auth_identities WHERE provider = 'password'").get()).toMatchObject({ n: 0 });
   });
 
-  it('links a first Google sign-in to the password account with that email', async () => {
+  it("won't put a first Google sign-in into an existing password account, and makes no second account", async () => {
     const { browser, sqlite } = setup();
     await browser()('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-first', 'first@gmail.com', true)) });
     const g = await browser()('POST', '/api/auth/google', { credential: await googleCredential('g-sub-2', 'first@gmail.com') });
+    expect(g.status).toBe(409);
+    expect(g.body).toMatchObject({ error: 'account_exists', methods: ['password'] });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM users').get()).toMatchObject({ n: 1 });
+    expect(sqlite.prepare('SELECT google_sub FROM users').get()).toEqual({ google_sub: null });
+  });
+
+  it('adds Google to a password account when its owner is signed in, then Google opens the same account', async () => {
+    const { browser, sqlite } = setup();
+    const owner = browser();
+    await owner('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-own', 'own@gmail.com', true)) });
+    expect((await owner('POST', '/api/auth/link/google', { credential: await googleCredential('g-other', 'someone.else@gmail.com') })).body.error).toBe('email_mismatch');
+    const linked = await owner('POST', '/api/auth/link/google', { credential: await googleCredential('g-own', 'Own@gmail.com') });
+    expect(linked.status).toBe(200);
+    expect(linked.body.user.methods).toEqual(['google', 'password']);
+    const g = await browser()('POST', '/api/auth/google', { credential: await googleCredential('g-own', 'own@gmail.com') });
+    expect(g.status).toBe(200);
     expect(g.body.user.methods).toEqual(['google', 'password']);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM users').get()).toMatchObject({ n: 1 });
+    // A Google account with its own ChargeOne account can't be added to another one.
+    const other = browser();
+    await other('POST', '/api/auth/google', { credential: await googleCredential('g-taken', 'taken@gmail.com') });
+    const phone = browser();
+    await phone('POST', '/api/auth/firebase', { idToken: await fbToken(phoneClaims('p-link', TEST_PHONE)) });
+    expect((await phone('POST', '/api/auth/link/google', { credential: await googleCredential('g-taken', 'taken@gmail.com') })).body.error).toBe('google_in_use');
+    expect((await browser()('POST', '/api/auth/link/google', { credential: await googleCredential('g-x', 'x@gmail.com') })).status).toBe(401);
+  });
+
+  it('fails the link on a database error instead of carrying on (no half-linked or second account)', async () => {
+    const { env, browser, sqlite } = setup();
+    const owner = browser();
+    await owner('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-err', 'err@gmail.com', true)) });
+    const prepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = ((sql: string) => {
+      if (sql.includes('SET google_sub = ?1')) throw new Error('D1_ERROR: Network connection lost.');
+      return prepare(sql);
+    }) as typeof env.DB.prepare;
+    const res = await owner('POST', '/api/auth/link/google', { credential: await googleCredential('g-err', 'err@gmail.com') });
+    expect(res.status).toBe(500);
+    env.DB.prepare = prepare;
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM users').get()).toMatchObject({ n: 1 });
+    expect(sqlite.prepare('SELECT google_sub FROM users').get()).toEqual({ google_sub: null });
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM auth_identities WHERE provider = 'google'").get()).toMatchObject({ n: 0 });
+    // Retrying works once the database is back.
+    expect((await owner('POST', '/api/auth/link/google', { credential: await googleCredential('g-err', 'err@gmail.com') })).status).toBe(200);
+  });
+
+  it('removes a sign-in method (never the last) and signs every device out', async () => {
+    const { browser } = setup();
+    const owner = browser();
+    await owner('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-rm', 'rm@gmail.com', true)) });
+    await owner('POST', '/api/auth/username', { username: 'remover' });
+    expect((await owner('POST', '/api/auth/unlink', { provider: 'password' })).body.error).toBe('last_method');
+    await owner('POST', '/api/auth/link/google', { credential: await googleCredential('g-rm', 'rm@gmail.com') });
+    const elsewhere = browser();
+    await elsewhere('POST', '/api/auth/google', { credential: await googleCredential('g-rm', 'rm@gmail.com') });
+    expect((await elsewhere('GET', '/api/me')).body.user).not.toBeNull();
+
+    expect((await owner('POST', '/api/auth/unlink', { provider: 'phone' })).body.error).toBe('not_linked');
+    expect((await owner('POST', '/api/auth/unlink', { provider: 'email' })).status).toBe(400);
+    const res = await owner('POST', '/api/auth/unlink', { provider: 'password' });
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({ methods: ['google'], username: null });
+    // This browser stays signed in with a new session; the other device is signed out.
+    expect((await owner('GET', '/api/me')).body.user.methods).toEqual(['google']);
+    expect((await elsewhere('GET', '/api/me')).body.user).toBeNull();
+    // The removed password can't come back in on its own.
+    expect((await browser()('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-rm', 'rm@gmail.com', true)) })).status).toBe(409);
   });
 
   it('never links an unverified email to an existing account', async () => {
@@ -218,6 +288,17 @@ describe('usernames', () => {
     expect((await setup().browser()('POST', '/api/auth/username', { username: 'nobody1' })).status).toBe(401);
   });
 
+  it("won't give a username to an account without a password (it could never sign in with it)", async () => {
+    const { browser } = setup();
+    const g = browser();
+    await g('POST', '/api/auth/google', { credential: await googleCredential('g-name', 'gname@gmail.com') });
+    expect((await g('POST', '/api/auth/username', { username: 'asha' })).body.error).toBe('username_needs_password');
+    const p = browser();
+    await p('POST', '/api/auth/firebase', { idToken: await fbToken(phoneClaims('p-name', TEST_PHONE)) });
+    expect((await p('POST', '/api/auth/username', { username: 'ravi' })).status).toBe(409);
+    expect((await p('GET', '/api/me')).body.user.username).toBeNull();
+  });
+
   it('limits availability checks per network', async () => {
     const api = setup().browser('203.0.113.50');
     for (let i = 0; i < 30; i++) expect((await api('GET', `/api/auth/username-available?u=name${i}`)).status).toBe(200);
@@ -248,6 +329,8 @@ describe('POST /api/auth/password-login', () => {
     expect((await api('GET', '/api/me')).body.user.username).toBe('pwuser');
     const byEmail = await browser()('POST', '/api/auth/password-login', { identifier: 'pw.user@example.com', password: 'Charge2026x' });
     expect(byEmail.status).toBe(200);
+    // "@pwuser" is how the app shows the username.
+    expect((await browser()('POST', '/api/auth/password-login', { username: ' @PwUser ', password: 'Charge2026x' })).status).toBe(200);
     // The Worker calls Firebase from the app's own origin.
     expect(calls.at(-1)?.referer).toBe('https://chargeone.test/');
   });
@@ -315,6 +398,8 @@ describe('POST /api/auth/forgot', () => {
     await api('POST', '/api/auth/username', { username: 'forgetful' });
     const real = await browser()('POST', '/api/auth/forgot', { identifier: 'Forgetful' });
     expect(calls.at(-1)?.body).toEqual({ requestType: 'PASSWORD_RESET', email: 'forgot@example.com' });
+    await browser()('POST', '/api/auth/forgot', { identifier: '@forgetful' });
+    expect(calls.at(-1)?.body).toEqual({ requestType: 'PASSWORD_RESET', email: 'forgot@example.com' });
     const unknown = await browser()('POST', '/api/auth/forgot', { identifier: 'ghost_user' });
     expect(String(calls.at(-1)?.body.email)).toContain('@no-account.chargeone.invalid');
     expect(real.status).toBe(200);
@@ -358,10 +443,65 @@ describe('free trial across sign-in methods', () => {
     const second = browser();
     await second('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-trial-2', 'trial@example.com', true)) });
     expect((await startTrial(second)).body.error).toBe('trial_used');
+    await second('POST', '/api/me/delete', {});
     // Google with that email after deletion is the same person too.
     const third = browser();
     const g = await third('POST', '/api/auth/google', { credential: await googleCredential('g-trial', 'trial@example.com') });
     expect(g.body.trial.eligible).toBe(false);
+  });
+
+  it('treats Gmail dot and +tag aliases of one inbox as the same person', async () => {
+    const { browser } = setup();
+    const first = browser();
+    await first('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-alias-1', 'asha.k@gmail.com', true)) });
+    expect((await startTrial(first)).status).toBe(200);
+    for (const [uid, alias] of [
+      ['u-alias-2', 'ashak+1@gmail.com'],
+      ['u-alias-3', 'a.s.h.a.k@googlemail.com'],
+    ]) {
+      const next = browser();
+      const res = await next('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims(uid, alias, true)) });
+      expect(res.body.trial.eligible).toBe(false);
+      expect((await startTrial(next)).body.error).toBe('trial_used');
+    }
+  });
+
+  it('gives no trial to a password account on a throwaway inbox', async () => {
+    const api = setup().browser();
+    const res = await api('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-temp', 'x1@mailinator.com', true)) });
+    expect(res.body.trial.eligible).toBe(false);
+    expect((await startTrial(api)).body.error).toBe('trial_not_eligible');
+  });
+
+  it('limits trials started from one network in a day, whatever install id is sent', async () => {
+    // TRIAL_NETWORK_DAILY_LIMIT sets the limit (sign-ins from one network are rate limited too).
+    const limit = 3;
+    expect(TRIAL_STARTS_PER_NETWORK_DAY).toBeGreaterThan(limit);
+    const { browser } = setup({ TRIAL_NETWORK_DAILY_LIMIT: String(limit) });
+    const ip = '203.0.113.200';
+    for (let i = 0; i < limit; i++) {
+      const api = browser(ip);
+      await api('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims(`u-net-${i}`, `net${i}@example.com`, true)) });
+      expect((await startTrial(api)).status).toBe(200);
+    }
+    const api = browser(ip);
+    await api('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-net-x', 'netx@example.com', true)) });
+    expect((await startTrial(api)).status).toBe(429);
+    // Another network is unaffected.
+    const elsewhere = browser();
+    await elsewhere('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-net-y', 'nety@example.com', true)) });
+    expect((await startTrial(elsewhere)).status).toBe(200);
+  });
+
+  it('takes the per-network limit from TRIAL_NETWORK_DAILY_LIMIT when it is set', async () => {
+    const { browser } = setup({ TRIAL_NETWORK_DAILY_LIMIT: '1' });
+    const ip = '203.0.113.201';
+    const first = browser(ip);
+    await first('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-lim-1', 'lim1@example.com', true)) });
+    expect((await startTrial(first)).status).toBe(200);
+    const second = browser(ip);
+    await second('POST', '/api/auth/firebase', { idToken: await fbToken(passwordClaims('u-lim-2', 'lim2@example.com', true)) });
+    expect((await startTrial(second)).status).toBe(429);
   });
 
   it('still grants a trial to a genuinely new phone account', async () => {

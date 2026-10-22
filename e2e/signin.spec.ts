@@ -85,9 +85,10 @@ test.describe("sign-in sheet", () => {
         }
       ).__gsi.callback({ credential: "gsi:g.driver@local.test" }),
     );
-    await expect(page.getByTestId("signin-username")).toBeVisible();
-    await page.getByTestId("claim-skip").click();
+    // Usernames are for password sign-in, so a Google account is not offered one.
     await expectSignedIn(page, "Google Driver");
+    await expect(page.getByTestId("signin-username")).toHaveCount(0);
+    await expect(page.getByTestId("you-set-username")).toHaveCount(0);
     expect(fb.calls).toContain("worker:google");
     expect(fb.leaks).toEqual([]);
     expect(errors).toEqual([]);
@@ -159,7 +160,7 @@ test.describe("sign-in sheet", () => {
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(page.getByTestId("you-signin")).toBeVisible();
     await page.getByTestId("you-signin").click();
-    await page.getByTestId("signin-identifier").fill(username.toUpperCase());
+    await page.getByTestId("signin-identifier").fill(`@${username.toUpperCase()}`);
     await page.getByTestId("signin-password").fill(PASSWORD);
     await page.getByTestId("signin-submit").click();
     await expectSignedIn(page, "Asha Rao");
@@ -376,9 +377,9 @@ test.describe("sign-in sheet", () => {
     await expect(page.getByTestId("you-signin")).toBeAttached();
 
     await page.getByTestId("signin-otp-input").fill(OTP);
-    await expect(page.getByTestId("signin-username")).toBeVisible();
-    await page.getByTestId("claim-skip").click();
+    // Usernames are for password sign-in, so a phone account is not offered one.
     await expectSignedIn(page, `+91•••••••${digits.slice(-3)}`);
+    await expect(page.getByTestId("signin-username")).toHaveCount(0);
     expect(fb.leaks).toEqual([]);
     expect(errors).toEqual([]);
   });

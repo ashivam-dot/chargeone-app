@@ -2,7 +2,7 @@
 // one-time code. Also creating an account, verifying the email, resetting a password and choosing a
 // username. This whole module is a lazy chunk; the Firebase SDK (phone only) is a further one.
 import { Check, Mail, Smartphone } from "lucide-preact";
-import { useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { ApiError, api, type Config, type Me } from "../../lib/api.ts";
 import {
   FirebaseAuthError,
@@ -10,7 +10,7 @@ import {
   type FirebaseSession,
 } from "../../lib/firebaseRest.ts";
 import { rememberFirebaseToken } from "../../lib/firebaseSession.ts";
-import { isEmail, normalizeUsername } from "../../shared/auth.ts";
+import { isEmail, normalizeUsername, stripHandle } from "../../shared/auth.ts";
 import { BASIC, COMPARE, PLANS } from "../../shared/plans.ts";
 import { Sheet } from "../Sheet.tsx";
 import { signInReady } from "../SignIn.tsx";
@@ -25,14 +25,15 @@ import {
 } from "./EmailForms.tsx";
 import { Spinner, errorText } from "./fields.tsx";
 import { GoogleButton } from "./GoogleButton.tsx";
+import { MethodsView } from "./MethodsView.tsx";
 import { PhoneForm } from "./PhoneForm.tsx";
 import "./signin.css";
 
 export interface SignInSheetProps {
   config: Config | null;
   dark: boolean;
-  /** Open straight at "choose a username" for a signed-in driver (from the You screen). */
-  start?: "username";
+  /** Open straight at "choose a username" or "sign-in methods" for a signed-in driver (from the You screen). */
+  start?: "username" | "methods";
   me?: Me | null;
   onClose: () => void;
   onSignedIn: (me: Me) => void;
@@ -82,7 +83,7 @@ function markAsked(me: Me): void {
   }
 }
 
-type View = "signin" | "register" | "forgot" | "verify" | "username";
+type View = "signin" | "register" | "forgot" | "verify" | "username" | "methods";
 type Method = "email" | "phone";
 
 const TITLES: Record<View, string> = {
@@ -91,7 +92,16 @@ const TITLES: Record<View, string> = {
   forgot: "Reset password",
   verify: "Verify your email",
   username: "Choose a username",
+  methods: "Sign-in methods",
 };
+
+/** Usernames stand in for the email at password sign-in, so only accounts with a password get one. */
+const canHaveUsername = (me: Me) =>
+  Boolean(me.user && !me.user.username && me.user.methods?.includes("password"));
+
+/** Where focus goes when the sheet moves to another view: its marked heading, else its first field or button. */
+const FOCUS_TARGET =
+  "[data-autofocus], input:not([type=hidden]):not([disabled]), textarea, select, button:not([disabled])";
 
 const unverified = (e: unknown): e is ApiError =>
   e instanceof ApiError && e.code === "email_unverified";
@@ -111,7 +121,7 @@ export function SignInSheet({
     [firebase],
   );
   const [view, setView] = useState<View>(
-    start === "username" && initialMe?.user ? "username" : "signin",
+    start && initialMe?.user ? start : "signin",
   );
   const [method, setMethod] = useState<Method>("email");
   const [identifier, setIdentifier] = useState("");
@@ -121,14 +131,28 @@ export function SignInSheet({
   const [usernameError, setUsernameError] = useState<string | null>(null);
   /** Signed in, waiting on the username step. */
   const signedIn = useRef<Me | null>(
-    start === "username" ? (initialMe ?? null) : null,
+    start ? (initialMe ?? null) : null,
   );
   /** A username typed at registration, claimed once the verified sign-in lands. */
   const pendingUsername = useRef<{ email: string; username: string } | null>(
     null,
   );
   const [initialUsername, setInitialUsername] = useState("");
+  /** Re-renders the methods view after a change (the account itself lives in signedIn). */
+  const [, setMethodsMe] = useState<Me | null>(null);
   const tabs = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const firstView = useRef(true);
+
+  // The control that moved the sheet on is gone with its view; keep focus inside the dialog.
+  useEffect(() => {
+    if (firstView.current) {
+      firstView.current = false;
+      return;
+    }
+    const target = root.current?.querySelector<HTMLElement>(FOCUS_TARGET);
+    target?.focus();
+  }, [view]);
 
   /** Every sign-in ends here: claim or offer a username, then hand the session to the app. */
   const finish = async (me: Me) => {
@@ -141,7 +165,7 @@ export function SignInSheet({
         ? pending.username
         : null;
     pendingUsername.current = null;
-    if (me.user && !me.user.username && wanted) {
+    if (me.user && canHaveUsername(me) && wanted) {
       try {
         const { username } = await api.claimUsername(wanted);
         return onSignedIn({ ...me, user: { ...me.user, username } });
@@ -152,7 +176,7 @@ export function SignInSheet({
         return setView("username");
       }
     }
-    if (me.user && !me.user.username && !askedBefore(me)) {
+    if (canHaveUsername(me) && !askedBefore(me)) {
       markAsked(me);
       setInitialUsername("");
       setUsernameError(null);
@@ -191,7 +215,8 @@ export function SignInSheet({
     }
   };
 
-  const signInWithPassword = async (id: string, password: string) => {
+  const signInWithPassword = async (typed: string, password: string) => {
+    const id = stripHandle(typed);
     if (id.includes("@")) {
       if (!rest)
         throw new ApiError(
@@ -270,7 +295,8 @@ export function SignInSheet({
     setView("verify");
   };
 
-  const forgot = async (id: string) => {
+  const forgot = async (typed: string) => {
+    const id = stripHandle(typed);
     if (isEmail(id) && rest) {
       try {
         await rest.sendPasswordReset(id.toLowerCase());
@@ -326,7 +352,7 @@ export function SignInSheet({
 
   /** Closing after the sign-in landed keeps the driver signed in. */
   const close = () =>
-    signedIn.current && view === "username"
+    signedIn.current && (view === "username" || view === "methods")
       ? onSignedIn(signedIn.current)
       : onClose();
 
@@ -418,6 +444,19 @@ export function SignInSheet({
       case "verify":
         return verify ? (
           <VerifyEmail state={verify} onVerified={finish} onBack={toSignIn} />
+        ) : null;
+      case "methods":
+        return signedIn.current ? (
+          <MethodsView
+          me={signedIn.current}
+          clientId={clientId}
+          dark={dark}
+          onUpdated={(m) => {
+            signedIn.current = m;
+            setMethodsMe(m);
+          }}
+          onDone={() => (signedIn.current ? onSignedIn(signedIn.current) : onClose())}
+        />
         ) : null;
       case "username":
         return (
@@ -547,6 +586,7 @@ export function SignInSheet({
         class={`auth auth--${view}`}
         data-testid="signin-sheet"
         data-view={view}
+        ref={root}
       >
         {body}
       </div>

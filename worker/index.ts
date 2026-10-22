@@ -36,7 +36,10 @@ import {
   forgotPassword,
   googleUser,
   identityDeletion,
+  linkDevIdentity,
+  linkGoogle,
   passwordLogin,
+  unlinkMethod,
   usernameAvailability,
 } from './identities.ts';
 import { basicTripsToday, planBasicRoute } from './basic.ts';
@@ -154,7 +157,22 @@ route('POST', '/api/auth/password-login', async (req, env) => {
   // The browser keeps the short-lived Firebase ID token only to delete the Firebase user with the account.
   return signedIn(req, env, user, { firebaseIdToken: idToken });
 });
-route('POST', '/api/auth/forgot', async (req, env) => json(await forgotPassword(req, env)));
+route('POST', '/api/auth/link/google', async (req, env) => {
+  const user = await requireUser(req, env);
+  await enforceRateLimit(env.DB, `auth:${await clientKey(req)}`, 20, 600);
+  const body = await readJson(req, 4096);
+  const credential = str(body, 'credential', { max: 4000 })!;
+  await linkGoogle(env, user, await verifyGoogleIdToken(credential, env.GOOGLE_CLIENT_ID));
+  return signedIn(req, env, user);
+});
+route('POST', '/api/auth/unlink', async (req, env) => {
+  const user = await requireUser(req, env);
+  await unlinkMethod(req, env, user);
+  // Every other device signs in again, so a method someone else had added stops working at once.
+  await revokeSessions(env, user.id);
+  return signedIn(req, env, user);
+});
+route('POST', '/api/auth/forgot',async (req, env) => json(await forgotPassword(req, env)));
 route('GET', '/api/auth/username-available', async (req, env) => json(await usernameAvailability(req, env)));
 route('POST', '/api/auth/username', async (req, env) => json(await claimUsername(req, env, await requireUser(req, env))));
 
@@ -162,7 +180,9 @@ route('POST', '/api/auth/dev', async (req, env) => {
   if (!isDev(env)) throw new HttpError(404, 'not_found', 'Not found.');
   const body = await readJson(req, 512);
   const email = str(body, 'email', { max: 80, pattern: /^[a-z0-9._-]+@local\.test$/, optional: true }) ?? 'driver@local.test';
+  const method = str(body, 'method', { max: 10, pattern: /^(password|phone)$/, optional: true }) as 'password' | 'phone' | undefined;
   const user = await upsertUser(env, `dev:${email}`, email, 'Test driver');
+  if (method) await linkDevIdentity(env, method, email, user.id);
   const token = await issueSession(env, user);
   return json(await meResponse(req, env, user), {
     headers: { 'Set-Cookie': sessionCookie(token, secureCookies(req, env)) },

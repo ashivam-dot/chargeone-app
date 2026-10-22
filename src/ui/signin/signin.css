@@ -650,6 +650,72 @@ div.auth-alert:has(> svg) {
   text-align: left;
 }
 
+/* ---------- Sign-in methods ---------- */
+.auth-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.auth-methods__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.auth-methods__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--auth-fill);
+}
+.auth-methods__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.auth-methods__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.auth-methods__text .muted {
+  overflow-wrap: anywhere;
+}
+.auth-methods__item .link,
+.auth-methods__item .btn {
+  flex: none;
+  min-height: 40px;
+}
+.auth-methods__add {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.auth-methods__add p,
+.auth-methods > p {
+  margin: 0;
+}
+.auth [data-autofocus]:focus {
+  outline: none;
+}
+.auth [data-autofocus]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
 @media (max-width: 360px) {
   .auth {
     gap: 14px;

@@ -101,6 +101,48 @@ export const PASSWORD_PROBLEM_TEXT: Record<PasswordProblem, string> = {
 export const EMAIL_PATTERN = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 export const isEmail = (value: string) => value.length <= 254 && EMAIL_PATTERN.test(value);
 
+/**
+ * What was typed in "Email or username", with one leading "@" dropped when the rest is a username:
+ * the app shows usernames as "@asha", so people type them that way. Emails are left alone.
+ */
+export function stripHandle(input: string): string {
+  const value = input.trim();
+  return value.startsWith('@') && !value.slice(1).includes('@') ? value.slice(1).trim() : value;
+}
+
+/** Mail providers whose addresses ignore dots in the local part. */
+const DOTLESS_DOMAINS = new Set(['gmail.com', 'googlemail.com']);
+
+/**
+ * One form per mailbox, for keys like "this person already had the free trial": lower case, no
+ * "+tag" (most providers deliver a+1@x to a@x), no dots for Gmail, googlemail.com read as gmail.com.
+ * Only for matching; the account keeps the address as typed.
+ */
+export function canonicalEmail(email: string): string {
+  const lower = email.trim().toLowerCase();
+  const at = lower.lastIndexOf('@');
+  if (at < 1) return lower;
+  let local = lower.slice(0, at).split('+')[0];
+  let domain = lower.slice(at + 1);
+  if (DOTLESS_DOMAINS.has(domain)) {
+    local = local.replaceAll('.', '');
+    domain = 'gmail.com';
+  }
+  return `${local || lower.slice(0, at)}@${domain}`;
+}
+
+/** Throwaway-inbox services: fine for signing in, but they don't get the free Plus week. */
+export const DISPOSABLE_EMAIL_DOMAINS = new Set([
+  'mailinator.com', 'guerrillamail.com', 'guerrillamail.net', 'guerrillamail.org', 'sharklasers.com', 'grr.la',
+  '10minutemail.com', '10minutemail.net', 'temp-mail.org', 'tempmail.com', 'tempmail.net', 'tempmailo.com',
+  'yopmail.com', 'yopmail.net', 'trashmail.com', 'getnada.com', 'nada.email', 'dispostable.com', 'maildrop.cc',
+  'mailnesia.com', 'throwawaymail.com', 'fakeinbox.com', 'mohmal.com', 'emailondeck.com', 'mintemail.com',
+  'spamgourmet.com', 'mailcatch.com', 'moakt.com', 'tmail.ws', 'tmpmail.org', 'tmpmail.net', 'burnermail.io',
+  'inboxkitten.com', '1secmail.com', '1secmail.net', '1secmail.org', 'mail.tm', 'mail.gw', 'emailfake.com',
+]);
+
+export const isDisposableEmail = (email: string) => DISPOSABLE_EMAIL_DOMAINS.has(email.trim().toLowerCase().split('@').pop() ?? '');
+
 /** "akash@gmail.com" -> "a•••@gmail.com". */
 export function maskEmail(email: string): string {
   const at = email.lastIndexOf('@');
