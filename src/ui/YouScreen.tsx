@@ -78,6 +78,8 @@ export function YouScreen(p: Props) {
   const e = me?.entitlement;
   const onTrial = e?.source === 'trial' && Boolean(me?.trial?.endsAt);
   const subscribed = e?.source === 'razorpay' && e.status === 'active' && me !== null && isPlus(me.plan);
+  /** Plus was ended by ChargeOne, but the Razorpay subscription renews until it is cancelled. */
+  const revokedRenewing = e?.source === 'razorpay' && e.status === 'revoked';
   const trialOpen = !onTrial && (me?.trial?.eligible ?? (!signedIn && p.signInReady)) && !(me && isPlus(me.plan));
 
   const act = async (label: string, fn: () => Promise<unknown>, after: () => void) => {
@@ -185,6 +187,17 @@ export function YouScreen(p: Props) {
             }}
           >
             {busy === 'cancel' ? 'Cancelling…' : 'Cancel subscription'}
+          </button>
+        )}
+        {revokedRenewing && (
+          <button
+            class="link danger"
+            disabled={busy !== null}
+            onClick={() => {
+              if (confirm('Your Plus was ended. Stop the Razorpay subscription so it is not charged again?')) void act('cancel', api.cancel, p.onChanged);
+            }}
+          >
+            {busy === 'cancel' ? 'Stopping…' : 'Stop Razorpay renewals'}
           </button>
         )}
         {e?.source === 'play' && me !== null && isPlus(me.plan) && (

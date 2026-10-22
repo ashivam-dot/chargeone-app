@@ -221,6 +221,7 @@ interface OverviewData {
   reports: { total: number; last7d: number; problems7d: number };
   upiPending: number;
   ai: { runsToday: number; budget: number; chatsToday: number };
+  publicRouting: { today: number; budget: number };
   integrations: Integration[];
 }
 
@@ -257,6 +258,16 @@ function Overview({ onError }: SectionProps) {
             <Tile id="plans" label="Active paid plans" value={paid} sub={data.activePlans.map((p) => `${p.count} ${p.name} (${p.source})`).join(', ') || 'none yet'} />
             <Tile id="trials" label="Plus trials" value={data.trials.running} sub={`running, ${data.trials.total} ever`} />
             <Tile id="ai" label="Copilot runs today" value={`${data.ai.runsToday} / ${data.ai.budget}`} sub={`${data.ai.chatsToday} chat messages`} />
+            <Tile
+              id="public-routing"
+              label="Free routing today"
+              value={`${data.publicRouting.today} / ${data.publicRouting.budget}`}
+              sub={
+                data.publicRouting.today >= data.publicRouting.budget * 0.8
+                  ? 'nearly used up: trip planning stops for everyone at the limit. Set ORS_API_KEY.'
+                  : 'shared keyless router calls'
+              }
+            />
             <Tile id="feedback" label="Feedback this week" value={data.feedback.last7d} sub={data.feedback.rating7d === null ? 'no ratings' : `average ${data.feedback.rating7d} of 5`} />
             <Tile id="reports" label="Reports this week" value={data.reports.last7d} sub={`${data.reports.problems7d} problems`} />
             <Tile id="upi" label="UPI to check" value={data.upiPending} sub={data.upiPending ? 'see Payments' : 'nothing waiting'} />

@@ -80,6 +80,42 @@ test.describe('guest on a server that is not fully set up', () => {
     expect(errors).toEqual([]);
   });
 
+  test("a guest's re-plan after today's trip shows why on the result, not silently", async ({ page }) => {
+    await withConfig(page, { googleClientId: null, devLogin: false });
+    await page.context().grantPermissions(['geolocation']);
+    await page.context().setGeolocation({ latitude: 11.02, longitude: 77.0 });
+    await mockPlaceSearch(page);
+    let calls = 0;
+    await page.route('**/api/route', (route) => {
+      calls++;
+      if (calls === 1) return shortRoute(route);
+      return route.fulfill({
+        status: 402,
+        json: {
+          error: 'daily_limit',
+          message: "Basic covers 1 trip up to 100 km a day, and this phone has used today's trip. It resets at midnight, India time.",
+          tier: 'basic',
+          scope: 'device',
+          usage: { shortToday: 1, longInWindow: 0 },
+        },
+      });
+    });
+    await openApp(page);
+    await page.getByTestId('plan-trip').click();
+    await pick(page, 'Start: city, area or charger', 'Gandhipuram');
+    await pick(page, 'Where to?', 'Peelamedu');
+    await page.getByRole('button', { name: 'Plan my trip' }).click();
+    await expect(page.locator('.sheet').filter({ hasText: 'To Peelamedu' })).toBeVisible();
+
+    await page.getByTestId('trip-replan').click();
+    const card = page.getByTestId('trip-limit');
+    await expect(card).toContainText("this phone has used today's trip");
+    await expect(page.getByTestId('trip-limit-soon')).toBeVisible();
+    await expect(page.locator('.sheet').filter({ hasText: 'To Peelamedu' })).toBeVisible();
+    await expect(page.getByRole('dialog').filter({ hasText: /Sign in|Unlock this trip/ })).toHaveCount(0);
+    expect(calls).toBe(2);
+  });
+
   test('a guest over the Basic limit sees the exact reason, not a sign-in screen', async ({ page }) => {
     await withConfig(page, { googleClientId: null, devLogin: false });
     await mockPlaceSearch(page);
@@ -150,5 +186,27 @@ test.describe('guest on a server that is not fully set up', () => {
 
     await page.getByTestId('find-car-input').fill('22 BH 1234 AA');
     await expect(page.getByTestId('find-car-rto')).toContainText('Bharat series (BH)');
+  });
+
+  test('a half-typed plate names the right RTO, and an unknown one says what to do', async ({ page }) => {
+    await withConfig(page, { vehicleLookup: false });
+    await openApp(page, { car: false });
+    await page.getByTestId('tab-car').click();
+    await page.getByTestId('car-add').click();
+
+    const input = page.getByTestId('find-car-input');
+    await input.fill('MH12');
+    await expect(page.getByTestId('find-car-rto')).toHaveText('Registered in Maharashtra - RTO MH-12 (Pune)');
+    await input.fill('MH12A');
+    await expect(page.getByTestId('find-car-rto')).toHaveText('Registered in Maharashtra - RTO MH-12 (Pune)');
+    await expect(page.getByTestId('find-car-picker')).toBeHidden();
+
+    // normalisePlate accepts these but parsePlate doesn't; with lookup off there is no consent box to tick.
+    for (const plate of ['XY12AB1234', 'MH12AB0000']) {
+      await input.fill(plate);
+      await page.getByTestId('find-car-go').click();
+      await expect(page.getByTestId('find-car-result')).toContainText("doesn't look like an Indian car number");
+      await expect(page.getByTestId('find-car-result')).not.toContainText('Tick the box');
+    }
   });
 });

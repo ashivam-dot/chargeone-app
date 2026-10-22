@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { BASIC_ROUTINGS_PER_IP } from './basic.ts';
 import worker from './index.ts';
 import { DEVICE, client, deviceHeaders, fakeEnv } from './test-support/fake-env.ts';
 import { osrmStub } from './test-support/fake-routes.ts';
@@ -73,6 +74,20 @@ describe('Basic trips without signing in', () => {
     expect((await api('POST', '/api/route', short)).status).toBe(502);
     vi.stubGlobal('fetch', osrmStub().fetch);
     expect((await client(worker, env, deviceHeaders())('POST', '/api/route', short)).status).toBe(200);
+  });
+
+  it(`caps the routing calls a network can spend on trips Basic doesn't cover at ${BASIC_ROUTINGS_PER_IP} a day`, async () => {
+    const stub = osrmStub({ roadKm: () => 130 });
+    const { guest } = setup(stub);
+    for (let i = 0; i < BASIC_ROUTINGS_PER_IP; i++) {
+      // A fresh install id and a new address in the same IPv6 /64 each time changes nothing.
+      const res = await guest(`a1b2c3d4-0000-4000-8000-0000000002${String(i).padStart(2, '0')}`, `2001:db8:0:7::${i + 1}`)('POST', '/api/route', { from: MG_ROAD, to: TUMAKURU });
+      expect(res.body.error).toBe('too_long');
+    }
+    const next = await guest(OTHER_DEVICE, '2001:db8:0:7::ff')('POST', '/api/route', { from: MG_ROAD, to: TUMAKURU });
+    expect(next.status).toBe(429);
+    expect(stub.calls).toHaveLength(BASIC_ROUTINGS_PER_IP);
+    expect((await guest(OTHER_DEVICE, '2001:db8:0:8::1')('POST', '/api/route', { from: MG_ROAD, to: TUMAKURU })).body.error).toBe('too_long');
   });
 
   it('shares three trips a day between phones on one network', async () => {

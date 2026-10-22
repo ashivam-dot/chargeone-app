@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEV_ADMIN_TOKEN, LOGIN_ATTEMPTS } from './adminAuth.ts';
+import { ADMIN_FAILURES, DEV_ADMIN_TOKEN, LOGIN_ATTEMPTS } from './adminAuth.ts';
 import { testEmail } from './admin.ts';
 import worker from './index.ts';
 import { DEVICE, client, deviceHeaders, fakeEnv } from './test-support/fake-env.ts';
@@ -58,6 +59,48 @@ describe('admin sign-in', () => {
     expect(blocked.status).toBe(429);
     const elsewhere = client(worker, setup().env, deviceHeaders(DEVICE, '198.51.100.9'));
     expect((await elsewhere('POST', '/api/admin/login', { token: ADMIN })).status).toBe(200);
+  });
+
+  it(`stops answering bearer guesses after ${ADMIN_FAILURES} wrong ones, even for the right token`, async () => {
+    const { env } = setup();
+    const from = (token: string, ip = '203.0.113.7') => client(worker, env, { Authorization: `Bearer ${token}`, 'CF-Connecting-IP': ip });
+    for (let i = 0; i < ADMIN_FAILURES; i++) expect((await from(`wrong-${i}`.padEnd(30, 'x'))('GET', '/api/admin/overview')).status).toBe(401);
+    expect((await from(ADMIN)('GET', '/api/admin/overview')).status).toBe(429);
+    expect((await from('wrong-again'.padEnd(30, 'x'))('GET', '/api/admin/overview')).status).toBe(429);
+    // The login form shares the lockout, so it is no way around it either.
+    expect((await client(worker, env, { 'CF-Connecting-IP': '203.0.113.7' })('POST', '/api/admin/login', { token: ADMIN })).status).toBe(429);
+    expect((await from(ADMIN, '198.51.100.9')('GET', '/api/admin/overview')).status).toBe(200);
+  });
+
+  it('counts a whole IPv6 /64 as one network', async () => {
+    const { env, sqlite } = setup();
+    const statuses = [];
+    for (let i = 1; i <= 12; i++) {
+      const api = client(worker, env, { 'CF-Connecting-IP': `2001:db8:0:1::${i.toString(16)}` });
+      statuses.push((await api('POST', '/api/admin/login', { token: `wrong-${i}`.padEnd(30, 'x') })).status);
+    }
+    expect(statuses.slice(0, LOGIN_ATTEMPTS)).toEqual(Array(LOGIN_ATTEMPTS).fill(401));
+    expect(statuses.slice(LOGIN_ATTEMPTS).every((s) => s === 429)).toBe(true);
+    expect(auditRows(sqlite).filter((r) => r.action === 'login_failed')).toHaveLength(LOGIN_ATTEMPTS);
+    const neighbour = client(worker, env, { 'CF-Connecting-IP': '2001:db8:0:2::1' });
+    expect((await neighbour('POST', '/api/admin/login', { token: ADMIN })).status).toBe(200);
+  });
+
+  it('caps failed-login audit rows across many networks', async () => {
+    const { env, sqlite } = setup();
+    for (let i = 0; i < 60; i++) {
+      const api = client(worker, env, { 'CF-Connecting-IP': `2001:db8:${i.toString(16)}::1` });
+      expect((await api('POST', '/api/admin/login', { token: 'not-the-admin-token-at-all-0000' })).status).toBe(401);
+    }
+    expect(auditRows(sqlite).filter((r) => r.action === 'login_failed')).toHaveLength(50);
+  });
+
+  it('deletes audit rows older than the retention window when the owner signs in', async () => {
+    const { browser, sqlite } = setup();
+    sqlite.prepare("INSERT INTO admin_audit (action, target, detail, ip_hash, at) VALUES ('grant', 'x', NULL, 'h', '2020-01-01T00:00:00.000Z')").run();
+    sqlite.prepare("INSERT INTO admin_audit (action, target, detail, ip_hash, at) VALUES ('grant', 'y', NULL, 'h', ?)").run(new Date(Date.now() - 30 * 86400_000).toISOString());
+    expect((await browser('POST', '/api/admin/login', { token: ADMIN })).status).toBe(200);
+    expect(auditRows(sqlite).map((r) => r.target)).toEqual(['y', null]);
   });
 
   it('rejects a tampered, a driver-session or a stale-token cookie', async () => {
@@ -139,6 +182,7 @@ describe('admin overview', () => {
     expect(res.body.users).toMatchObject({ total: 1, new24h: 1, new7d: 1 });
     expect(res.body.activePlans).toEqual([]);
     expect(res.body.ai).toMatchObject({ runsToday: 0, budget: 400 });
+    expect(res.body.publicRouting).toEqual({ today: 0, budget: 800 });
     const byId = Object.fromEntries((res.body.integrations as Array<Record<string, any>>).map((i) => [i.id, i]));
     expect(byId.google).toMatchObject({ configured: false, missing: ['GOOGLE_CLIENT_ID'] });
     expect(byId.google.howTo).toContain('https://chargeone.test');
@@ -239,6 +283,25 @@ describe('test sessions', () => {
     expect((sqlite.prepare("SELECT COUNT(*) AS n FROM users WHERE email LIKE 'test-%'").get() as { n: number }).n).toBe(1);
     expect((await client(worker, env, { Authorization: `Bearer ${ADMIN}` })('GET', '/api/admin/overview')).body.users.total).toBe(0);
     expect(auditRows(sqlite).filter((r) => r.action === 'test_session')).toHaveLength(2);
+  });
+
+  it("keeps a test account's charger reports off the public map and station pages", async () => {
+    const { browser, env } = await signedIn();
+    const station = JSON.parse(readFileSync(new URL('../public/data/stations.json', import.meta.url), 'utf8')).stations[0];
+    const at = { lat: station.lat, lng: station.lng };
+    await browser('POST', '/api/admin/test-session', { plan: 'plus' });
+    expect((await browser('POST', '/api/checkins', { stationId: station.id, kind: 'broken', position: at, accuracy: 10 })).status).toBe(201);
+
+    const visitor = client(worker, env);
+    expect((await visitor('GET', '/api/status')).body.statuses).toEqual([]);
+    expect((await visitor('GET', `/api/stations/${station.id}/reports`)).body.reports).toEqual([]);
+    expect((await browser('GET', '/api/admin/reports')).body.reports).toHaveLength(1);
+
+    const driver = client(worker, env, deviceHeaders(DEVICE, '198.51.100.20'));
+    await driver('POST', '/api/auth/dev', { email: 'real@local.test' });
+    expect((await driver('POST', '/api/checkins', { stationId: station.id, kind: 'worked', position: at, accuracy: 10 })).status).toBe(201);
+    expect((await visitor('GET', '/api/status')).body.statuses).toMatchObject([{ stationId: station.id }]);
+    expect((await visitor('GET', `/api/stations/${station.id}/reports`)).body.reports).toMatchObject([{ kind: 'worked' }]);
   });
 
   it('gives each tier its own plan: Free has none, Trip Pass has the pass', async () => {

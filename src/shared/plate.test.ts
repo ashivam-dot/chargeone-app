@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describePlate, parsePlate } from './plate.ts';
+import { describePlate, parsePlate, platePrefix } from './plate.ts';
 import { RTO_CITIES, STATES } from './rto.ts';
 import { searchVehicles } from './vehicleSearch.ts';
 import { normalisePlate } from './vehicleMatch.ts';
@@ -77,6 +77,12 @@ describe('parsePlate', () => {
     }
   });
 
+  it("doesn't read a half-typed plate as a short one from another district", () => {
+    for (const raw of ['MH12', 'KA51', 'MH1234', 'MH12A', 'KA51M']) expect(parse(raw), raw).toBeNull();
+    expect(parse('MH12AB1')).toMatchObject({ rto: 'MH12', city: 'Pune' });
+    expect(parse('MH121234')).toMatchObject({ rto: 'MH12', display: 'MH 12 1234' });
+  });
+
   it('agrees with the lookup normaliser on what a plate is', () => {
     for (const raw of ['KA51MM1234', 'dl3cab1234', 'TN011234', '22 BH 1234 AA', 'MH12ABC1234']) {
       expect(normalisePlate(raw)).toBe(parse(raw)!.plate);
@@ -90,6 +96,20 @@ describe('describePlate', () => {
     expect(describePlate(parse('KA 70 A 1234')!)).toBe('Registered in Karnataka - RTO KA-70');
     expect(describePlate(parse('22 BH 1234 AA')!)).toBe('Bharat series (BH), first registered in 2022. Valid in every state.');
     expect(describePlate(parse('T 0624 KA 1234 AB')!)).toBe('Temporary registration in Karnataka.');
+  });
+});
+
+describe('platePrefix', () => {
+  it('names the RTO from the state and district while the rest is typed', () => {
+    for (const raw of ['MH12', 'mh 12', 'MH12A', 'MH12AB', 'MH12AB1']) {
+      expect(describePlate(platePrefix(raw)!), raw).toBe('Registered in Maharashtra - RTO MH-12 (Pune)');
+    }
+    expect(describePlate(platePrefix('KA51M')!)).toBe('Registered in Karnataka - RTO KA-51 (Bengaluru)');
+    expect(platePrefix('DL3C')).toMatchObject({ rto: 'DL03', city: 'Delhi' });
+  });
+
+  it('waits until the district is clear, and ignores unknown states', () => {
+    for (const raw of ['MH', 'MH1', 'MH00', 'XY12', '22BH', 'T0624']) expect(platePrefix(raw), raw).toBeNull();
   });
 });
 

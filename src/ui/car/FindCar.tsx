@@ -6,7 +6,7 @@ import { useRef, useState } from 'preact/hooks';
 import { ApiError, api } from '../../lib/api.ts';
 import { haptic } from '../../native/platform.ts';
 import { LOOKUP_CONSENT_VERSION } from '../../shared/contracts.ts';
-import { describePlate, parsePlate } from '../../shared/plate.ts';
+import { describePlate, parsePlate, platePrefix } from '../../shared/plate.ts';
 import { normalisePlate } from '../../shared/vehicleMatch.ts';
 import { searchVehicles } from '../../shared/vehicleSearch.ts';
 import { VEHICLES } from '../../shared/vehicles.ts';
@@ -55,6 +55,8 @@ export function FindCar({ lookupOn, onFound }: Props) {
   const raw = normaliseVin(value);
   const plate = raw.length < 17 ? normalisePlate(value) : null;
   const parsed = raw.length < 17 ? parsePlate(value) : null;
+  /** While a plate is half typed, its state and district already say where it is from. */
+  const region = parsed ?? (raw.length < 17 ? platePrefix(value) : null);
   /** Without a lookup partner, a plate leads to the model search instead. */
   const picking = parsed !== null && !lookupOn;
   const matches = picking ? searchVehicles(query) : [];
@@ -86,6 +88,10 @@ export function FindCar({ lookupOn, onFound }: Props) {
     if (picking) return searchRef.current?.focus();
     if (parsed?.kind === 'temporary') return fail("Temporary numbers can't be looked up. Enter the VIN instead (on your RC as Chassis No.), or pick your car below.");
     if (!plate) return fail('Enter a car number like MH12AB1234, or the 17-character VIN from your RC (Chassis No.).');
+    // Without a lookup partner only a plate parsePlate recognises leads anywhere (the model search).
+    if (!lookupOn) {
+      return fail("That doesn't look like an Indian car number (state code, RTO, series, number). Check it, enter the VIN, or pick your car below.");
+    }
     if (!consent) return fail('Tick the box first, so ChargeOne can check the number.');
     setBusy(true);
     try {
@@ -131,9 +137,9 @@ export function FindCar({ lookupOn, onFound }: Props) {
           </button>
         </span>
       </label>
-      {parsed && (
+      {region && (
         <p class="find-car__rto small" data-testid="find-car-rto">
-          {describePlate(parsed)}
+          {describePlate(region)}
         </p>
       )}
       {picking && (

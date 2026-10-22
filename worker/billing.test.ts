@@ -676,3 +676,51 @@ describe('quota enforcement is on the server', () => {
     expect(again.body.counted).toBe('replan');
   });
 });
+
+describe('admin actions on a Razorpay subscriber', () => {
+  const ADMIN = 'owner-admin-token-0123456789abcdef';
+
+  async function subscriber() {
+    const { env, sqlite } = fakeEnv({ ADMIN_TOKEN: ADMIN });
+    const api = client(worker, env);
+    const admin = client(worker, env, { Authorization: `Bearer ${ADMIN}` });
+    await api('POST', '/api/auth/dev', { email: 'payer@local.test' });
+    await api('POST', '/api/billing/checkout', { plan: 'plus_monthly' });
+    const charged = (payment: string) => ({
+      event: 'subscription.charged',
+      payload: { subscription: { entity: { id: 'sub_T1', status: 'active', current_end: Math.floor(Date.now() / 1000) + 30 * 86400 } }, payment: { entity: { id: payment } } },
+    });
+    await webhook(api, charged('pay_R1'), 'evt_r1');
+    expect((await api('GET', '/api/me')).body.plan).toBe('plus_monthly');
+    const id = (sqlite.prepare("SELECT id FROM users WHERE email = 'payer@local.test'").get() as { id: string }).id;
+    return { api, admin, id, charged };
+  }
+
+  it('refuses a grant that would replace the live subscription', async () => {
+    const { api, admin, id } = await subscriber();
+    const grant = await admin('POST', `/api/admin/users/${id}/grant`, { plan: 'trip_pass', days: 7 });
+    expect(grant.status).toBe(409);
+    expect(grant.body).toMatchObject({ error: 'store_subscription' });
+    expect(grant.body.message).toContain('Razorpay');
+    expect((await api('GET', '/api/me')).body.entitlement).toMatchObject({ source: 'razorpay', status: 'active' });
+    // The driver can still cancel in the app.
+    expect((await api('POST', '/api/billing/cancel', {})).status).toBe(200);
+  });
+
+  it('keeps a revoke when the next renewal arrives, and lets the driver stop renewals', async () => {
+    const { api, admin, id, charged } = await subscriber();
+    expect((await admin('POST', `/api/admin/users/${id}/revoke`, {})).status).toBe(200);
+    expect((await api('GET', '/api/me')).body.plan).toBe('free');
+
+    await webhook(api, charged('pay_R2'), 'evt_r2');
+    expect((await api('GET', '/api/me')).body).toMatchObject({ plan: 'free', entitlement: { status: 'revoked' } });
+
+    const cancel = await api('POST', '/api/billing/cancel', {});
+    expect(cancel.status).toBe(200);
+    expect(calls.at(-1)).toMatchObject({ path: '/subscriptions/sub_T1/cancel' });
+    expect((await api('GET', '/api/me')).body.plan).toBe('free');
+
+    // Once revoked, the owner can grant a plan of their own.
+    expect((await admin('POST', `/api/admin/users/${id}/grant`, { plan: 'trip_pass', days: 2 })).status).toBe(200);
+  });
+});

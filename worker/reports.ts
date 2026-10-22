@@ -71,11 +71,12 @@ export function summarise(rows: CheckinRow[]): StationStatus[] {
   return [...byStation.values()];
 }
 
+/** Public: reports from admin test sessions (users.is_test) are left out here and in stationReports. */
 export async function recentStatuses(env: Env, now = new Date()): Promise<StationStatus[]> {
   const since = new Date(now.getTime() - STATUS_LOOKBACK_DAYS * 86400_000).toISOString();
   const { results } = await env.DB.prepare(
-    `SELECT station_id, kind, kw, vehicle, created_at FROM checkins
-     WHERE created_at >= ?1 ORDER BY created_at DESC LIMIT 50000`,
+    `SELECT c.station_id, c.kind, c.kw, c.vehicle, c.created_at FROM checkins c JOIN users u ON u.id = c.user_id
+     WHERE c.created_at >= ?1 AND u.is_test = 0 ORDER BY c.created_at DESC LIMIT 50000`,
   )
     .bind(since)
     .all<CheckinRow>();
@@ -88,8 +89,8 @@ export interface ReportRow extends CheckinRow {
 
 export async function stationReports(env: Env, stationId: string): Promise<ReportRow[]> {
   const { results } = await env.DB.prepare(
-    `SELECT station_id, kind, kw, vehicle, note, created_at FROM checkins
-     WHERE station_id = ?1 ORDER BY created_at DESC LIMIT 20`,
+    `SELECT c.station_id, c.kind, c.kw, c.vehicle, c.note, c.created_at FROM checkins c JOIN users u ON u.id = c.user_id
+     WHERE c.station_id = ?1 AND u.is_test = 0 ORDER BY c.created_at DESC LIMIT 20`,
   )
     .bind(stationId)
     .all<ReportRow>();

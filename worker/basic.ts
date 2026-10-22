@@ -18,10 +18,17 @@ import { distanceMetres } from './stations.ts';
 /** Phones on one Wi-Fi or carrier IP share this many Basic trips a day. */
 export const BASIC_TRIPS_PER_IP = 3;
 const ROUTES_PER_IP_PER_HOUR = 20;
+/**
+ * Routing calls a network may make for Basic a day: its trips plus a few that find no road or turn
+ * out too long. Those use the shared keyless router without counting as a trip, so without this a
+ * guest could spend the network's whole public-router share on them.
+ */
+export const BASIC_ROUTINGS_PER_IP = BASIC_TRIPS_PER_IP + 5;
 const MAX_KM = BASIC.maxTripKm ?? FREE_TRIP_KM;
 
 const deviceSlot = (device: string) => `basic-dev:${device}`;
 const ipSlot = (ip: string) => `basic-ip:${ip}`;
+const routingSlot = (ip: string) => `basic-route-ip:${ip}`;
 
 /** Basic trips planned today on this device. */
 export async function basicTripsToday(env: Env, device: string, now = new Date()): Promise<number> {
@@ -76,7 +83,17 @@ export async function planBasicRoute(req: Request, env: Env) {
   if (used >= BASIC.shortTripsPerDay) throw dailyLimit(used, 'device');
   if (ipUsed >= BASIC_TRIPS_PER_IP) throw dailyLimit(used, 'network');
 
-  const route = await router(env, { ip, origin: new URL(req.url).origin })([from, to]);
+  if ((await claimSlot(env.DB, routingSlot(ip), BASIC_ROUTINGS_PER_IP, day)) === null) {
+    throw new HttpError(429, 'rate_limited', "This network has tried a lot of routes today that Basic doesn't cover. Please try again tomorrow.");
+  }
+  let route;
+  try {
+    route = await router(env, { ip, origin: new URL(req.url).origin })([from, to]);
+  } catch (err) {
+    // Busy or out of capacity: no answer came back, so the attempt isn't held against the network.
+    if (err instanceof HttpError && (err.status === 429 || err.status >= 500)) await releaseSlot(env.DB, routingSlot(ip), day);
+    throw err;
+  }
   if (route.distanceKm > MAX_KM) throw tooLong(route.distanceKm, false);
 
   const count = await claimSlot(env.DB, deviceSlot(device), BASIC.shortTripsPerDay, day);

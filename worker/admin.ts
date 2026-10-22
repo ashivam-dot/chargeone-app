@@ -10,7 +10,7 @@ import { getEntitlement, grantPlan, startOfIndianDay } from './entitlements.ts';
 import { isDev, type Env } from './env.ts';
 import { HttpError, claimSlot, clientKey, deviceKey, indianDayStart, num, readJson, releaseSlot, slotCount, str } from './http.ts';
 import { playEnabled } from './play.ts';
-import { publicRouterName, router } from './routing.ts';
+import { PUBLIC_ROUTES_PER_DAY, PUBLIC_ROUTE_DAY_SLOT, publicRouterName, router } from './routing.ts';
 import { stationIndex } from './stations.ts';
 import { upiEnabled } from './upi.ts';
 import { lookupProvider, vehicleLookup } from './vehicleLookup.ts';
@@ -181,7 +181,7 @@ export async function overview(env: Env, origin: string, now = new Date()) {
   const day = indianDayStart(now);
   const d1 = iso(now.getTime() - DAY_MS);
   const d7 = iso(now.getTime() - 7 * DAY_MS);
-  const [users, trips, basic, plans, trials, feedback, reports, upi, aiRuns, chats] = await Promise.all([
+  const [users, trips, basic, plans, trials, feedback, reports, upi, aiRuns, chats, publicRoutes] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS total, SUM(created_at >= ?1) AS new24h, SUM(created_at >= ?2) AS new7d, SUM(email = 'deleted') AS deleted
        FROM users WHERE is_test = 0`,
@@ -212,6 +212,7 @@ export async function overview(env: Env, origin: string, now = new Date()) {
     db.prepare("SELECT COUNT(*) AS pending FROM upi_payments WHERE status = 'claimed'").first<Row>(),
     slotCount(db, AGENT_GLOBAL_SLOT, day),
     db.prepare("SELECT COALESCE(SUM(count), 0) AS n FROM rate_limits WHERE key LIKE 'agent-chat:%' AND window_start = ?1").bind(day).first<Row>(),
+    slotCount(db, PUBLIC_ROUTE_DAY_SLOT, day),
   ]);
   return {
     generatedAt: nowIso,
@@ -224,6 +225,8 @@ export async function overview(env: Env, origin: string, now = new Date()) {
     reports: { total: reports?.total ?? 0, last7d: reports?.last7d ?? 0, problems7d: reports?.problems7d ?? 0 },
     upiPending: upi?.pending ?? 0,
     ai: { runsToday: aiRuns, budget: AGENT_CALLS_PER_DAY, chatsToday: chats?.n ?? 0 },
+    /** Calls to the keyless public router today, shared by everyone; at the budget, routing without ORS stops. */
+    publicRouting: { today: publicRoutes, budget: PUBLIC_ROUTES_PER_DAY },
     integrations: integrations(env, origin),
   };
 }
@@ -321,6 +324,16 @@ export async function grantUser(req: Request, env: Env, id: string) {
   if (!PAID_PLANS.includes(plan)) throw new HttpError(400, 'invalid', 'Pick Trip Pass, Plus monthly or Plus yearly.');
   const days = num(body, 'days', { min: 1, max: 400 })!;
   const now = new Date();
+  // A grant replaces the purchase's id, which would cut the user off from cancelling a store
+  // subscription in the app, make its webhooks miss and let its next renewal overwrite the grant.
+  const current = await getEntitlement(env, id);
+  if (current && STORE_SOURCES.includes(current.source) && current.status === 'active' && current.activeUntil && new Date(current.activeUntil) > now) {
+    throw new HttpError(
+      409,
+      'store_subscription',
+      `This driver pays through ${current.source === 'play' ? 'Google Play' : 'Razorpay'} until ${current.activeUntil.slice(0, 10)}. A grant now would break that subscription: wait until it ends, or revoke it first.`,
+    );
+  }
   // A fresh external id per grant, so a shorter grant really replaces a longer one.
   await grantPlan(env, {
     userId: id,
@@ -335,7 +348,14 @@ export async function grantUser(req: Request, env: Env, id: string) {
   return userDetail(env, id, now);
 }
 
-/** Ends the plan in ChargeOne at once. It doesn't refund or cancel a Razorpay or Play subscription. */
+/** Purchases a grant must not replace: they renew on their own and are matched by their external id. */
+const STORE_SOURCES = ['razorpay', 'play'];
+
+/**
+ * Ends the plan in ChargeOne at once, for good: a Play sync or Razorpay renewal of the same purchase
+ * doesn't bring it back (see grantStatement). It doesn't refund or cancel the store subscription;
+ * the driver can still stop Razorpay renewals in the app.
+ */
 export async function revokeUser(req: Request, env: Env, id: string) {
   const row = await findUser(env, id);
   const now = new Date().toISOString();
@@ -440,7 +460,8 @@ export async function testSession(req: Request, env: Env, secure: boolean): Prom
 
   if (plan === 'basic') {
     const device = await deviceKey(req);
-    const keys = [`basic-ip:${await clientKey(req)}`, ...(device ? [`basic-dev:${device}`] : [])];
+    const ip = await clientKey(req);
+    const keys = [`basic-ip:${ip}`, `basic-route-ip:${ip}`, ...(device ? [`basic-dev:${device}`] : [])];
     const res = await env.DB.prepare(`DELETE FROM rate_limits WHERE key IN (${keys.map((_, i) => `?${i + 1}`).join(', ')})`).bind(...keys).run();
     await audit(req, env, 'test_session', 'basic', { car, basicReset: res.meta.changes ?? 0 });
     return { body: { plan, user: null, car, basicReset: (res.meta.changes ?? 0) > 0 }, cookie: clearSessionCookie(secure) };

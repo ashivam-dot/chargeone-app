@@ -1,4 +1,5 @@
 import { BedDouble, BellRing, Bookmark, BookmarkCheck, Car, ChevronDown, Gauge, Lightbulb, Moon, Navigation, SlidersHorizontal, Split, Utensils, X, Zap } from 'lucide-preact';
+import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Station } from '../data/model.ts';
 import type { Place, PlacesData } from '../data/places.ts';
@@ -565,6 +566,17 @@ export function TripPlanner(props: Props) {
           onSave={save}
           onUnlock={unlock}
           onReplan={() => void replanFromHere()}
+          limitCard={
+            limit && (
+              <GuestLimitCard
+                limit={limit}
+                signInReady={props.signInReady}
+                onStartTrial={props.onStartTrial}
+                onSignIn={props.onRequireSignIn}
+                onPlans={props.onPlans}
+              />
+            )
+          }
           onClear={clear}
           onChooseRoute={chooseRoute}
           onStartDrive={props.onStartDrive ? startDrive : undefined}
@@ -635,6 +647,8 @@ interface ResultProps {
   onSave: () => void;
   onUnlock: (label: string, perk: Perk) => void;
   onReplan: () => void;
+  /** A guest's re-plan that Basic doesn't cover: shown by the re-plan button, as the form is hidden. */
+  limitCard: ComponentChildren;
   onClear: () => void;
   onChooseRoute: (index: number) => void;
   onStartDrive?: () => void;
@@ -724,13 +738,15 @@ function verdictText(j: Journey): string {
 }
 
 function JourneyResult(props: ResultProps) {
-  const { result, journey, alerts, busy, error, me, plan, statuses, saveState, onSave, onUnlock, onReplan, onClear, onChooseRoute, onStartDrive, onSelectStation, onOpenPlace } = props;
+  const { result, journey, alerts, busy, error, me, plan, statuses, saveState, onSave, onUnlock, onReplan, limitCard, onClear, onChooseRoute, onStartDrive, onSelectStation, onOpenPlace } = props;
   const ends = dayEnds(journey, result.from, result.to);
   const multi = journey.days.length > 1;
   const area = (stationId: string) => result.places?.area[stationId] ?? null;
   const now = new Date();
   const replanFree = plan.freeReplans && now.getTime() - result.startedAt.getTime() < REPLAN_WINDOW_HOURS * 3600_000;
   const replanCost = plan.freeReplans ? 'uses a long trip' : "uses one of today's trips";
+  // Basic has no re-plans: each one is a new trip, so say so once today's are used.
+  const basicUsed = !me?.user && typeof me?.basicToday === 'number' && me.basicToday >= BASIC.shortTripsPerDay;
   let stopNo = 0;
 
   return (
@@ -937,8 +953,9 @@ function JourneyResult(props: ResultProps) {
             <PerkLock text="Save this trip to open without signal" plan={cheapestWith('savedTrips')} onUnlock={() => onUnlock('Saved trips', 'savedTrips')} />
           )
         )}
-        <button class="btn btn--block" disabled={busy !== null} onClick={onReplan}>
-          {busy ?? `Re-plan from where I am (${replanFree ? 'free' : replanCost})`}
+        {limitCard}
+        <button class="btn btn--block" disabled={busy !== null} onClick={onReplan} data-testid="trip-replan">
+          {busy ?? `Re-plan from where I am (${basicUsed ? "today's Basic trip is used" : replanFree ? 'free' : replanCost})`}
         </button>
         <button class="btn btn--block btn--ghost" onClick={onClear}>
           Plan another trip

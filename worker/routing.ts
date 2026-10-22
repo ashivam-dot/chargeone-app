@@ -20,6 +20,7 @@ const VALHALLA_URL = 'https://valhalla1.openstreetmap.de/route';
 const PUBLIC_USER_AGENT = 'ChargeOne/0.2 (+https://chargeone.akshshivam5.workers.dev; EV trip planner for India)';
 /** Routing calls a day to the public server, across everyone; well under its "no heavy usage" rule. */
 export const PUBLIC_ROUTES_PER_DAY = 800;
+export const PUBLIC_ROUTE_DAY_SLOT = 'public-route:day';
 /** Per network (hashed IP) a day, so one script can't use up everyone's share. */
 export const PUBLIC_ROUTES_PER_IP_PER_DAY = 25;
 /** Identical requests (same points to ~10 m) are answered from the edge cache for this long. */
@@ -153,7 +154,7 @@ async function publicSlot(env: Env, caller: RouteCaller | undefined): Promise<vo
   if (ipKey && (await claimSlot(env.DB, ipKey, PUBLIC_ROUTES_PER_IP_PER_DAY, day)) === null) {
     throw new HttpError(429, 'rate_limited', 'This network has planned a lot of routes today. Please try again tomorrow.');
   }
-  if ((await claimSlot(env.DB, 'public-route:day', PUBLIC_ROUTES_PER_DAY, day)) === null) {
+  if ((await claimSlot(env.DB, PUBLIC_ROUTE_DAY_SLOT, PUBLIC_ROUTES_PER_DAY, day)) === null) {
     if (ipKey) await releaseSlot(env.DB, ipKey, day);
     throw new HttpError(503, 'routing_unavailable', "Free route planning has reached today's limit for everyone. Please try again tomorrow.");
   }

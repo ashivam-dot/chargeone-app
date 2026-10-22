@@ -114,9 +114,27 @@ async function shortHash(value: string): Promise<string> {
   return toHex(new Uint8Array(digest)).slice(0, 24);
 }
 
-/** A short hash of the client IP, so rate-limit rows never store addresses. */
+/**
+ * The network an address belongs to, for per-network limits. An IPv4 address is its own network.
+ * One IPv6 customer or server usually holds a whole /64, so every address in it counts as one.
+ */
+export function clientNetwork(ip: string): string {
+  const mapped = ip.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
+  if (mapped) return mapped[1];
+  if (!ip.includes(':')) return ip;
+  const [head, tail = null] = ip.toLowerCase().split('%')[0].split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail === null ? [] : tail ? tail.split(':') : [];
+  const groups = tail === null ? left : [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill('0'), ...right];
+  return `${groups
+    .slice(0, 4)
+    .map((g) => (Number.parseInt(g, 16) || 0).toString(16))
+    .join(':')}::/64`;
+}
+
+/** A short hash of the client's network (see clientNetwork), so rate-limit rows never store addresses. */
 export async function clientKey(req: Request): Promise<string> {
-  return shortHash(`chargeone:${clientIp(req)}`);
+  return shortHash(`chargeone:${clientNetwork(clientIp(req))}`);
 }
 
 /** A short hash of the app's install id, or null when the header is missing or malformed. */

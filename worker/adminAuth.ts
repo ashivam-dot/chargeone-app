@@ -3,7 +3,7 @@
 // a bearer token instead. Every change made through the console is written to admin_audit.
 import { base64UrlDecode, base64UrlEncode, constantTimeEqual, hmacSha256 } from './crypto.ts';
 import { isDev, type Env } from './env.ts';
-import { HttpError, clientKey, enforceRateLimit, readJson, str } from './http.ts';
+import { HttpError, clientKey, enforceRateLimit, rateLimit, readJson, slotCount, str } from './http.ts';
 
 export const ADMIN_COOKIE = 'co_admin';
 const ADMIN_HOURS = 12;
@@ -11,6 +11,16 @@ const MIN_TOKEN_CHARS = 24;
 /** Login attempts per network address in LOGIN_WINDOW_SEC, right or wrong. */
 export const LOGIN_ATTEMPTS = 5;
 const LOGIN_WINDOW_SEC = 15 * 60;
+/**
+ * Wrong tokens a network may send in FAIL_WINDOW_SEC, by bearer header and login form together.
+ * Once reached, even the right token is refused until the window ends, so guessing gets no answer.
+ */
+export const ADMIN_FAILURES = 10;
+const FAIL_WINDOW_SEC = 3600;
+/** Failed logins written to admin_audit an hour across all networks, so a flood can't bury real entries. */
+const FAILED_LOGIN_AUDITS_PER_HOUR = 50;
+/** Audit rows older than this are deleted when the owner signs in. */
+const AUDIT_RETENTION_DAYS = 400;
 /**
  * The token `wrangler dev` uses when ADMIN_TOKEN isn't set, so the console works locally without a
  * secret. It is public (it's in the README) and refused in production.
@@ -95,14 +105,28 @@ function readCookie(req: Request): string | null {
   return null;
 }
 
+const failKey = async (req: Request) => `admin-fail:${await clientKey(req)}`;
+
+/** Refuses a network that has sent ADMIN_FAILURES wrong tokens this window, before any token is compared. */
+async function refuseLockedOut(env: Env, key: string): Promise<void> {
+  const window = Math.floor(Date.now() / 1000 / FAIL_WINDOW_SEC) * FAIL_WINDOW_SEC;
+  if ((await slotCount(env.DB, key, window)) >= ADMIN_FAILURES) {
+    throw new HttpError(429, 'rate_limited', 'Too many wrong admin tokens from this network. Please wait an hour.');
+  }
+}
+
+const countFailure = (env: Env, key: string) => rateLimit(env.DB, key, ADMIN_FAILURES, FAIL_WINDOW_SEC);
+
 /** Guards every admin route: the console's cookie, or ADMIN_TOKEN as a bearer token (scripts/upi-admin.ts). */
 export async function requireAdmin(req: Request, env: Env): Promise<AdminAuth> {
   const token = adminToken(env);
   const auth = req.headers.get('Authorization') ?? '';
   if (/^Bearer\s+/i.test(auth)) {
+    const key = await failKey(req);
+    await refuseLockedOut(env, key);
     const sent = auth.replace(/^Bearer\s+/i, '').trim();
     if (sent && constantTimeEqual(sent, token)) return { via: 'bearer' };
-    await enforceRateLimit(env.DB, `admin-fail:${await clientKey(req)}`, 10, 3600);
+    await countFailure(env, key);
     throw new HttpError(401, 'unauthorized', 'Unauthorized.');
   }
   const cookie = readCookie(req);
@@ -110,16 +134,22 @@ export async function requireAdmin(req: Request, env: Env): Promise<AdminAuth> {
   throw new HttpError(401, 'admin_signed_out', 'Sign in to the admin console.');
 }
 
-/** Checks the token sent from the login form. Every attempt counts towards the limit, right or wrong. */
+/** Checks the token sent from the login form. Every attempt counts towards the login limit, right or wrong, and wrong ones towards ADMIN_FAILURES. */
 export async function adminLogin(req: Request, env: Env): Promise<{ expiresAt: string; value: string }> {
   const token = adminToken(env);
+  const key = await failKey(req);
+  await refuseLockedOut(env, key);
   await enforceRateLimit(env.DB, `admin-login:${await clientKey(req)}`, LOGIN_ATTEMPTS, LOGIN_WINDOW_SEC);
   const sent = str(await readJson(req, 1024), 'token', { max: 512 })!.trim();
   if (!constantTimeEqual(sent, token)) {
-    await audit(req, env, 'login_failed', null);
+    await countFailure(env, key);
+    if (await rateLimit(env.DB, 'admin-login-failed-audit', FAILED_LOGIN_AUDITS_PER_HOUR, 3600)) await audit(req, env, 'login_failed', null);
     throw new HttpError(401, 'wrong_token', 'That admin token is not right.');
   }
   await audit(req, env, 'login', null);
+  await env.DB.prepare('DELETE FROM admin_audit WHERE at < ?1')
+    .bind(new Date(Date.now() - AUDIT_RETENTION_DAYS * 86400_000).toISOString())
+    .run();
   return createAdminToken(env);
 }
 
