@@ -69,7 +69,7 @@ r = await call('POST', '/api/route', { from: MG_ROAD, to: ELECTRONIC_CITY });
 check('second guest trip today returns 402 daily_limit', r.status === 402 && r.body.error === 'daily_limit', r.body);
 
 r = await call('POST', '/api/route', { from: MG_ROAD, to: MYSURU }, { 'X-ChargeOne-Device': randomUUID() });
-check('guest long trip returns 402 sign_in_required', r.status === 402 && r.body.error === 'sign_in_required', r.body);
+check('guest long trip returns 402 too_long', r.status === 402 && r.body.error === 'too_long', r.body);
 
 const feedback = { rating: 5, category: 'app', message: 'Smoke test feedback.', screen: 'smoke', appVersion: '0.1.0', platform: 'web', contactOk: true };
 r = await call('POST', '/api/feedback', feedback);

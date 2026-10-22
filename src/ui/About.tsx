@@ -62,7 +62,8 @@ export function About({ dataset, onClose }: Props) {
           <li>
             Map © <a href="https://openfreemap.org" target="_blank" rel="noopener noreferrer">OpenFreeMap</a>, ©{' '}
             <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>. Place search by
-            Photon. Routes by openrouteservice. Terrain ©{' '}
+            Photon. Routes by openrouteservice, or FOSSGIS's public Valhalla server on OpenStreetMap data (
+            <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener noreferrer">report a map error</a>). Terrain ©{' '}
             <a href="https://mapterhorn.com/attribution" target="_blank" rel="noopener noreferrer">Mapterhorn</a>.
           </li>
           <li>

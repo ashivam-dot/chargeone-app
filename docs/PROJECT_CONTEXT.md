@@ -125,8 +125,22 @@ headless shell's SwiftShader gives 2-3 fps) -> `scripts/demo-landscape.ts` -> `s
 
 Deployed to `https://chargeone.akshshivam5.workers.dev` (personal Cloudflare, D1 `chargeone`
 `1a4296a3-…`, `SESSION_SECRET` set). No iOS build exists (no Xcode on this Mac), so the owner's wife got the
-link on WhatsApp to install it as a PWA (Safari, Add to Home Screen). Without `ORS_API_KEY` production trip
-planning answers 503 `not_configured`; without `GOOGLE_CLIENT_ID` there's no sign-in, trial or copilot.
+link on WhatsApp to install it as a PWA (Safari, Add to Home Screen). Without `GOOGLE_CLIENT_ID` there's no
+sign-in, trial or copilot (the sign-in sheet says "being set up" and guests are never sent to it for Basic).
+
+Keyless routing (2026-10-23, `worker/routing.ts`): ORS when `ORS_API_KEY` is set (busy -> public fallback);
+else FOSSGIS Valhalla (`valhalla1.openstreetmap.de`, polyline6, `parseValhalla` tested on recorded fixtures in
+`worker/test-support/fixtures/`) in production and the OSRM demo in development; `PUBLIC_ROUTER=off` gives 503
+`not_configured`. Valhalla is capped at 800 routes/day overall, 25/day per hashed IP, 1 request/second, edge
+cached 3 days, no alternatives, no elevation (plans assume flat roads), UA + Referer sent, OSM credit and
+"report a map error" shown under the trip. FOSSGIS terms forbid it being a substantial part of a commercial
+offering and ask for a contact email on the site: a stopgap until the ORS key is set.
+Guest limits are 402 `too_long` / `daily_limit` with the exact reason ("Basic covers 1 trip up to 100 km a
+day; this trip is 148 km"), shown inline in the planner (`GuestLimitCard`), not as a sign-in or paywall.
+Plates: `src/shared/plate.ts` parses standard, Delhi, BH and temporary plates; `src/shared/rto.ts` names the
+state and only confident RTO cities. With no lookup partner, `FindCar` shows "Registered in <State> - RTO
+KA-51 (Bengaluru)", says model lookup needs a data partner, and offers a search over `VEHICLES`
+(`src/shared/vehicleSearch.ts`).
 WhatsApp Web ignores synthetic clicks on chat rows: open a chat by typing in "Search or start a new chat",
 then ArrowDown and Enter; check the composer's `aria-label` ("Type a message to <name>") before sending.
 
@@ -161,7 +175,8 @@ Blocked or waiting on the owner:
    `wrangler secret put VOICE_TTS_URL` and `VOICE_TTS_TOKEN`.
 6. Admin console + UPI: `ADMIN_TOKEN` (see Admin console), `UPI_VPA`, `UPI_PAYEE_NAME`; Play: service account + products (see README).
 7. Number-plate lookup: sign up at Deepvue (or Cashfree) with the personal Gmail, then
-   `wrangler secret put DEEPVUE_CLIENT_ID` and `DEEPVUE_CLIENT_SECRET`. Until then the app decodes VINs only.
+   `wrangler secret put DEEPVUE_CLIENT_ID` and `DEEPVUE_CLIENT_SECRET`. Until then the app decodes VINs, reads
+   the plate's state and RTO, and offers a model search.
    3D cars are likenesses; closer fidelity means more tuning in `carDesigns.ts` against photos.
 8. Live operator status: only through partner feeds (OCPI from operators, Delhi EV portal); needs agreements.
 

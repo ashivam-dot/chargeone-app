@@ -336,6 +336,40 @@ html {
   color: var(--text);
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
+.find-car__rto {
+  margin: 0;
+  color: var(--text);
+}
+.find-car__pick {
+  display: grid;
+  gap: 8px;
+}
+.find-car__pick p {
+  margin: 0;
+  color: var(--muted);
+}
+.find-car__models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.find-car__model {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.find-car__model:hover,
+.find-car__model:focus-visible {
+  border-color: var(--accent);
+}
 .detected {
   display: flex;
   align-items: center;

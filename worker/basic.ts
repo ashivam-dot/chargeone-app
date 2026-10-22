@@ -1,4 +1,4 @@
-import { BASIC, FREE_TRIP_KM, PLANS, TRIAL_DAYS, type UsageCounts } from '../src/shared/plans.ts';
+import { BASIC, FREE_TRIP_KM, type UsageCounts } from '../src/shared/plans.ts';
 import type { Env } from './env.ts';
 import {
   HttpError,
@@ -30,22 +30,29 @@ export async function basicTripsToday(env: Env, device: string, now = new Date()
 
 const usage = (n: number): UsageCounts => ({ shortToday: n, longInWindow: 0 });
 
-function tooLong(): HttpError {
-  return new HttpError(
-    402,
-    'sign_in_required',
-    `Basic plans trips up to ${MAX_KM} km. Sign in free for longer trips, or try Plus free for ${TRIAL_DAYS} days.`,
-    { tier: 'basic' },
-  );
+const COVERS = `Basic covers ${BASIC.shortTripsPerDay} trip up to ${MAX_KM} km a day`;
+
+/** km is the road distance, or the straight line (which the road can only exceed) before routing. */
+function tooLong(km: number, straightLine: boolean): HttpError {
+  const rounded = Math.round(km);
+  return new HttpError(402, 'too_long', `${COVERS}; this trip is ${straightLine ? 'at least ' : ''}${rounded} km.`, {
+    tier: 'basic',
+    limitKm: MAX_KM,
+    distanceKm: rounded,
+    straightLine,
+  });
 }
 
-function dailyLimit(used: number): HttpError {
-  return new HttpError(
-    402,
-    'daily_limit',
-    `Basic includes ${BASIC.shortTripsPerDay} trip plan a day. Sign in free for ${PLANS.free.shortTripsPerDay} a day.`,
-    { tier: 'basic', plan: 'free', usage: usage(used) },
-  );
+function dailyLimit(used: number, scope: 'device' | 'network'): HttpError {
+  const why =
+    scope === 'device'
+      ? "and this phone has used today's trip"
+      : `and phones on this network have used today's ${BASIC_TRIPS_PER_IP} between them`;
+  return new HttpError(402, 'daily_limit', `${COVERS}, ${why}. It resets at midnight, India time.`, {
+    tier: 'basic',
+    scope,
+    usage: usage(used),
+  });
 }
 
 /**
@@ -62,20 +69,21 @@ export async function planBasicRoute(req: Request, env: Env) {
 
   const straightKm = distanceMetres(from, to) / 1000;
   if (straightKm < 0.5) throw new HttpError(400, 'too_short', 'Start and destination are the same place.');
-  if (straightKm > MAX_KM) throw tooLong();
+  if (straightKm > MAX_KM) throw tooLong(straightKm, true);
 
   const day = indianDayStart();
   const [used, ipUsed] = await Promise.all([slotCount(env.DB, deviceSlot(device), day), slotCount(env.DB, ipSlot(ip), day)]);
-  if (used >= BASIC.shortTripsPerDay || ipUsed >= BASIC_TRIPS_PER_IP) throw dailyLimit(used);
+  if (used >= BASIC.shortTripsPerDay) throw dailyLimit(used, 'device');
+  if (ipUsed >= BASIC_TRIPS_PER_IP) throw dailyLimit(used, 'network');
 
-  const route = await router(env)([from, to]);
-  if (route.distanceKm > MAX_KM) throw tooLong();
+  const route = await router(env, { ip, origin: new URL(req.url).origin })([from, to]);
+  if (route.distanceKm > MAX_KM) throw tooLong(route.distanceKm, false);
 
   const count = await claimSlot(env.DB, deviceSlot(device), BASIC.shortTripsPerDay, day);
-  if (count === null) throw dailyLimit(BASIC.shortTripsPerDay);
+  if (count === null) throw dailyLimit(BASIC.shortTripsPerDay, 'device');
   if ((await claimSlot(env.DB, ipSlot(ip), BASIC_TRIPS_PER_IP, day)) === null) {
     await releaseSlot(env.DB, deviceSlot(device), day);
-    throw dailyLimit(count - 1);
+    throw dailyLimit(count - 1, 'network');
   }
   return {
     tripId: crypto.randomUUID(),
