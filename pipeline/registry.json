@@ -106,6 +106,11 @@
       "anchor": "osm-n12596574170",
       "legacy": "osm-n12596574170"
     },
+    "c1_2frtkp2bp727": {
+      "created": "2026-10-23",
+      "anchor": "ocm-311546",
+      "legacy": "ocm-311546"
+    },
     "c1_2h3vdgclijij": {
       "created": "2026-10-23",
       "anchor": "ocm-309067",
@@ -1505,6 +1510,11 @@
       "created": "2026-10-23",
       "anchor": "osm-n10177662896",
       "legacy": "osm-n10177662896"
+    },
+    "c1_75ud2nfiqd36": {
+      "created": "2026-10-23",
+      "anchor": "ocm-480933",
+      "legacy": "osm-w1152421163"
     },
     "c1_75yk3eyclaf3": {
       "created": "2026-10-23",
@@ -3694,7 +3704,8 @@
     "c1_fwevnaag5ky7": {
       "created": "2026-10-23",
       "anchor": "ocm-475875",
-      "legacy": "ocm-475875"
+      "legacy": "ocm-475875",
+      "mergedInto": "c1_7urhykwg44yo"
     },
     "c1_fwpzjpqesprq": {
       "created": "2026-10-23",
@@ -3914,7 +3925,8 @@
     "c1_glba32wlvcid": {
       "created": "2026-10-23",
       "anchor": "ocm-313495",
-      "legacy": "ocm-313495"
+      "legacy": "ocm-313495",
+      "gone": true
     },
     "c1_gljvwjhdd6ts": {
       "created": "2026-10-23",
@@ -5664,7 +5676,7 @@
     "c1_luoegjdtihya": {
       "created": "2026-10-23",
       "anchor": "ocm-480932",
-      "legacy": "osm-w1152421163"
+      "legacy": "ocm-480932"
     },
     "c1_lvgigfze74sr": {
       "created": "2026-10-23",
@@ -6529,7 +6541,8 @@
     "c1_owfmh3i6gfst": {
       "created": "2026-10-23",
       "anchor": "ocm-471003",
-      "legacy": "ocm-471003"
+      "legacy": "ocm-471003",
+      "gone": true
     },
     "c1_owtbqik3kzzj": {
       "created": "2026-10-23",
@@ -6834,7 +6847,8 @@
     "c1_pttku4mcrx6q": {
       "created": "2026-10-23",
       "anchor": "ocm-313503",
-      "legacy": "ocm-313503"
+      "legacy": "ocm-313503",
+      "gone": true
     },
     "c1_puwogt6mazct": {
       "created": "2026-10-23",
@@ -7694,7 +7708,8 @@
     "c1_svvttrcooxx7": {
       "created": "2026-10-23",
       "anchor": "ocm-309095",
-      "legacy": "ocm-309095"
+      "legacy": "ocm-309095",
+      "gone": true
     },
     "c1_swhi7zp4crb6": {
       "created": "2026-10-23",
@@ -8654,7 +8669,8 @@
     "c1_vyveam6orxgq": {
       "created": "2026-10-23",
       "anchor": "ocm-313577",
-      "legacy": "ocm-313577"
+      "legacy": "ocm-313577",
+      "gone": true
     },
     "c1_w2njhyil2735": {
       "created": "2026-10-23",
@@ -9224,7 +9240,8 @@
     "c1_xrunh7qobkb7": {
       "created": "2026-10-23",
       "anchor": "ocm-308970",
-      "legacy": "ocm-308970"
+      "legacy": "ocm-308970",
+      "mergedInto": "c1_dltyc2cslayp"
     },
     "c1_xse2vqdmyl36": {
       "created": "2026-10-23",
@@ -10422,7 +10439,7 @@
     "ocm-308953": "c1_pnugwifne5sg",
     "ocm-308964": "c1_qvw3hga6kqve",
     "ocm-308965": "c1_7nwwvq7mxqgq",
-    "ocm-308970": "c1_xrunh7qobkb7",
+    "ocm-308970": "c1_dltyc2cslayp",
     "ocm-308971": "c1_dltyc2cslayp",
     "ocm-308972": "c1_grfivobt33pd",
     "ocm-308973": "c1_t3atqvvc5z6k",
@@ -10676,7 +10693,7 @@
     "ocm-311543": "c1_4cmusr6c2245",
     "ocm-311544": "c1_jsti4jzruhb6",
     "ocm-311545": "c1_z53dw6553hjf",
-    "ocm-311546": "c1_z53dw6553hjf",
+    "ocm-311546": "c1_2frtkp2bp727",
     "ocm-311547": "c1_t3ypmum54jca",
     "ocm-311548": "c1_szo64dvpjr5p",
     "ocm-311549": "c1_hdgu75kj3652",
@@ -11336,7 +11353,7 @@
     "ocm-475680": "c1_zqwo2zy3n3aw",
     "ocm-475873": "c1_7uv7g2ctolz2",
     "ocm-475874": "c1_7urhykwg44yo",
-    "ocm-475875": "c1_fwevnaag5ky7",
+    "ocm-475875": "c1_7urhykwg44yo",
     "ocm-475886": "c1_jcvct33im62j",
     "ocm-475941": "c1_ui43ecpaavqs",
     "ocm-477284": "c1_tivuj2p77jlx",
@@ -11448,7 +11465,7 @@
     "ocm-480930": "c1_gm4ytrqo5tra",
     "ocm-480931": "c1_2ii5pxiqptef",
     "ocm-480932": "c1_luoegjdtihya",
-    "ocm-480933": "c1_luoegjdtihya",
+    "ocm-480933": "c1_75ud2nfiqd36",
     "ocm-480934": "c1_hsssep6hbfrf",
     "ocm-480935": "c1_3eu65hyyp6ok",
     "ocm-481488": "c1_2uvk6kzgb4ru",
@@ -12076,7 +12093,7 @@
     "osm-w1150511285": "c1_klghqnk555ny",
     "osm-w1150599656": "c1_amlgljrmv7is",
     "osm-w1152420782": "c1_hsssep6hbfrf",
-    "osm-w1152421163": "c1_luoegjdtihya",
+    "osm-w1152421163": "c1_75ud2nfiqd36",
     "osm-w1152424877": "c1_mfmrjqmnjkuk",
     "osm-w1152427340": "c1_m5vgcamwwu4q",
     "osm-w1198553894": "c1_yhixf257jwyu",

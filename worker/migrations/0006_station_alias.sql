@@ -1,5 +1,5 @@
 -- Every id a charger was known by (osm-/ocm- ids and retired c1_ ids) and its current stable c1_ id.
--- Seeded from public/data/aliases.json version 6931a4e7fb37 by scripts/station-alias-sql.ts, which
+-- Seeded from public/data/aliases/ version 6fcfc49dc91e by scripts/station-alias-sql.ts, which
 -- also writes the re-runnable sync for later data builds.
 CREATE TABLE station_alias (
   alias TEXT PRIMARY KEY,
@@ -7,6 +7,8 @@ CREATE TABLE station_alias (
 ) WITHOUT ROWID;
 
 INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
+('c1_fwevnaag5ky7','c1_7urhykwg44yo'),
+('c1_xrunh7qobkb7','c1_dltyc2cslayp'),
 ('ocm-103603','c1_i7hgrcslxfhc'),
 ('ocm-103604','c1_qkltwyhpn74n'),
 ('ocm-103606','c1_n2gqkxaakj6t'),
@@ -204,10 +206,10 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-307291','c1_c6riu2qhvnj2'),
 ('ocm-307292','c1_keknwpa363lc'),
 ('ocm-307293','c1_zlkfqynixip7'),
-('ocm-307294','c1_fglmlgzfabtw'),
-('ocm-307295','c1_2zsyubcudyow'),
-('ocm-307296','c1_4d7wxx74mqsa');
+('ocm-307294','c1_fglmlgzfabtw');
 INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
+('ocm-307295','c1_2zsyubcudyow'),
+('ocm-307296','c1_4d7wxx74mqsa'),
 ('ocm-307376','c1_buovvcv27ary'),
 ('ocm-307378','c1_ufztz3lwgsyk'),
 ('ocm-307379','c1_frjldwli3tq3'),
@@ -402,13 +404,13 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-308953','c1_pnugwifne5sg'),
 ('ocm-308964','c1_qvw3hga6kqve'),
 ('ocm-308965','c1_7nwwvq7mxqgq'),
-('ocm-308970','c1_xrunh7qobkb7'),
+('ocm-308970','c1_dltyc2cslayp'),
 ('ocm-308971','c1_dltyc2cslayp'),
 ('ocm-308972','c1_grfivobt33pd'),
-('ocm-308973','c1_t3atqvvc5z6k'),
-('ocm-308974','c1_v3gtzokmpezt'),
-('ocm-308975','c1_qeyllekqygg3');
+('ocm-308973','c1_t3atqvvc5z6k');
 INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
+('ocm-308974','c1_v3gtzokmpezt'),
+('ocm-308975','c1_qeyllekqygg3'),
 ('ocm-308976','c1_inn5mlcca3uj'),
 ('ocm-308977','c1_m5m53kuycj4g'),
 ('ocm-308978','c1_qychtpac3nnl'),
@@ -457,7 +459,6 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-309069','c1_fwpzjpqesprq'),
 ('ocm-309070','c1_ruemzuh3u7mu'),
 ('ocm-309076','c1_r7veisllolu7'),
-('ocm-309095','c1_svvttrcooxx7'),
 ('ocm-309096','c1_hbmpeklzmcc7'),
 ('ocm-309097','c1_id32af4yqzpc'),
 ('ocm-309098','c1_myyckty4ewfz'),
@@ -607,9 +608,9 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-311461','c1_g7vxqqk35zg2'),
 ('ocm-311462','c1_26glugq7jgid'),
 ('ocm-311463','c1_7ezd6ukz7xxy'),
-('ocm-311464','c1_xky3yrdbmoq2'),
-('ocm-311479','c1_bf4rjk2ihgbv');
+('ocm-311464','c1_xky3yrdbmoq2');
 INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
+('ocm-311479','c1_bf4rjk2ihgbv'),
 ('ocm-311480','c1_tu6gq5vibgyd'),
 ('ocm-311481','c1_nflyuocdac5k'),
 ('ocm-311482','c1_wgp5ns2cghio'),
@@ -658,7 +659,7 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-311543','c1_4cmusr6c2245'),
 ('ocm-311544','c1_jsti4jzruhb6'),
 ('ocm-311545','c1_z53dw6553hjf'),
-('ocm-311546','c1_z53dw6553hjf'),
+('ocm-311546','c1_2frtkp2bp727'),
 ('ocm-311547','c1_t3ypmum54jca'),
 ('ocm-311548','c1_szo64dvpjr5p'),
 ('ocm-311549','c1_hdgu75kj3652'),
@@ -808,14 +809,12 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-313492','c1_3ijgiobswcok'),
 ('ocm-313493','c1_ieol3pylztgz'),
 ('ocm-313494','c1_wbzghhh6lcnj'),
-('ocm-313495','c1_glba32wlvcid'),
 ('ocm-313496','c1_cy2bd2cfmujp');
 INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-313497','c1_rtgzf7q2l2gw'),
 ('ocm-313498','c1_hky5fjbkmm5s'),
 ('ocm-313499','c1_ievxztlr4y62'),
 ('ocm-313502','c1_wwnxrzx7yoee'),
-('ocm-313503','c1_pttku4mcrx6q'),
 ('ocm-313505','c1_apepm6u7jocw'),
 ('ocm-313506','c1_mlni434j2bal'),
 ('ocm-313508','c1_lsxifudg67no'),
@@ -861,7 +860,6 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-313574','c1_mrihbeyqc4ka'),
 ('ocm-313575','c1_dt5zvgqzcclj'),
 ('ocm-313576','c1_nr5whoimfkrc'),
-('ocm-313577','c1_vyveam6orxgq'),
 ('ocm-313578','c1_flg6zkzcq6pp'),
 ('ocm-313579','c1_2uefkztuixku'),
 ('ocm-313580','c1_45dqtxkszk7e'),
@@ -1010,10 +1008,10 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-313748','c1_jetbyv5qmq7j'),
 ('ocm-313749','c1_ax3ylae6nr6v'),
 ('ocm-313750','c1_yf74rv7rrven'),
-('ocm-313751','c1_opbaw5ltjch5');
-INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
+('ocm-313751','c1_opbaw5ltjch5'),
 ('ocm-313752','c1_3vdlu7ijfxpq'),
-('ocm-313753','c1_ze5osm4ge4cm'),
+('ocm-313753','c1_ze5osm4ge4cm');
+INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-313754','c1_sjpfadj4b75s'),
 ('ocm-313755','c1_jnv6dv37baec'),
 ('ocm-313756','c1_zpoo7toa5hs3'),
@@ -1211,17 +1209,16 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-469383','c1_ygenzsby3rcz'),
 ('ocm-469384','c1_e4wbslyoggq4'),
 ('ocm-469487','c1_gtazkmgchfoy'),
-('ocm-469488','c1_ftz5khuajncc');
-INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
+('ocm-469488','c1_ftz5khuajncc'),
 ('ocm-469517','c1_5imjsi7dj46p'),
-('ocm-469522','c1_ftz5khuajncc'),
+('ocm-469522','c1_ftz5khuajncc');
+INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-469742','c1_4xageqhresax'),
 ('ocm-469744','c1_bu7ddzy5dqzg'),
 ('ocm-470709','c1_umwvqndvuk3a'),
 ('ocm-470710','c1_ojddawmq4bdc'),
 ('ocm-470760','c1_cvnmu522mb4o'),
 ('ocm-470897','c1_ianktqktlqwm'),
-('ocm-471003','c1_owfmh3i6gfst'),
 ('ocm-471853','c1_jsgg73ibh66z'),
 ('ocm-471854','c1_q656chhr7xox'),
 ('ocm-471855','c1_qtid3ifzjif5'),
@@ -1321,7 +1318,7 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-475680','c1_zqwo2zy3n3aw'),
 ('ocm-475873','c1_7uv7g2ctolz2'),
 ('ocm-475874','c1_7urhykwg44yo'),
-('ocm-475875','c1_fwevnaag5ky7'),
+('ocm-475875','c1_7urhykwg44yo'),
 ('ocm-475886','c1_jcvct33im62j'),
 ('ocm-475941','c1_ui43ecpaavqs'),
 ('ocm-477284','c1_tivuj2p77jlx'),
@@ -1412,11 +1409,11 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-480419','c1_feswrfy6gkv7'),
 ('ocm-480420','c1_fdzhvfeggfli'),
 ('ocm-480421','c1_eau7ztyzrybg'),
-('ocm-480422','c1_qe6llnzsusbq');
-INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
+('ocm-480422','c1_qe6llnzsusbq'),
 ('ocm-480423','c1_abrac42i3n4e'),
 ('ocm-480424','c1_56f7pwfqyrre'),
-('ocm-480425','c1_zvkk3qomh4z3'),
+('ocm-480425','c1_zvkk3qomh4z3');
+INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-480426','c1_ahhszwcohp2u'),
 ('ocm-480427','c1_xbgayd3osolf'),
 ('ocm-480428','c1_3325heg2lo4b'),
@@ -1434,7 +1431,7 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('ocm-480930','c1_gm4ytrqo5tra'),
 ('ocm-480931','c1_2ii5pxiqptef'),
 ('ocm-480932','c1_luoegjdtihya'),
-('ocm-480933','c1_luoegjdtihya'),
+('ocm-480933','c1_75ud2nfiqd36'),
 ('ocm-480934','c1_hsssep6hbfrf'),
 ('ocm-480935','c1_3eu65hyyp6ok'),
 ('ocm-481488','c1_2uvk6kzgb4ru'),
@@ -1613,11 +1610,11 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('osm-n11408768738','c1_lp3fx7ulkeoi'),
 ('osm-n11414388215','c1_lf5pe5nucrlx'),
 ('osm-n11414388216','c1_lf5pe5nucrlx'),
-('osm-n11421789517','c1_3ye5ksj2etf3');
-INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
+('osm-n11421789517','c1_3ye5ksj2etf3'),
 ('osm-n11421789521','c1_3ye5ksj2etf3'),
 ('osm-n11449177423','c1_45xcymo4iexs'),
-('osm-n11452082417','c1_dijeobhuassy'),
+('osm-n11452082417','c1_dijeobhuassy');
+INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('osm-n11454822427','c1_ztrcfsz6xe77'),
 ('osm-n11454822430','c1_ztrcfsz6xe77'),
 ('osm-n11454822431','c1_ztrcfsz6xe77'),
@@ -1814,11 +1811,11 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('osm-n13639989058','c1_67zbcqiskimh'),
 ('osm-n13639995467','c1_kczkvp2mccmc'),
 ('osm-n13640015379','c1_gd52sl2dgnfa'),
-('osm-n13640131586','c1_bl4gag3xknji');
-INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
+('osm-n13640131586','c1_bl4gag3xknji'),
 ('osm-n13640131587','c1_azl6tkyfyoeu'),
 ('osm-n13640142200','c1_lh65zhp2unwl'),
-('osm-n13640389831','c1_ifk2geuaslx4'),
+('osm-n13640389831','c1_ifk2geuaslx4');
+INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('osm-n13640768575','c1_wqyofuugxyy2'),
 ('osm-n13640776732','c1_6ic5lktbvves'),
 ('osm-n13668832204','c1_qut5642dhe3j'),
@@ -2015,11 +2012,11 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('osm-n8836770673','c1_dytcod7cel2d'),
 ('osm-n8893808042','c1_4zmaefe4s4lw'),
 ('osm-n8901628132','c1_26av2rwpvu6k'),
-('osm-n8919501650','c1_m54sny2su3sm');
-INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
+('osm-n8919501650','c1_m54sny2su3sm'),
 ('osm-n8919511936','c1_oci5a355ehca'),
 ('osm-n8948790096','c1_zmg5ntmgq6u3'),
-('osm-n9096832477','c1_suxemgegjxs3'),
+('osm-n9096832477','c1_suxemgegjxs3');
+INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('osm-n9104747115','c1_kytxftlx3opo'),
 ('osm-n9202909866','c1_djjq67un7jf6'),
 ('osm-n9204462345','c1_7snketblmozy'),
@@ -2065,7 +2062,7 @@ INSERT OR REPLACE INTO station_alias (alias, station_id) VALUES
 ('osm-w1150511285','c1_klghqnk555ny'),
 ('osm-w1150599656','c1_amlgljrmv7is'),
 ('osm-w1152420782','c1_hsssep6hbfrf'),
-('osm-w1152421163','c1_luoegjdtihya'),
+('osm-w1152421163','c1_75ud2nfiqd36'),
 ('osm-w1152424877','c1_mfmrjqmnjkuk'),
 ('osm-w1152427340','c1_m5vgcamwwu4q'),
 ('osm-w1198553894','c1_yhixf257jwyu'),

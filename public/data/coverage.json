@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-22T20:17:34.089Z",
+  "generatedAt": "2026-10-23T00:00:00.000Z",
   "denominator": {
     "title": "State / UT wise installed EV charging stations (EVCS) as on 29.07.2026",
     "asOf": "2026-07-29",
@@ -10,8 +10,8 @@
     "note": "Government counts are \"at least\" figures of installed stations of every kind (cars, 2W, 3W, buses, captive). They are a ceiling for what open data can show, not a target."
   },
   "national": {
-    "stations": 2005,
-    "dc": 1385,
+    "stations": 2000,
+    "dc": 1381,
     "government": [
       {
         "label": "Installed EV charging stations, pan India",
@@ -28,43 +28,43 @@
         "url": "https://www.hindustantimes.com/car-bike/india-has-over-52-700-public-ev-charging-stations-including-16-561-fast-chargers-for-cars-govt-101784783674297.html"
       }
     ],
-    "wording": "ChargeOne lists 2005 of at least 52718 installed charging stations in India (government count as of 2026-07-29)."
+    "wording": "ChargeOne lists 2000 of at least 52718 installed charging stations in India (government count as of 2026-07-29)."
   },
   "states": [
     {
       "state": "Kerala",
-      "stations": 672,
-      "dc": 564,
-      "withKw": 584,
-      "withKwShare": 0.869,
+      "stations": 668,
+      "dc": 563,
+      "withKw": 583,
+      "withKwShare": 0.873,
       "government": 3399,
-      "share": 0.198,
-      "wording": "ChargeOne lists 672 of at least 3399 installed charging stations (government count as of 2026-07-29)."
+      "share": 0.197,
+      "wording": "ChargeOne lists 668 of at least 3399 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Karnataka",
-      "stations": 431,
-      "dc": 343,
-      "withKw": 376,
-      "withKwShare": 0.872,
+      "stations": 429,
+      "dc": 342,
+      "withKw": 375,
+      "withKwShare": 0.874,
       "government": 6805,
       "share": 0.063,
-      "wording": "ChargeOne lists 431 of at least 6805 installed charging stations (government count as of 2026-07-29)."
+      "wording": "ChargeOne lists 429 of at least 6805 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Tamil Nadu",
-      "stations": 272,
-      "dc": 203,
-      "withKw": 228,
-      "withKwShare": 0.838,
+      "stations": 273,
+      "dc": 204,
+      "withKw": 229,
+      "withKwShare": 0.839,
       "government": 3839,
       "share": 0.071,
-      "wording": "ChargeOne lists 272 of at least 3839 installed charging stations (government count as of 2026-07-29)."
+      "wording": "ChargeOne lists 273 of at least 3839 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Delhi",
       "stations": 172,
-      "dc": 19,
+      "dc": 17,
       "withKw": 30,
       "withKwShare": 0.174,
       "government": 2370,
@@ -73,13 +73,13 @@
     },
     {
       "state": "Maharashtra",
-      "stations": 138,
-      "dc": 74,
-      "withKw": 69,
-      "withKwShare": 0.5,
+      "stations": 139,
+      "dc": 75,
+      "withKw": 70,
+      "withKwShare": 0.504,
       "government": 6985,
       "share": 0.02,
-      "wording": "ChargeOne lists 138 of at least 6985 installed charging stations (government count as of 2026-07-29)."
+      "wording": "ChargeOne lists 139 of at least 6985 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Uttar Pradesh",
@@ -93,13 +93,13 @@
     },
     {
       "state": "Rajasthan",
-      "stations": 51,
-      "dc": 46,
-      "withKw": 47,
-      "withKwShare": 0.922,
+      "stations": 50,
+      "dc": 45,
+      "withKw": 46,
+      "withKwShare": 0.92,
       "government": 2827,
       "share": 0.018,
-      "wording": "ChargeOne lists 51 of at least 2827 installed charging stations (government count as of 2026-07-29)."
+      "wording": "ChargeOne lists 50 of at least 2827 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Haryana",
@@ -164,7 +164,7 @@
     {
       "state": "Telangana",
       "stations": 14,
-      "dc": 7,
+      "dc": 6,
       "withKw": 8,
       "withKwShare": 0.571,
       "government": 3739,
