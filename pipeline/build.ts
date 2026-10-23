@@ -116,6 +116,8 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     shardBytes: built.shardBytes,
     fileBytes: new Map([...built.files].map(([name, b]) => [name, b.length])),
     aliasCollisions: built.aliasCollisions,
+    canonical: layer.stations,
+    adapters: runs.map((r) => ({ key: r.adapter.key, licence: r.adapter.licence.id })),
   });
   for (const c of gates.checks) console.log(`  check: ${c}`);
   const m = built.manifest.counts;

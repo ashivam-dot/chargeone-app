@@ -4,8 +4,74 @@
 import type { Dataset, Station } from '../src/data/model.ts';
 import { PLAN_MIN_CONFIDENCE } from '../src/data/trust.ts';
 import { THRESHOLDS } from './config.ts';
+import { denied, strings } from './lib/denylist.ts';
 import { distanceMetres } from './lib/geo.ts';
-import type { HealthReport, SourceKey } from './types.ts';
+import type { CanonicalStation, FieldValue, HealthReport, SourceKey } from './types.ts';
+
+/**
+ * Licences a published value may carry: free, no card, commercial use allowed
+ * (research/free-only-coverage-2026-10-23). Anything else, or no licence at all, fails the build.
+ */
+export const ALLOWED_LICENCES: ReadonlySet<string> = new Set(['ODbL-1.0', 'CC-BY-4.0', 'GODL-India', 'CDLA-Permissive-2.0', 'CC0-1.0', 'Apache-2.0']);
+
+/** The licences each source may hand us. A record whose licence doesn't fit its source came from somewhere else. */
+export const SOURCE_LICENCES: Readonly<Record<string, ReadonlySet<string>>> = {
+  osm: new Set(['ODbL-1.0']),
+  ocm: new Set(['CC-BY-4.0']),
+};
+
+const STATION_FIELDS = ['name', 'operator', 'connectors', 'maxKw', 'points', 'hours', 'price', 'access', 'address', 'website'] as const;
+
+/**
+ * Per-record and per-field provenance: every source record and every field claim must name an allowed
+ * licence that fits its source (and upstream origin, when a source is an aggregate), every claim must come
+ * from one of the station's own records, and no published text or URL may look copied from Google Maps or
+ * PlugShare. Returns one line per problem kind with a count and the first few station ids.
+ */
+export function provenanceFailures(stations: CanonicalStation[], adapters: Array<{ key: string; licence: string | undefined }> = []): string[] {
+  const problems = new Map<string, string[]>();
+  const add = (kind: string, where: string) => {
+    const list = problems.get(kind);
+    if (list) list.push(where);
+    else problems.set(kind, [where]);
+  };
+  const licenceProblem = (licence: string | null | undefined, source: string): string | null => {
+    if (!licence) return 'missing licence';
+    if (!ALLOWED_LICENCES.has(licence)) return `licence ${licence} not allowed`;
+    if (!SOURCE_LICENCES[source]) return `source ${source} not allowed`;
+    if (!SOURCE_LICENCES[source].has(licence)) return `licence ${licence} does not fit source ${source}`;
+    return null;
+  };
+
+  for (const a of adapters) {
+    const p = licenceProblem(a.licence, a.key);
+    if (p) add(`adapter: ${p}`, a.key);
+  }
+
+  for (const s of stations) {
+    const members = new Map(s.members.map((r) => [r.sourceId, r]));
+    for (const r of s.members) {
+      const p = licenceProblem(r.licence, r.source);
+      if (p) add(`record: ${p}`, `${s.id} (${r.sourceId})`);
+      if (r.origin !== undefined && (!r.origin || denied(r.origin))) add('record: origin missing or denied', `${s.id} (${r.sourceId})`);
+      const texts = [r.name, r.operator, r.address, r.website, r.url, r.editUrl, r.hours, r.price, r.origin];
+      if (texts.some((t) => denied(t))) add('record: Google/PlugShare text or URL', `${s.id} (${r.sourceId})`);
+    }
+    for (const key of STATION_FIELDS) {
+      const field = s[key] as FieldValue<unknown>;
+      if (strings(field.value).some((t) => denied(t))) add(`field ${key}: Google/PlugShare text or URL`, s.id);
+      for (const c of field.claims) {
+        const p = licenceProblem(c.licence, c.source);
+        if (p) add(`claim ${key}: ${p}`, `${s.id} (${c.sourceId})`);
+        const owner = members.get(c.sourceId);
+        if (!owner) add(`claim ${key}: from a record the station doesn't hold`, `${s.id} (${c.sourceId})`);
+        else if (owner.licence !== c.licence) add(`claim ${key}: licence differs from its record`, `${s.id} (${c.sourceId})`);
+        if (strings(c.value).some((t) => denied(t))) add(`claim ${key}: Google/PlugShare text or URL`, `${s.id} (${c.sourceId})`);
+      }
+    }
+  }
+  return [...problems].map(([kind, where]) => `provenance: ${where.length} × ${kind}, first: ${where.slice(0, 3).join(', ')}`);
+}
 
 export interface Baseline {
   /** Records per source in the last build (after adapter filtering). */
@@ -36,6 +102,10 @@ export interface GateInput {
   fileBytes?: Map<string, number>;
   /** Alias keys that are some live station's own id (outputs.ts leaves them out; any is a registry bug). */
   aliasCollisions?: string[];
+  /** The canonical stations behind `stations`, for the per-record licence and denylist gate. */
+  canonical?: CanonicalStation[];
+  /** Each source's declared licence. */
+  adapters?: Array<{ key: string; licence: string | undefined }>;
 }
 
 export interface GateResult {
@@ -106,6 +176,12 @@ export function runGates(g: GateInput): GateResult {
   // "Operational" with nothing to plug into is a contradiction an adapter let through.
   const empty = g.stations.filter((s) => s.status === 'operational' && s.connectors.length === 0);
   if (empty.length) failures.push(`${empty.length} operational stations list no connectors, first: ${empty.slice(0, 3).map((s) => s.id).join(', ')}`);
+
+  if (g.canonical || g.adapters) {
+    const provenance = provenanceFailures(g.canonical ?? [], g.adapters ?? []);
+    failures.push(...provenance);
+    checks.push(`provenance: ${g.canonical?.length ?? 0} stations, ${provenance.length ? 'FAILED' : 'every record and claim licensed, no denylisted text'}`);
+  }
 
   if (g.aliasCollisions?.length) failures.push(`${g.aliasCollisions.length} aliases are live station ids, first: ${g.aliasCollisions.slice(0, 3).join(', ')}`);
 

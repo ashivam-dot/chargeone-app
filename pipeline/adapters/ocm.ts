@@ -3,6 +3,7 @@
 import type { ConnectorType } from '../../src/data/model.ts';
 import { ocmConnectorType, safeUrl } from '../../src/data/normalize.ts';
 import { roundKw } from '../lib/connectors.ts';
+import { GOOGLE_DERIVED, strings } from '../lib/denylist.ts';
 import { inIndia, round6 } from '../lib/geo.ts';
 import { canonicalOperator, differentOperators, knownOperator } from '../lib/operators.ts';
 import { STOPWORDS, tokenize } from '../lib/text.ts';
@@ -87,17 +88,12 @@ const FLAG_STATUS: Record<number, SourceStatus> = { 30: 'temporarily_unavailable
 
 /**
  * Records copied from Google Maps (Google Place IDs, Maps links). Google's terms forbid storing them: never
- * ship. Covers maps.google.*, google.<tld>/maps, goo.gl/maps, the maps.app.goo.gl share links and g.page.
+ * ship. The pattern lives in lib/denylist.ts, which the build gate also uses on every published record.
  */
-export const GOOGLE_DERIVED = /google\s*place|\bChIJ[0-9A-Za-z_-]{10,}|maps\.google\.|google\.[a-z.]+\/maps|goo\.gl\/maps|maps\.app\.goo\.gl|g\.page\//i;
+export { GOOGLE_DERIVED };
 
 /** Every free-text value in a POI (titles, addresses, comments, URLs, media captions), for the Google scan. */
-function freeText(value: unknown, out: string[] = []): string[] {
-  if (typeof value === 'string') out.push(value);
-  else if (Array.isArray(value)) for (const v of value) freeText(v, out);
-  else if (value && typeof value === 'object') for (const v of Object.values(value)) freeText(v, out);
-  return out;
-}
+const freeText = (value: unknown): string[] => strings(value);
 
 const CURRENT: Record<number, PowerType> = { 10: 'AC_1_PHASE', 20: 'AC_3_PHASE', 30: 'DC' };
 

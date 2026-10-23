@@ -86,7 +86,12 @@ Environment: `PIPELINE_CACHE_DIR` (default `data-cache/`, gitignored, never comm
    - an alias is also a live station id (`aliasCollisions`; such aliases are also left out of the
      alias files);
    - any file is over 24 MiB (`assetBytes`, the Workers static-asset limit) or `public/data/` holds
-     more than 3,000 files (`maxDataFiles`).
+     more than 3,000 files (`maxDataFiles`);
+   - **provenance** (`provenanceFailures`): any adapter, source record or field claim has no licence, a
+     licence outside `ALLOWED_LICENCES` (ODbL-1.0, CC-BY-4.0, GODL-India, CDLA-Permissive-2.0, CC0-1.0,
+     Apache-2.0), or a licence that doesn't fit its source (`SOURCE_LICENCES`); a claim points at a
+     record the station doesn't hold; an aggregate record's upstream `origin` is empty or denied; or any
+     published text or URL matches the Google Maps / PlugShare denylist (`lib/denylist.ts`).
 
 ## Outputs (`public/data/`)
 

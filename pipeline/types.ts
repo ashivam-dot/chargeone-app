@@ -70,6 +70,11 @@ export interface SourceRecord {
   url: string;
   editUrl?: string;
   licence: LicenceId;
+  /**
+   * The upstream dataset inside an aggregate source (an Overture record's `sources[].dataset`, e.g.
+   * "Foursquare"). Absent for single-origin sources. The licence gate checks it against the denylist.
+   */
+  origin?: string;
   /** Best date for "last seen": OSM check_date or edit time; OCM DateLastVerified. */
   observedAt: string | null;
   /** False when the date is only an edit or bulk-import date, not a survey or verification. */
