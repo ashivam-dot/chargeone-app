@@ -843,6 +843,54 @@ a {
   background: color-mix(in srgb, var(--bad) 14%, transparent);
 }
 
+/* What would make an unsafe trip work: one button per option, each re-planning the same road. */
+.fixes {
+  margin-top: 10px;
+}
+.fixes h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+.fixes ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.fix {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.fix {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+button.fix:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.fix strong {
+  font-size: 0.95rem;
+}
+.fix span {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.fix--text {
+  cursor: default;
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

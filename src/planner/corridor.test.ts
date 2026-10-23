@@ -65,3 +65,35 @@ describe('strict planning on the real data (Bengaluru to Mysuru)', () => {
     expect(dc.filter((s) => (s.confidence ?? 0) >= PLAN_MIN_CONFIDENCE).length / dc.length).toBeGreaterThanOrEqual(0.25);
   });
 });
+
+/** A real road route (OSRM on OpenStreetMap, thinned to one point per 500 m); see the fixture's `source`. */
+function fixture(name: string): { coords: Coord[]; distanceKm: number; durationMin: number } {
+  return JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf8'));
+}
+
+describe('the example trips the app suggests', () => {
+  it('Delhi to Jaipur at 80% (the copilot and voice example) plans on trusted chargers', () => {
+    const p = planTrip({ route: fixture('delhi-jaipur'), stations, statuses: new Map(), vehicle: nexon, options: { ...DEFAULT_OPTIONS, startSocPct: 80 }, now });
+    expect(p.feasible).toBe(true);
+    expect(p.stops.length).toBeGreaterThan(0);
+    for (const s of p.stops) expect(s.trusted).toBe(true);
+  });
+
+  it('Coimbatore to Chennai at 60% names the gap and offers unconfirmed chargers that close it', () => {
+    const route = fixture('coimbatore-chennai');
+    const input = { route, stations, statuses: new Map(), vehicle: nexon, now };
+    const strict = planTrip({ ...input, options: { ...DEFAULT_OPTIONS, startSocPct: 60 } });
+    // Trusted chargers alone don't reach Chennai: the plan says where, and that the extras would.
+    expect(strict.feasible).toBe(false);
+    expect(strict.gapAtKm).not.toBeNull();
+    expect(strict.extras.length).toBeGreaterThan(0);
+    expect(strict.extrasFeasible).toBe(true);
+    expect(strict.warnings.join(' ')).toMatch(/only on chargers we're sure of/);
+    // Leaving full doesn't help, so the app mustn't offer that.
+    expect(planTrip({ ...input, options: { ...DEFAULT_OPTIONS, startSocPct: 100 } }).feasible).toBe(false);
+    // The opt-in plan gets there, through at least one unconfirmed charger.
+    const loose = planTrip({ ...input, options: { ...DEFAULT_OPTIONS, startSocPct: 60, allowUnverified: true } });
+    expect(loose.feasible).toBe(true);
+    expect(loose.stops.some((s) => !s.trusted)).toBe(true);
+  });
+});

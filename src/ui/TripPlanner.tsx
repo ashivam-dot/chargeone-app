@@ -89,7 +89,7 @@ interface Result {
   /** Set when the result was opened from a saved trip rather than planned now. */
   savedAt: string | null;
   /** Every road route planned for this trip with its comparison; `active` is the one shown. */
-  routes: Array<{ candidate: RouteCandidate; analysis: RouteAnalysis; destStays: Result['destStays']; tip: string | null }>;
+  routes: Array<{ candidate: RouteCandidate; analysis: RouteAnalysis; destStays: Result['destStays']; tip: string | null; fullWorks: boolean }>;
   active: number;
   /** The driver asked to plan at unverified chargers too (for this trip only). */
   unverified: boolean;
@@ -220,21 +220,28 @@ export function TripPlanner(props: Props) {
     startedAt: Date,
     savedAt: string | null = null,
     unverified = false,
+    startSocPct = options.startSocPct,
   ) => {
     const now = new Date();
-    const planOptions: PlanOptions = { ...options, allowUnverified: unverified };
+    const planOptions: PlanOptions = { ...options, startSocPct, allowUnverified: unverified };
     const destStays = staysNearDestination({ stations, places }, end);
     const geometries = [{ ...response.route, via: null }, ...(response.alternatives ?? [])];
     const candidates: RouteCandidate[] = [];
     const tips: Array<string | null> = [];
+    const fullWorks: boolean[] = [];
     for (const g of geometries) {
       const input = { route: { coords: g.coords, distanceKm: g.distanceKm, durationMin: g.durationMin }, stations, statuses, vehicle: car, options: planOptions, now };
-      const journey = planJourney({ ...input, dailyHours: plan.multiDay ? dailyHours : 0, places });
+      const dayHours = plan.multiDay ? dailyHours : 0;
+      const journey = planJourney({ ...input, dailyHours: dayHours, places });
       candidates.push({ coords: g.coords, distanceKm: g.distanceKm, durationMin: g.durationMin, journey, via: g.via });
       tips.push(journey.days.length === 1 ? fullChargeTip(journey.days[0].plan, input) : null);
+      // A trip that can't be done as asked: would leaving full be enough, on the same chargers?
+      fullWorks.push(
+        !journey.feasible && startSocPct < 100 && planJourney({ ...input, options: { ...planOptions, startSocPct: 100 }, dailyHours: dayHours, places }).feasible,
+      );
     }
     const analyses = compareRoutes(candidates, stations, statuses, places, now);
-    const routes = candidates.map((candidate, i) => ({ candidate, analysis: analyses[i], destStays, tip: tips[i] }));
+    const routes = candidates.map((candidate, i) => ({ candidate, analysis: analyses[i], destStays, tip: tips[i], fullWorks: fullWorks[i] }));
     const journey = candidates[0].journey;
     setResult({ response, journey, places, destStays, tip: tips[0], from: start, to: end, plannedAt: now, startedAt, savedAt, routes, active: 0, unverified });
     props.onShow(tripView(journey, destStays, response.route.coords, candidates.slice(1).map((c) => c.coords)));
@@ -310,6 +317,13 @@ export function TripPlanner(props: Props) {
   const useExtras = () => {
     if (!result || !vehicle) return;
     present(vehicle, result.response, result.places, result.from, result.to, result.startedAt, result.savedAt, true);
+  };
+
+  // Same road, leaving with a full battery: also a re-plan with no new route request.
+  const useFullCharge = () => {
+    if (!result || !vehicle) return;
+    setOpt('startSocPct', 100);
+    present(vehicle, result.response, result.places, result.from, result.to, result.startedAt, result.savedAt, result.unverified, 100);
   };
 
   const clear = () => {
@@ -590,6 +604,7 @@ export function TripPlanner(props: Props) {
           onSelectStation={props.onSelectStation}
           onOpenPlace={props.onOpenPlace}
           onUseExtras={useExtras}
+          onFullCharge={useFullCharge}
         />
       )}
     </Sheet>
@@ -663,6 +678,7 @@ interface ResultProps {
   onSelectStation: (id: string) => void;
   onOpenPlace: (place: Place) => void;
   onUseExtras?: () => void;
+  onFullCharge?: () => void;
 }
 
 function RouteCompareCards({ result, onChoose }: { result: Result; onChoose: (i: number) => void }) {
@@ -747,7 +763,7 @@ function verdictText(j: Journey): string {
 }
 
 function JourneyResult(props: ResultProps) {
-  const { result, journey, alerts, busy, error, me, plan, statuses, saveState, onSave, onUnlock, onReplan, limitCard, onClear, onChooseRoute, onStartDrive, onSelectStation, onOpenPlace, onUseExtras } = props;
+  const { result, journey, alerts, busy, error, me, plan, statuses, saveState, onSave, onUnlock, onReplan, limitCard, onClear, onChooseRoute, onStartDrive, onSelectStation, onOpenPlace, onUseExtras, onFullCharge } = props;
   const extras = journey.days.flatMap((d) => d.plan.extras.map((s) => ({ s, km: d.startKm + s.alongKm })));
   const extrasWork = journey.days.some((d) => d.plan.extras.length > 0) && journey.days.every((d) => d.plan.feasible || d.plan.extrasFeasible);
   const ends = dayEnds(journey, result.from, result.to);
@@ -758,14 +774,74 @@ function JourneyResult(props: ResultProps) {
   const replanCost = plan.freeReplans ? 'uses a long trip' : "uses one of today's trips";
   // Basic has no re-plans: each one is a new trip, so say so once today's are used.
   const basicUsed = !me?.user && typeof me?.basicToday === 'number' && me.basicToday >= BASIC.shortTripsPerDay;
+  const gapDay = journey.days.find((d) => d.plan.gapAtKm !== null);
+  const gapKm = gapDay ? Math.round(gapDay.startKm + gapDay.plan.gapAtKm!) : null;
+  const safeRoute = result.routes.findIndex((r, i) => i !== result.active && r.candidate.journey.feasible);
+  const fullWorks = result.routes[result.active]?.fullWorks ?? false;
+  const canFix = safeRoute >= 0 || fullWorks || (extrasWork && Boolean(onUseExtras));
   let stopNo = 0;
 
   return (
     <div class="trip-result">
       <div class={`verdict ${journey.feasible ? 'verdict--ok' : 'verdict--bad'}`} role="status">
         <strong>{verdictText(journey)}</strong>
-        <span>Arrive with about {Math.max(0, journey.arrivalSocPct)}% battery</span>
+        <span>
+          {journey.feasible || journey.tooLong
+            ? `Arrive with about ${Math.max(0, journey.arrivalSocPct)}% battery`
+            : gapKm !== null
+              ? `No ${result.unverified ? 'known' : 'confirmed'} charger in reach after km ${gapKm}`
+              : 'You would arrive below your safety reserve'}
+        </span>
       </div>
+
+      {!journey.feasible && !journey.tooLong && (
+        // Never a dead end: what would make this trip work, best first, each a re-plan of the same road.
+        <section class="fixes" aria-label="Ways to make this trip" data-testid="trip-fixes">
+          <h3>{canFix ? 'Ways to make this trip' : 'What you can do'}</h3>
+          <ul>
+            {safeRoute >= 0 && (
+              <li>
+                <button class="fix" onClick={() => onChooseRoute(safeRoute)} data-testid="fix-route">
+                  <strong>Take the {result.routes[safeRoute].analysis.label.toLowerCase()} instead</strong>
+                  <span>It has confirmed chargers all the way with your battery.</span>
+                </button>
+              </li>
+            )}
+            {fullWorks && onFullCharge && (
+              <li>
+                <button class="fix" onClick={onFullCharge} data-testid="fix-full">
+                  <strong>Leave with a full battery</strong>
+                  <span>At 100% the chargers on this plan are enough. Charge at home or near the start first.</span>
+                </button>
+              </li>
+            )}
+            {extrasWork && onUseExtras && (
+              <li>
+                <button class="fix" onClick={onUseExtras} data-testid="use-extras">
+                  <strong>Also use chargers nobody has confirmed recently</strong>
+                  <span>
+                    {extras.length === 1 ? 'One charger' : `${extras.length} chargers`} on this road would fill the gap. They're listed in our data but have no recent check-in, so call
+                    ahead or check reports before you rely on them.
+                  </span>
+                </button>
+              </li>
+            )}
+            <li class="fix fix--text">
+              <strong>Or change the trip</strong>
+              <span>
+                {gapKm !== null
+                  ? `Plan to a town before km ${gapKm} and charge there overnight, or pick a nearer destination.`
+                  : 'Start with more charge, or pick a nearer destination.'}{' '}
+                Know a charger on this road that we don't?{' '}
+                <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener noreferrer">
+                  Add it to OpenStreetMap
+                </a>{' '}
+                and a later plan can use it.
+              </span>
+            </li>
+          </ul>
+        </section>
+      )}
 
       <div class="stats">
         <div>
@@ -852,11 +928,6 @@ function JourneyResult(props: ResultProps) {
               </li>
             ))}
           </ul>
-          {extrasWork && onUseExtras && (
-            <button class="btn btn--glass" onClick={onUseExtras} data-testid="use-extras">
-              Plan with these chargers anyway
-            </button>
-          )}
         </section>
       )}
 
