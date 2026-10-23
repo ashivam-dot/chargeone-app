@@ -7,7 +7,8 @@ import { nearbyPlaces, sortStays } from '../planner/journey.ts';
 import { NearbyPlaces } from './NearbyPlaces.tsx';
 import { ApiError, api, currentPosition, type Report } from '../lib/api.ts';
 import { SPEED_LABEL, VEHICLE_LABEL, directionsUrl, formatDate, formatKw, latestUpdate, stationLink } from '../lib/format.ts';
-import { LIVE_COLOUR, LIVE_LABEL, REPORT_LABEL, liveState, timeAgo, type ReportKind, type StationStatus } from '../shared/status.ts';
+import { REPORT_LABEL, chargerState, liveState, stateReason, timeAgo, type ReportKind, type StationStatus } from '../shared/status.ts';
+import { StateBadge } from './StateIcon.tsx';
 import { IS_NATIVE } from '../native/bridge.ts';
 import { isOperatorAppInstalled, openOperatorApp } from '../native/operatorApp.ts';
 import { deviceFromUa, operatorAppFor, webLink, type OperatorApp } from '../shared/operatorApps.ts';
@@ -62,9 +63,11 @@ function OperatorAppLink({ app }: { app: OperatorApp }) {
   );
 }
 
-function LiveBlock({ status, app }: { status: StationStatus | undefined; app: OperatorApp | null }) {
+function LiveBlock({ station, status, app }: { station: Station; status: StationStatus | undefined; app: OperatorApp | null }) {
   const now = new Date();
   const state = liveState(status, now);
+  // The same state, glyph and words as the map pin.
+  const pin = chargerState(station, status, now);
   const lines: string[] = [];
   if (status?.lastWorkedAt) {
     const kw = status.lastWorkedKw ? ` at ${formatKw(status.lastWorkedKw)}` : '';
@@ -78,14 +81,12 @@ function LiveBlock({ status, app }: { status: StationStatus | undefined; app: Op
     lines.push(`${REPORT_LABEL[status.problemKind ?? 'broken']} reported ${timeAgo(status.problemAt, now)}${n}`);
   }
   return (
-    <div class={`live live--${state}`} role="status" data-testid="live-status">
+    <div class={`live live--${pin.state}`} role="status" data-testid="live-status" data-state={pin.state}>
       <div class="live__head">
-        <span class="live__badge" style={{ '--live': LIVE_COLOUR[state] }}>
-          <span class="live__dot" aria-hidden="true" />
-          {LIVE_LABEL[state]}
-        </span>
+        <StateBadge state={pin.state} />
         {status && <span class="live__count">{status.reports7d} report{status.reports7d === 1 ? '' : 's'} this week</span>}
       </div>
+      <p class="live__why small">{stateReason(pin, station)}</p>
       {lines.length > 0 ? (
         <ul class="live__lines">
           {lines.map((l) => (
@@ -212,8 +213,9 @@ export function StationSheet(props: Props) {
       </p>
 
       <div class="trust" data-testid="trust">
-        <span class={`trust__badge trust__badge--${badge}`} data-testid="trust-badge">
-          {TRUST_LABEL[badge]}
+        {/* Plain text, not a second pill: the state badge in the live block is the sheet's one status badge. */}
+        <span class={`trust__label trust__label--${badge}`} data-testid="trust-badge">
+          Listing: {TRUST_LABEL[badge]}
         </span>
         {speedUnknown(station) && (
           <span class="trust__badge trust__badge--speed" data-testid="speed-unknown">
@@ -238,7 +240,7 @@ export function StationSheet(props: Props) {
         </button>
       </div>
 
-      <LiveBlock status={status} app={operatorApp} />
+      <LiveBlock station={station} status={status} app={operatorApp} />
 
       <section class="report" aria-label="Report this charger">
         <h3>Are you here now?</h3>

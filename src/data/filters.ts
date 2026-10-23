@@ -86,10 +86,36 @@ export function filterStations(stations: Station[], f: Filters): Station[] {
   return activeFilterCount(f) === 0 && f.mode === 'all' && f.showRestricted ? stations : stations.filter((s) => matchesFilters(s, f));
 }
 
-/** Stations the mode and the customers-only setting hide, so the count can say so. */
+/**
+ * Stations the mode and the customers-only setting hide among those the other filters keep, so the count
+ * can say so: with the operator set to Ather Grid in car mode, that's the Ather chargers for scooters.
+ */
 export function hiddenBySettings(stations: Station[], f: Filters): number {
-  const settingsOnly: Filters = { ...EMPTY_FILTERS, mode: f.mode, showRestricted: f.showRestricted };
-  return stations.length - filterStations(stations, settingsOnly).length;
+  const relaxed: Filters = { ...f, mode: 'all', showRestricted: true };
+  return filterStations(stations, relaxed).length - filterStations(stations, f).length;
+}
+
+/** The filters with the mode and customers-only setting opened up: "show the hidden ones". */
+export function showHidden<F extends Filters>(f: F): F {
+  return { ...f, mode: 'all', showRestricted: true };
+}
+
+/**
+ * The filters loosened only as far as `s` needs to pass them: a charger picked from search that a filter
+ * hides opens without wiping the rest. The mode and the customers-only setting open together
+ * (showHidden), every other filter is cleared only if this station fails it.
+ */
+export function relaxToShow<F extends Filters>(s: Station, f: F): F {
+  let out: F = f;
+  const fails = (k: Partial<Filters>) => !matchesFilters(s, { ...EMPTY_FILTERS, ...k });
+  if (fails({ mode: f.mode, showRestricted: f.showRestricted })) out = showHidden(out);
+  if (f.dcOnly && fails({ dcOnly: true })) out = { ...out, dcOnly: false };
+  if (f.open24x7 && fails({ open24x7: true })) out = { ...out, open24x7: false };
+  if (f.operator !== null && fails({ operator: f.operator })) out = { ...out, operator: null };
+  if (f.minKw > 0 && fails({ minKw: f.minKw })) out = { ...out, minKw: 0 };
+  if (f.connectors.length > 0 && fails({ connectors: f.connectors })) out = { ...out, connectors: [] };
+  if (f.vehicle !== null && fails({ vehicle: f.vehicle })) out = { ...out, vehicle: null };
+  return out;
 }
 
 export function operatorsByCount(stations: Station[]): Array<{ name: string; count: number }> {

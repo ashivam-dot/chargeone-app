@@ -1857,6 +1857,11 @@ button.poi__name:hover {
 .trust__badge--speed {
   --trust: var(--warn);
 }
+.trust__label {
+  font-size: 0.86rem;
+  font-weight: 650;
+  color: var(--text);
+}
 .trust__why {
   flex-basis: 100%;
 }
@@ -1898,6 +1903,8 @@ button.poi__name:hover {
   z-index: 4;
   max-width: 420px;
   box-shadow: var(--shadow);
+  /* Opaque over the map: the translucent panel let pins and labels show through the text. */
+  background: var(--panel-solid);
 }
 .extras {
   margin-top: 12px;

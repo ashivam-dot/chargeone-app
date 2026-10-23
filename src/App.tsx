@@ -1,6 +1,6 @@
 import { Route } from 'lucide-preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { DEFAULT_FILTERS, filterStations, hiddenBySettings, operatorsByCount, type MapMode } from './data/filters.ts';
+import { DEFAULT_FILTERS, EMPTY_FILTERS, filterStations, hiddenBySettings, operatorsByCount, relaxToShow, type MapMode } from './data/filters.ts';
 import { loadDataset, loadStationDetail, type DataManifest } from './data/loader.ts';
 import { keepIfSame, statusesByStation, unknownStatusIds } from './data/statusIds.ts';
 import type { Dataset, Station } from './data/model.ts';
@@ -8,21 +8,24 @@ import type { Place, PlacesData } from './data/places.ts';
 import { api, type Config, type Me } from './lib/api.ts';
 import { setHdVoice } from './voice/hd.ts';
 import { loadPlaces } from './lib/places.ts';
+import { THEME_COLOUR, loadTheme, saveTheme } from './lib/theme.ts';
 import { clearSavedTrips } from './lib/savedTrips.ts';
 import { isObject, loadJson, removeJson, saveJson } from './lib/storage.ts';
 import { MapView, type FlyTarget, type MapViewport, type PlaceMarker, type StopMarker } from './map/MapView.tsx';
 import { PLATFORM } from './native/bridge.ts';
 import { BACK_EVENT, haptic, initNativeShell, onAppResume } from './native/platform.ts';
 import { PLANS, isPlus, type PlanId } from './shared/plans.ts';
-import { liveState, type StationStatus } from './shared/status.ts';
+import { operatorBounds } from './shared/operatorSearch.ts';
+import { worksNow, type StationStatus } from './shared/status.ts';
 import type { MyVehicle } from './shared/vehicles.ts';
 import { StateCoverage } from './ui/Coverage.tsx';
 import { DEFAULT_PAINTS } from './ui/car/carPaints.ts';
 import { useCarLink } from './ui/car/carLink.ts';
 import type { VoiceTrip } from './ui/copilot/CopilotScreen.tsx';
 import type { CarPosition } from './ui/drive/DriveMode.tsx';
-import { FilterBar, type MapFilters } from './ui/FilterBar.tsx';
+import { FilterBar, HiddenPill, type MapFilters } from './ui/FilterBar.tsx';
 import { Onboarding } from './ui/onboarding/Onboarding.tsx';
+import { MapLegend } from './ui/MapLegend.tsx';
 import { PlaceInput, type PickedPlace } from './ui/PlaceInput.tsx';
 import { PlaceSheet } from './ui/PlaceSheet.tsx';
 import type { Paywall } from './ui/Plans.tsx';
@@ -32,7 +35,7 @@ import { SignIn, signInReady } from './ui/SignIn.tsx';
 import { forgetFirebaseToken } from './lib/firebaseSession.ts';
 import { StationSheet } from './ui/StationSheet.tsx';
 import { TripPlanner, type DriveRequest, type PlannedTrip, type TripView } from './ui/TripPlanner.tsx';
-import { YouScreen } from './ui/YouScreen.tsx';
+
 
 const CarScreen = lazy(() => import('./ui/car/CarScreen.tsx').then((m) => m.CarScreen));
 const CopilotScreen = lazy(() => import('./ui/copilot/CopilotScreen.tsx').then((m) => m.CopilotScreen));
@@ -41,6 +44,7 @@ const DriveMode = lazy(() => import('./ui/drive/DriveMode.tsx').then((m) => m.Dr
 const Feedback = lazy(() => import('./ui/Feedback.tsx').then((m) => m.Feedback));
 const Garage = lazy(() => import('./ui/Garage.tsx').then((m) => m.Garage));
 const About = lazy(() => import('./ui/About.tsx').then((m) => m.About));
+const YouScreen = lazy(() => import('./ui/YouScreen.tsx').then((m) => m.YouScreen));
 const Plans = lazy(() => import('./ui/Plans.tsx').then((m) => m.Plans));
 /** Alias buckets, fetched only for an id the index doesn't list (src/data/aliasLookup.ts). */
 const resolveAlias = (id: string) => import('./data/aliasLookup.ts').then((m) => m.resolveAlias(id));
@@ -134,7 +138,7 @@ export function App() {
   const [cachedPlan] = useState(loadCachedPlan);
   const [vehicle, setVehicle] = useState<MyVehicle | null>(() => loadJson<MyVehicle | null>('vehicle', null, (v): v is MyVehicle | null => v === null || isVehicle(v)));
   const [paint, setPaint] = useState(() => loadJson('paint', DEFAULT_PAINTS[0].hex, isPaint));
-  const [dark, setDark] = useState(() => loadJson('dark', true, isBool));
+  const [dark, setDark] = useState(() => loadTheme() === 'dark');
   const [online, setOnline] = useState(navigator.onLine);
   // First visit only, and not when a shared link opens a charger or place.
   const [onboard, setOnboard] = useState(() => {
@@ -154,7 +158,7 @@ export function App() {
   // Fetch the other screens once the map is up, so they open instantly and still open offline.
   useEffect(() => {
     if (!dataset) return;
-    const t = setTimeout(() => [CarScreen, CopilotScreen, DriveMode, SignIn].forEach((c) => c.preload()), 2000);
+    const t = setTimeout(() => [CarScreen, CopilotScreen, DriveMode, SignIn, YouScreen].forEach((c) => c.preload()), 2000);
     return () => clearTimeout(t);
   }, [dataset]);
 
@@ -167,7 +171,7 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#05070b' : '#f6f8fb');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOUR[dark ? 'dark' : 'light']);
   }, [dark]);
 
   useEffect(() => {
@@ -318,15 +322,17 @@ export function App() {
   }, [stations, rawStatuses, aliasOf]);
   const operators = useMemo(() => operatorsByCount(stations), [stations]);
   const dcCount = useMemo(() => stations.filter((s) => s.speed === 'dc').length, [stations]);
-  const shown = useMemo(() => {
-    const base = filterStations(stations, filters);
-    if (!filters.workingOnly) return base;
-    const now = new Date();
-    return base.filter((s) => {
-      const state = liveState(statuses.get(s.id), now);
-      return state === 'working' || state === 'in_use';
-    });
-  }, [stations, filters, statuses]);
+  /** What the map shows for some filters: the "Working" chip uses the pins' own rule (shared/status.ts). */
+  const visible = useCallback(
+    (f: MapFilters) => {
+      const base = filterStations(stations, f);
+      if (!f.workingOnly) return base;
+      const now = new Date();
+      return base.filter((s) => worksNow(s, statuses.get(s.id), now));
+    },
+    [stations, statuses],
+  );
+  const shown = useMemo(() => visible(filters), [visible, filters]);
   const selectedLite = selectedId ? byId.get(selectedId) ?? null : null;
   const selectedDetail = selectedId ? details.get(selectedId) : undefined;
   const selected = selectedDetail ?? selectedLite;
@@ -343,11 +349,29 @@ export function App() {
       live = false;
     };
   }, [selectedLite, details, dataset]);
-  const hiddenCount = useMemo(() => hiddenBySettings(stations, filters), [stations, filters.mode, filters.showRestricted]);
-  const changeFilters = (f: MapFilters) => {
-    if (f.mode !== filters.mode) saveJson('map-mode', f.mode);
+  const hiddenCount = useMemo(() => hiddenBySettings(stations, filters), [stations, filters]);
+  /** Chargers the mode and customers-only setting keep, before any other filter. */
+  const listedCount = useMemo(
+    () => filterStations(stations, { ...EMPTY_FILTERS, mode: filters.mode, showRestricted: filters.showRestricted }).length,
+    [stations, filters.mode, filters.showRestricted],
+  );
+  const mapCentre = useMemo(
+    () => (mapView ? { lat: (mapView.bounds.south + mapView.bounds.north) / 2, lng: (mapView.bounds.west + mapView.bounds.east) / 2 } : null),
+    [mapView],
+  );
+  /** `remember: false` for the app's own loosening (opening a hidden charger): only a driver's pick of mode sticks. */
+  const changeFilters = (f: MapFilters, remember = true) => {
+    if (remember && f.mode !== filters.mode) saveJson('map-mode', f.mode);
     setFilters(f);
   };
+  /** The operator banner: that operator's chargers every other filter hides, and showing them all. */
+  const operatorAll = useMemo(
+    () => (filters.operator ? filterStations(stations, { ...EMPTY_FILTERS, operator: filters.operator }).length : 0),
+    [stations, filters.operator],
+  );
+  const operatorHidden = Math.max(0, operatorAll - shown.length);
+  const showOperatorAll = () =>
+    changeFilters({ ...filters, ...EMPTY_FILTERS, operator: filters.operator, workingOnly: false }, false);
   const placeIndexById = useMemo(() => new Map(places?.places.map((p, i) => [p.id, i]) ?? []), [places]);
 
   // Places are a separate, larger file: fetch it only once something needs it.
@@ -533,7 +557,7 @@ export function App() {
         : { bottom: TABBAR_PX, left: 0 };
   const toggleDark = () => {
     setDark(!dark);
-    saveJson('dark', !dark);
+    saveTheme(dark ? 'light' : 'dark');
   };
   const finishOnboarding = () => {
     setOnboard(false);
@@ -590,17 +614,67 @@ export function App() {
               placeholder="Search a place or charger"
               value={null}
               stations={stations}
+              near={mapCentre}
               onPick={(p) => {
                 if (!p) return;
-                if (p.stationId) select(p.stationId);
-                else setFlyTarget(p.bbox ? { kind: 'bbox', bbox: p.bbox } : { kind: 'point', lat: p.lat, lng: p.lng, zoom: 12 });
+                if (p.stationId) {
+                  // A charger the filters hide still opens: loosen only what hides it, for this visit only.
+                  const s = byId.get(p.stationId);
+                  if (s && !shown.some((x) => x.id === s.id)) {
+                    const relaxed = relaxToShow(s, filters);
+                    changeFilters(relaxed.workingOnly && !worksNow(s, statuses.get(s.id), new Date()) ? { ...relaxed, workingOnly: false } : relaxed, false);
+                  }
+                  select(p.stationId);
+                } else setFlyTarget(p.bbox ? { kind: 'bbox', bbox: p.bbox } : { kind: 'point', lat: p.lat, lng: p.lng, zoom: 12 });
+              }}
+              onOperator={(op) => {
+                if (tab !== 'explore') setTab('explore');
+                const next = { ...filters, operator: op };
+                changeFilters(next);
+                // Fit to the ones the map will show; if the filters hide them all, to all of them.
+                const b = operatorBounds(visible(next), op) ?? operatorBounds(stations, op);
+                if (b) setFlyTarget({ kind: 'bbox', bbox: b });
               }}
             />
           </div>
         </header>
       )}
 
-      {tab === 'explore' && !drive && <FilterBar filters={filters} operators={operators} shown={shown.length} total={stations.length} hidden={hiddenCount} vehicle={vehicle} onChange={changeFilters} />}
+      {tab === 'explore' && !drive && (
+        <FilterBar
+          filters={filters}
+          operators={operators}
+          shown={shown.length}
+          total={stations.length}
+          listed={listedCount}
+          hidden={hiddenCount}
+          vehicle={vehicle}
+          onChange={changeFilters}
+        />
+      )}
+      {tab === 'explore' && !drive && !stationOpen && filters.operator && (
+        <div class="banner banner--op" role="status" data-testid="operator-banner">
+          <span>
+            <strong>{filters.operator}</strong> · {shown.length} on the map
+            {operatorHidden > 0 && <> · {operatorHidden} more hidden by filters</>}
+          </span>
+          {operatorHidden > 0 && (
+            <button type="button" class="link link--inline" data-testid="show-hidden-operator" onClick={showOperatorAll}>
+              Show
+            </button>
+          )}
+          <button type="button" class="banner__close" aria-label={`Stop showing only ${filters.operator}`} data-testid="clear-operator" onClick={() => changeFilters({ ...filters, operator: null })}>
+            ×
+          </button>
+        </div>
+      )}
+      {tab === 'explore' && !drive && !stationOpen && dataset && (
+        <div class="map-row">
+          <MapLegend />
+          {/* With an operator picked, its banner says what's hidden instead. */}
+          {!filters.operator && <HiddenPill filters={filters} hidden={hiddenCount} onChange={changeFilters} />}
+        </div>
+      )}
 
       {!online && <div class="banner" role="status">You're offline. The map and saved chargers still work; status may be out of date.</div>}
       {loadError && (

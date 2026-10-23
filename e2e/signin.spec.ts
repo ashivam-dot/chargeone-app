@@ -384,13 +384,13 @@ test.describe("sign-in sheet", () => {
     expect(errors).toEqual([]);
   });
 
-  test("Google's button stands out on the dark sheet and the text links are big enough to tap", async ({
+  test("Google's button reads on the sheet and the text links are big enough to tap", async ({
     page,
   }) => {
     await setup(page);
     await openSignIn(page);
-    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-    // "filled_black" is a near-black pill on a near-black sheet; the white outline button reads.
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    // The white outline button in both themes ("filled_black" would vanish on the dark sheet).
     await expect(
       page.getByTestId("signin-google").locator("iframe"),
     ).toHaveAttribute("data-theme", "outline");

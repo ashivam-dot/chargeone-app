@@ -23,7 +23,7 @@ await ctx.addInitScript(
     if ('speechSynthesis' in window) window.speechSynthesis.speak = () => {};
     localStorage.setItem('chargeone:welcomed', 'true');
     localStorage.setItem('chargeone:vehicle', JSON.stringify(vehicle));
-    localStorage.setItem('chargeone:dark', JSON.stringify(dark));
+    localStorage.setItem('chargeone:theme', JSON.stringify(dark ? 'dark' : 'light'));
   },
   [NEXON, !light] as const,
 );

@@ -1,6 +1,6 @@
 import { BedDouble, Utensils, Zap } from 'lucide-preact';
 import type { ConnectorType } from '../data/model.ts';
-import { CONNECTOR_OPTIONS, type Filters, type MapMode } from '../data/filters.ts';
+import { CONNECTOR_OPTIONS, showHidden, type Filters, type MapMode } from '../data/filters.ts';
 import type { MyVehicle } from '../shared/vehicles.ts';
 
 export interface MapFilters extends Filters {
@@ -14,7 +14,9 @@ interface Props {
   operators: Array<{ name: string; count: number }>;
   shown: number;
   total: number;
-  /** Chargers the mode and the customers-only setting hide. */
+  /** Chargers the mode and the customers-only setting keep (defaults to total - hidden). */
+  listed?: number;
+  /** Chargers the mode and the customers-only setting hide among those the other filters keep (for `listed`). */
   hidden?: number;
   vehicle?: MyVehicle | null;
   onChange: (f: MapFilters) => void;
@@ -39,9 +41,20 @@ function hiddenWhy(f: Filters): string {
   return `Hidden: ${why.join(', or ')}`;
 }
 
+/** "120 hidden · Show" over the map, outside the scrolling chips, so a driver missing a charger sees why. */
+export function HiddenPill({ filters, hidden, onChange }: { filters: MapFilters; hidden: number; onChange: (f: MapFilters) => void }) {
+  if (hidden <= 0) return null;
+  const why = hiddenWhy(filters);
+  return (
+    <button type="button" class="map-hidden" data-testid="show-hidden" title={why} aria-label={`Show ${hidden} hidden chargers. ${why}.`} onClick={() => onChange(showHidden(filters))}>
+      {hidden} hidden · <span class="map-hidden__show">Show</span>
+    </button>
+  );
+}
+
 const sameSet = (a: ConnectorType[], b: ConnectorType[]) => a.length === b.length && a.every((c) => b.includes(c));
 
-export function FilterBar({ filters, operators, shown, total, hidden = 0, vehicle = null, onChange }: Props) {
+export function FilterBar({ filters, operators, shown, total, listed: listedProp, hidden = 0, vehicle = null, onChange }: Props) {
   const mine = vehicle && filters.mode !== '2w' ? plugsFor(vehicle) : null;
   const plugValue =
     filters.connectors.length === 0
@@ -53,7 +66,7 @@ export function FilterBar({ filters, operators, shown, total, hidden = 0, vehicl
           : 'several';
   const pickPlug = (v: string) =>
     onChange({ ...filters, connectors: v === '' ? [] : v === 'mine' && mine ? mine : v === 'several' ? filters.connectors : [v as ConnectorType] });
-  const listed = total - hidden;
+  const listed = listedProp ?? total - hidden;
 
   return (
     <div class="filters" role="toolbar" aria-label="Filter the map">
@@ -72,8 +85,8 @@ export function FilterBar({ filters, operators, shown, total, hidden = 0, vehicl
         <BedDouble size={14} aria-hidden="true" /> Stays
       </button>
       <span class="filters__sep" aria-hidden="true" />
-      <button class="chip" aria-pressed={filters.workingOnly} onClick={() => onChange({ ...filters, workingOnly: !filters.workingOnly })}>
-        <span class="dot dot--working" aria-hidden="true" /> Working recently
+      <button class="chip" aria-pressed={filters.workingOnly} data-testid="working-only" title="Green and amber pins: listed as operational, or a driver says it works" onClick={() => onChange({ ...filters, workingOnly: !filters.workingOnly })}>
+        <span class="dot dot--working" aria-hidden="true" /> Working
       </button>
       <button class="chip" aria-pressed={filters.dcOnly} onClick={() => onChange({ ...filters, dcOnly: !filters.dcOnly })}>
         <Zap size={14} aria-hidden="true" /> DC fast
@@ -117,14 +130,9 @@ export function FilterBar({ filters, operators, shown, total, hidden = 0, vehicl
           ))}
         </select>
       </label>
+      {/* What the mode and customers-only hide is said over the map (HiddenPill), where it can't scroll away. */}
       <span class="filters__count" aria-live="polite" data-testid="filter-count">
         {shown === listed ? `${listed} chargers` : `${shown} of ${listed}`}
-        {hidden > 0 && (
-          <span class="muted" title={hiddenWhy(filters)}>
-            {' '}
-            · {hidden} hidden
-          </span>
-        )}
       </span>
     </div>
   );

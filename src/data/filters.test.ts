@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_FILTERS, EMPTY_FILTERS, activeFilterCount, filterStations, hiddenBySettings, operatorsByCount } from './filters.ts';
+import { DEFAULT_FILTERS, EMPTY_FILTERS, activeFilterCount, filterStations, hiddenBySettings, operatorsByCount, relaxToShow } from './filters.ts';
 import type { Station } from './model.ts';
 
 function station(over: Partial<Station>): Station {
@@ -50,6 +50,29 @@ describe('filterStations', () => {
   it('keeps stations with unknown vehicle types when filtering by vehicle', () => {
     const ids = filterStations(all, { ...EMPTY_FILTERS, vehicle: 'car' }).map((s) => s.id);
     expect(ids).toEqual(['dc', 'ac', 'unknown']);
+  });
+});
+
+describe('relaxToShow: opening a charger the filters hide', () => {
+  const picked = { ...DEFAULT_FILTERS, dcOnly: true, connectors: ['CCS2' as const], operator: 'Statiq', minKw: 50, open24x7: true };
+
+  it('changes nothing when the charger already passes', () => {
+    expect(relaxToShow(dc, picked)).toBe(picked);
+  });
+
+  it('clears only the filters that hide it', () => {
+    const r = relaxToShow(ac, picked);
+    expect(filterStations([ac], r)).toEqual([ac]);
+    // AC, Tata, 7.4 kW, Type 2 and not 24x7 fail DC, plug, operator, min kW and 24x7; the mode is kept.
+    expect(r).toMatchObject({ dcOnly: false, connectors: [], operator: null, minKw: 0, open24x7: false, mode: 'car', showRestricted: false });
+    const onlyDc = { ...DEFAULT_FILTERS, dcOnly: true, open24x7: true };
+    expect(relaxToShow(station({ id: 'ac24', speed: 'ac', is24x7: true }), onlyDc)).toMatchObject({ dcOnly: false, open24x7: true, mode: 'car' });
+  });
+
+  it('opens the mode and customers-only setting only when they hide it', () => {
+    const r = relaxToShow(twoWheeler, { ...DEFAULT_FILTERS, dcOnly: false });
+    expect(r).toMatchObject({ mode: 'all', showRestricted: true });
+    expect(filterStations([twoWheeler], r)).toEqual([twoWheeler]);
   });
 });
 
