@@ -86,10 +86,18 @@ export function filterStations(stations: Station[], f: Filters): Station[] {
   return activeFilterCount(f) === 0 && f.mode === 'all' && f.showRestricted ? stations : stations.filter((s) => matchesFilters(s, f));
 }
 
-/** Stations the mode and the customers-only setting hide, so the count can say so. */
+/**
+ * Stations the mode and the customers-only setting hide among those the other filters keep, so the count
+ * can say so: with the operator set to Ather Grid in car mode, that's the Ather chargers for scooters.
+ */
 export function hiddenBySettings(stations: Station[], f: Filters): number {
-  const settingsOnly: Filters = { ...EMPTY_FILTERS, mode: f.mode, showRestricted: f.showRestricted };
-  return stations.length - filterStations(stations, settingsOnly).length;
+  const relaxed: Filters = { ...f, mode: 'all', showRestricted: true };
+  return filterStations(stations, relaxed).length - filterStations(stations, f).length;
+}
+
+/** The filters with the mode and customers-only setting opened up: "show the hidden ones". */
+export function showHidden<F extends Filters>(f: F): F {
+  return { ...f, mode: 'all', showRestricted: true };
 }
 
 export function operatorsByCount(stations: Station[]): Array<{ name: string; count: number }> {

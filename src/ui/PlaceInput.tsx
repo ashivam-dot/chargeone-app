@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Station } from '../data/model.ts';
 import { searchPlaces, type Place } from '../lib/geocode.ts';
+import { MIN_QUERY, searchChargers } from '../shared/operatorSearch.ts';
 
 export interface PickedPlace {
   name: string;
@@ -19,13 +20,17 @@ interface Props {
   onPick: (p: PickedPlace | null) => void;
   /** Extra first option, e.g. "Use my location". */
   leading?: { label: string; onSelect: () => void };
+  /** Where the map is looking: the nearest matching chargers come first. */
+  near?: { lat: number; lng: number } | null;
+  /** Offers "All Statiq chargers (128)" when the query names an operator. */
+  onOperator?: (operator: string) => void;
 }
 
-const MIN_CHARS = 2;
+const MIN_CHARS = MIN_QUERY;
 const DEBOUNCE_MS = 300;
 
 /** Place search with a short debounce; also matches charger names on the map. */
-export function PlaceInput({ label, placeholder, value, stations = [], autoFocus, onPick, leading }: Props) {
+export function PlaceInput({ label, placeholder, value, stations = [], autoFocus, onPick, leading, near, onOperator }: Props) {
   const [text, setText] = useState(value?.name ?? '');
   const [places, setPlaces] = useState<Place[]>([]);
   const [open, setOpen] = useState(false);
@@ -37,10 +42,13 @@ export function PlaceInput({ label, placeholder, value, stations = [], autoFocus
   useEffect(() => setText(value?.name ?? ''), [value]);
 
   const query = text.trim();
-  const stationHits =
-    query.length >= MIN_CHARS && query !== value?.name
-      ? stations.filter((s) => s.name.toLowerCase().includes(query.toLowerCase())).slice(0, 3)
-      : [];
+  // Names, operators and the brands drivers type ("HP" -> HPCL), by whole words: see shared/operatorSearch.ts.
+  const chargers = useMemo(
+    () => (query.length >= MIN_CHARS && query !== value?.name ? searchChargers(stations, query, { near }) : null),
+    [stations, query, value?.name, near?.lat, near?.lng],
+  );
+  const stationHits = chargers?.stations ?? [];
+  const operatorHits = onOperator ? chargers?.operators ?? [] : [];
 
   useEffect(() => {
     if (query.length < MIN_CHARS || query === value?.name) {
@@ -65,12 +73,19 @@ export function PlaceInput({ label, placeholder, value, stations = [], autoFocus
     };
   }, [query]);
 
-  const options: Array<{ key: string; title: string; detail: string; pick: () => void }> = [
+  const options: Array<{ key: string; title: string; detail: string; testId?: string; pick: () => void }> = [
     ...(leading ? [{ key: 'leading', title: leading.label, detail: '', pick: leading.onSelect }] : []),
+    ...operatorHits.map((o) => ({
+      key: `op:${o.name}`,
+      title: `All ${o.name} chargers (${o.count})`,
+      detail: 'Show them all on the map',
+      testId: 'operator-suggestion',
+      pick: () => onOperator?.(o.name),
+    })),
     ...stationHits.map((s) => ({
       key: s.id,
       title: s.name,
-      detail: s.operator ? `Charger · ${s.operator}` : 'Charger',
+      detail: ['Charger', s.operator, s.state].filter(Boolean).join(' · '),
       pick: () => onPick({ name: s.name, lat: s.lat, lng: s.lng, bbox: null, stationId: s.id }),
     })),
     ...places.map((p, i) => ({
@@ -138,7 +153,8 @@ export function PlaceInput({ label, placeholder, value, stations = [], autoFocus
               id={`${listId}-${i}`}
               role="option"
               aria-selected={i === active}
-              class={i === active ? 'is-active' : ''}
+              class={[o.testId ? 'place__all' : '', i === active ? 'is-active' : ''].filter(Boolean).join(' ')}
+              data-testid={o.testId}
               onMouseDown={(e) => {
                 e.preventDefault();
                 choose(i);
