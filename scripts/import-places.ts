@@ -6,6 +6,12 @@
 // linkPlaces then keeps only places within walking or driving distance. Every answer is cached in
 // data-cache/, so a re-run only asks about chargers it hasn't seen before.
 // Usage: node scripts/import-places.ts [--from-cache]   (--from-cache: no network, use what is cached)
+//
+// Faster, and no load on Overpass: read a local OpenStreetMap extract instead.
+//   node scripts/import-places.ts --from-pbf /tmp/osm/india.osm.pbf [--points points.json]
+// writes data-cache/osm-places-pbf.json: food, stays and toilets within FOOD_RADIUS_M / STAY_RADIUS_M
+// of every car charger (or of each {lat, lng} in points.json), then stops. The next normal run
+// (e.g. --from-cache) folds those places into places.json, with the Overpass caches.
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -14,6 +20,7 @@ import type { Dataset, Station } from '../src/data/model.ts';
 import type { OsmElement } from '../src/data/normalize.ts';
 import { assignAreas, compact, FOOD_RADIUS_M, linkPlaces, osmToCities, osmToPlace, STAY_RADIUS_M, type Place, type PlacesData } from '../src/data/places.ts';
 import { geohash } from '../pipeline/lib/geo.ts';
+import { flagValue, readPbf, SegmentIndex } from './osm-pbf.ts';
 import { geohashBounds, type Bounds } from '../src/shared/geohash.ts';
 import { overpass, OVERPASS_PAUSE_MS, sleep } from './overpass.ts';
 
@@ -22,6 +29,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const LEGACY_CACHE = join(ROOT, 'data-cache', 'osm-places.json');
 /** Places around each charger point, filled a batch of cells at a time. */
 const AROUND_CACHE = join(ROOT, 'data-cache', 'osm-places-around.json');
+/** Places around each charger point, read from a local extract by --from-pbf. Same shape as AROUND_CACHE. */
+const PBF_CACHE = join(ROOT, 'data-cache', 'osm-places-pbf.json');
 const STATIONS_FILE = join(ROOT, 'public', 'data', 'stations.json');
 const OUT_FILE = join(ROOT, 'public', 'data', 'places.json');
 /** Geohash precision for grouping chargers: 5 is about 4.9 x 4.9 km. */
@@ -63,6 +72,47 @@ interface AroundCache {
 }
 
 const pointKey = (s: { lat: number; lng: number }) => `${s.lat.toFixed(4)},${s.lng.toFixed(4)}`;
+
+const FOOD = /^(restaurant|cafe|fast_food|food_court)$/;
+const STAY = /^(hotel|motel|guest_house|hostel)$/;
+
+/**
+ * The OSM places import-places looks for (named food and stays, plus toilets) within reach of any of
+ * `points`: food and toilets within FOOD_RADIUS_M, stays within STAY_RADIUS_M.
+ */
+export function placesNearPoints(elements: OsmElement[], points: Array<{ lat: number; lng: number }>): OsmElement[] {
+  const near = new SegmentIndex();
+  for (const p of points) near.addLine([[p.lng, p.lat], [p.lng, p.lat]]);
+  const out: OsmElement[] = [];
+  const seen = new Set<string>();
+  for (const el of elements) {
+    const t = el.tags ?? {};
+    const lat = el.lat ?? el.center?.lat;
+    const lng = el.lon ?? el.center?.lon;
+    if (lat === undefined || lng === undefined) continue;
+    const stay = (STAY.test(t.tourism ?? '') || t.leisure === 'resort') && Boolean(t.name);
+    const food = FOOD.test(t.amenity ?? '') && Boolean(t.name);
+    const toilets = t.amenity === 'toilets';
+    if (!stay && !food && !toilets) continue;
+    const id = `${el.type}${el.id}`;
+    if (seen.has(id) || near.nearestM(lat, lng, stay ? STAY_RADIUS_M : FOOD_RADIUS_M) === null) continue;
+    seen.add(id);
+    out.push(el);
+  }
+  return out;
+}
+
+/** --from-pbf: writes PBF_CACHE for the given points (default: every car charger) and returns. */
+async function fromPbf(pbf: string, pointsFile: string | null, stations: Station[]): Promise<void> {
+  const points: Array<{ lat: number; lng: number }> = pointsFile ? JSON.parse(await readFile(pointsFile, 'utf8')) : stations.filter(carCanCharge);
+  const { places } = await readPbf(pbf, false);
+  const elements = placesNearPoints(places, points);
+  const cache: AroundCache = { points: [...new Set(points.map(pointKey))], elements };
+  await mkdir(dirname(PBF_CACHE), { recursive: true });
+  await writeFile(PBF_CACHE, JSON.stringify(cache));
+  console.log(`  ${elements.length} of ${places.length} places in ${pbf} are near ${cache.points.length} points`);
+  console.log(`Wrote ${PBF_CACHE}`);
+}
 const carCanCharge = (s: Station) => !s.batterySwap && (s.vehicles.length === 0 || s.vehicles.includes('car'));
 
 /** Share of car chargers with a stay within 2 km and food within 500 m, the trip planner's bar. */
@@ -77,11 +127,14 @@ function coverage(stations: Station[], near: PlacesData['near']): string {
 async function main(): Promise<void> {
   const offline = process.argv.includes('--from-cache');
   const dataset = JSON.parse(await readFile(STATIONS_FILE, 'utf8')) as Dataset;
+  const pbf = flagValue(process.argv, '--from-pbf');
+  if (pbf) return fromPbf(pbf, flagValue(process.argv, '--points'), dataset.stations);
+  const fromExtract: AroundCache = existsSync(PBF_CACHE) ? JSON.parse(await readFile(PBF_CACHE, 'utf8')) : { points: [], elements: [] };
 
   // The legacy file already holds everything around OSM charging stations, so those points count as asked.
   const legacy: OsmElement[] = existsSync(LEGACY_CACHE) ? JSON.parse(await readFile(LEGACY_CACHE, 'utf8')) : [];
   const around: AroundCache = existsSync(AROUND_CACHE) ? JSON.parse(await readFile(AROUND_CACHE, 'utf8')) : { points: [], elements: [] };
-  const asked = new Set(around.points);
+  const asked = new Set([...around.points, ...fromExtract.points]);
   if (legacy.length) for (const s of dataset.stations) if (s.id.startsWith('osm-')) asked.add(pointKey(s));
 
   // Charger points not asked about yet, grouped by cell. A fetched cell covers every point in it.
@@ -131,7 +184,7 @@ async function main(): Promise<void> {
 
   const seen = new Set<string>();
   const all: Place[] = [];
-  for (const el of [...legacy, ...around.elements]) {
+  for (const el of [...legacy, ...around.elements, ...fromExtract.elements]) {
     const p = osmToPlace(el);
     if (p && !seen.has(p.id)) {
       seen.add(p.id);
@@ -165,7 +218,10 @@ async function main(): Promise<void> {
   console.log(`Wrote ${OUT_FILE}`);
 }
 
-main().catch((err: unknown) => {
-  console.error(err);
-  process.exit(1);
-});
+// Only when run as a script, so tests can import the helpers.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((err: unknown) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

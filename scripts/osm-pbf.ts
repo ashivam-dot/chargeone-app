@@ -66,14 +66,17 @@ function tagsOf(f: Feature): Record<string, string> {
 const TYPES = { n: 'node', w: 'way', r: 'relation' } as const;
 
 /**
- * An exported feature as the element Overpass would have returned with `out tags center`: a node
+ * An exported feature (`osmium export -u type_id`) as the element Overpass would have returned with `out tags center`: a node
  * keeps its point, a way or relation gets the centre of its bounding box.
  */
 export function featureToElement(f: Feature): OsmElement | null {
-  const m = /^([nwr])(\d+)$/.exec(f.id ?? '');
+  const m = /^([nwra])(\d+)$/.exec(f.id ?? '');
   if (!m || !f.geometry) return null;
-  const type = TYPES[m[1] as keyof typeof TYPES];
-  const id = Number(m[2]);
+  // osmium numbers an area 2 x the way id, or 2 x the relation id + 1.
+  const n = Number(m[2]);
+  const area = m[1] === 'a';
+  const type = area ? (n % 2 ? 'relation' : 'way') : TYPES[m[1] as keyof typeof TYPES];
+  const id = area ? Math.floor(n / 2) : n;
   const tags = tagsOf(f);
   if (f.geometry.type === 'Point') {
     const [lon, lat] = f.geometry.coordinates as Pos;
