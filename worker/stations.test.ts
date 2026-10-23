@@ -21,6 +21,10 @@ for (const f of readdirSync(new URL('../public/data/aliases/', import.meta.url))
 // The app's own ids resolve too: an osm-/ocm- id that is a station's legacy id is not in `aliases`.
 for (const [c1, legacy] of Object.entries(aliases.legacy)) if (legacy !== c1 && !aliases.aliases[legacy]) aliases.aliases[legacy] = c1;
 const BENGALURU = { lat: 12.9716, lng: 77.5946 };
+/** Stations OSM or OCM describe keep an osm-/ocm- app id; stations only a location list knows use their c1_ id. */
+const LEGACY_ID = /^(osm|ocm)-/;
+/** Record ids of the location lists (tg-, ovt-): they resolve in the alias buckets but never reach D1. */
+const LIST_RECORD_ID = /^(tg|ovt)-/;
 
 beforeEach(() => clearStationCaches());
 afterEach(() => clearStationCaches());
@@ -83,7 +87,7 @@ describe('stationsNear', () => {
 });
 
 describe('check-ins under stable ids', () => {
-  const at = dataset.stations.find((s) => s.lat > 12 && s.lat < 14)!;
+  const at = dataset.stations.find((s) => s.lat > 12 && s.lat < 14 && LEGACY_ID.test(s.id))!;
 
   async function signedIn() {
     const { env, sqlite } = fakeEnv();
@@ -129,7 +133,7 @@ describe('migration 0006_station_alias', () => {
     db.prepare("INSERT INTO users (id, email, created_at) VALUES ('u1', 'old@local.test', '2026-01-01T00:00:00Z')").run();
     const insert = db.prepare("INSERT INTO checkins (station_id, user_id, kind, created_at) VALUES (?, 'u1', 'worked', '2026-10-01T00:00:00Z')");
     // Every id reports could have been stored under before: each station's legacy id and every alias.
-    const before = [...new Set([...dataset.stations.map((s) => s.id), ...Object.keys(aliases.aliases)])];
+    const before = [...new Set([...dataset.stations.map((s) => s.id), ...Object.keys(aliases.aliases)])].filter((id) => !LIST_RECORD_ID.test(id));
     for (const id of before) insert.run(id);
     applyMigrations(db, (f) => f.startsWith('0006'));
     const rows = db.prepare('SELECT station_id, COUNT(*) AS n FROM checkins GROUP BY station_id').all() as Array<{ station_id: string; n: number }>;
@@ -172,7 +176,8 @@ describe('worker lookups: fallbacks and failures', () => {
     // The next request asks again instead of remembering "no sharded files".
     const real = fakeEnv().env.ASSETS;
     (env as { ASSETS: unknown }).ASSETS = real;
-    expect(await resolveStationId(env, dataset.stations[0].id)).toBe(aliases.aliases[dataset.stations[0].id]);
+    // A station only a location list knows has its c1_ id as its app id, which resolves to itself.
+    expect(await resolveStationId(env, dataset.stations[0].id)).toBe(aliases.aliases[dataset.stations[0].id] ?? dataset.stations[0].id);
 
     clearStationCaches();
     const missing = assetsOf(files);

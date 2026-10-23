@@ -10,7 +10,8 @@ import type { OsmElement } from '../src/data/normalize.ts';
 import { assignAreas, compact, linkPlaces, osmToCities, osmToPlace, type Place, type PlacesData } from '../src/data/places.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const CACHE_FILE = join(ROOT, 'data-cache', 'osm-places.json');
+/** The same cache directory as the data pipeline (PIPELINE_CACHE_DIR, default data-cache/). */
+const CACHE_FILE = join(process.env.PIPELINE_CACHE_DIR || join(ROOT, 'data-cache'), 'osm-places.json');
 const STATIONS_FILE = join(ROOT, 'public', 'data', 'stations.json');
 const OUT_FILE = join(ROOT, 'public', 'data', 'places.json');
 const USER_AGENT = 'ChargeOne-data-import/0.1 (personal open-data project)';

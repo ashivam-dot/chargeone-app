@@ -7,6 +7,9 @@ import { currentPlan, quotaWindows, usageCounts } from './entitlements.ts';
 import { isDev, type Env } from './env.ts';
 import { HttpError, claimSlot, clientKey, enforceRateLimit, indianDayStart, latLngInIndia, readJson, releaseSlot, str, type LatLng } from './http.ts';
 import { distanceMetres } from './stations.ts';
+import { BUSY, NO_ROUTE, parseValhalla, type RouteResult } from './valhalla.ts';
+
+export { decodePolyline, parseValhalla, type RouteResult, type RouteSource } from './valhalla.ts';
 
 const ORS_URL = 'https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson';
 const OSRM_DEMO_URL = 'https://router.project-osrm.org/route/v1/driving';
@@ -34,17 +37,6 @@ const REPLAN_DISTANCE_EXTRA_KM = 10;
 const REPEAT_WINDOW_MS = 10 * 60_000;
 const REPEAT_DISTANCE_KM = 0.5;
 
-export type RouteSource = 'ors' | 'valhalla' | 'osrm';
-
-export interface RouteResult {
-  coords: Coord[];
-  distanceKm: number;
-  durationMin: number;
-  hasElevation: boolean;
-  /** Which router drew it; the app shows the matching attribution. */
-  source?: RouteSource;
-}
-
 /** Computes a road route through the points in order (start, any via points, destination). */
 export type RouteFn = (points: LatLng[], signal?: AbortSignal) => Promise<RouteResult>;
 
@@ -54,9 +46,6 @@ export interface RouteCaller {
   ip: string;
   origin: string;
 }
-
-const BUSY = () => new HttpError(502, 'routing_unavailable', 'The route service is busy. Please try again in a minute.');
-const NO_ROUTE = () => new HttpError(422, 'no_route', 'No road route found between these places.');
 
 /** A deadline for one call, together with the caller's own signal when there is one. */
 const deadline = (signal?: AbortSignal) =>
@@ -112,50 +101,6 @@ async function routeWithOsrmDemo(points: LatLng[], signal?: AbortSignal): Promis
   const r = data.routes?.[0];
   if (data.code !== 'Ok' || !r) throw NO_ROUTE();
   return { coords: r.geometry.coordinates, distanceKm: r.distance / 1000, durationMin: r.duration / 60, hasElevation: false, source: 'osrm' };
-}
-
-/** Decodes an encoded polyline (Valhalla uses 6 decimal places) to [lng, lat] pairs. */
-export function decodePolyline(encoded: string, precision = 6): Coord[] {
-  const factor = 10 ** precision;
-  const out: Coord[] = [];
-  let i = 0, lat = 0, lng = 0;
-  while (i < encoded.length) {
-    for (const axis of [0, 1]) {
-      let shift = 0, result = 0, byte: number;
-      do {
-        byte = encoded.charCodeAt(i++) - 63;
-        result |= (byte & 0x1f) << shift;
-        shift += 5;
-      } while (byte >= 0x20);
-      const delta = result & 1 ? ~(result >> 1) : result >> 1;
-      if (axis === 0) lat += delta;
-      else lng += delta;
-    }
-    out.push([lng / factor, lat / factor]);
-  }
-  return out;
-}
-
-interface ValhallaReply {
-  trip?: { status?: number; summary?: { length?: number; time?: number }; legs?: Array<{ shape?: string }> };
-  error_code?: number;
-}
-
-/** Turns a Valhalla /route reply into a route. Valhalla has no elevation on /route, so plans assume flat roads. */
-export function parseValhalla(status: number, body: unknown): RouteResult {
-  const data = (body ?? {}) as ValhallaReply;
-  // 4xx carries an error_code: 442 no path, 171 no road near a point, 154 too long for the server.
-  if (status === 400 || status === 404) throw NO_ROUTE();
-  if (status !== 200 || !data.trip || data.trip.status !== 0) throw BUSY();
-  const coords: Coord[] = [];
-  for (const leg of data.trip.legs ?? []) {
-    const pts = decodePolyline(leg.shape ?? '');
-    // Each leg starts where the last one ended.
-    coords.push(...(coords.length ? pts.slice(1) : pts));
-  }
-  const km = data.trip.summary?.length;
-  if (coords.length < 2 || typeof km !== 'number') throw NO_ROUTE();
-  return { coords, distanceKm: km, durationMin: (data.trip.summary?.time ?? 0) / 60, hasElevation: false, source: 'valhalla' };
 }
 
 /** The edge cache exists only on Cloudflare; tests and Node run without it. */

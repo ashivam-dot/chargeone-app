@@ -1,16 +1,8 @@
 import { DEVICE_HEADER, DEVICE_ID } from '../src/shared/contracts.ts';
 import { toHex } from './crypto.ts';
+import { HttpError } from './errors.ts';
 
-export class HttpError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-    readonly extra: Record<string, unknown> = {},
-  ) {
-    super(message);
-  }
-}
+export { HttpError } from './errors.ts';
 
 const API_HEADERS: Record<string, string> = {
   'Content-Type': 'application/json; charset=utf-8',
