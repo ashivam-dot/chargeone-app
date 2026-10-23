@@ -1,0 +1,4328 @@
+{
+  "generatedAt": "2026-10-23T12:03:41.494Z",
+  "harness": "scripts/trip-benchmark.ts",
+  "data": {
+    "stationsInIndex": 2000,
+    "carUsableStations": 1892,
+    "placesLoaded": true,
+    "places": 5385,
+    "stationsWithNearbyPlaces": 937
+  },
+  "options": {
+    "startSocPct": 80,
+    "arriveReservePct": 15,
+    "stopReservePct": 10,
+    "chargeToPct": 80,
+    "acOn": true,
+    "extraPassengers": 1,
+    "style": "normal",
+    "dailyHours": 8,
+    "cars": [
+      "tata-nexon-ev-45",
+      "tata-tiago-ev-24"
+    ]
+  },
+  "definitions": {
+    "within3km_8km": "findCandidates(): stations compatible with the car (chargeOption), straight-line off-route distance <= N km",
+    "trusted": "isTrusted(): DC (or AC-only car), plug verified, trust >= PLAN_MIN_CONFIDENCE, not customers-only, no problem report",
+    "largestGap": "longest stretch along the route between consecutive chargers within 8 km (route start and end count as anchors)",
+    "strictPlan": "planTrip() with DEFAULT_OPTIONS (what the app plans by default)",
+    "loosePlan": "planTrip() with allowUnverified: true",
+    "journey8h": "planJourney() dailyHours 8 with places.json (nightsWithStay = overnights whose charger has >=1 stay within 3 km)",
+    "freePlanSingleDay": "planJourney() dailyHours 0 (Free plan has multiDay=false)"
+  },
+  "skippedRoutes": [],
+  "results": [
+    {
+      "route": "mumbai-pune",
+      "name": "Mumbai - Pune",
+      "points": [
+        {
+          "name": "Mumbai",
+          "lat": 19.076,
+          "lng": 72.8777
+        },
+        {
+          "name": "Pune",
+          "lat": 18.5204,
+          "lng": 73.8567
+        }
+      ],
+      "car": "tata-nexon-ev-45",
+      "batteryKwh": 45,
+      "routeKm": 141.1,
+      "routeDriveHours": 3.3,
+      "chargers": {
+        "within3km": 38,
+        "within3kmTrusted": 16,
+        "within8km": 50,
+        "within8kmTrusted": 17,
+        "within8kmDc": 22,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 7,
+            "trusted": 0
+          },
+          "100": {
+            "all": 43,
+            "trusted": 17
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 119.5,
+        "fromKm": 0,
+        "toKm": 119.5
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 119.5,
+        "fromKm": 0,
+        "toKm": 119.5
+      },
+      "strictPlan": {
+        "feasible": true,
+        "stops": 0,
+        "gapAtKm": null,
+        "arrivalSocPct": 32,
+        "chargeMinutes": 0,
+        "driveMinutes": 195,
+        "stopDetail": [],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "loosePlan": {
+        "feasible": true,
+        "stops": 0,
+        "gapAtKm": null,
+        "arrivalSocPct": 32,
+        "chargeMinutes": 0,
+        "driveMinutes": 195,
+        "stopDetail": [],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "journey8hStrict": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 141.1,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "journey8hLoose": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 141.1,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "freePlanSingleDay": {
+        "feasible": true,
+        "days": 1,
+        "stops": 0
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "mumbai-pune",
+      "name": "Mumbai - Pune",
+      "points": [
+        {
+          "name": "Mumbai",
+          "lat": 19.076,
+          "lng": 72.8777
+        },
+        {
+          "name": "Pune",
+          "lat": 18.5204,
+          "lng": 73.8567
+        }
+      ],
+      "car": "tata-tiago-ev-24",
+      "batteryKwh": 24,
+      "routeKm": 141.1,
+      "routeDriveHours": 3.3,
+      "chargers": {
+        "within3km": 38,
+        "within3kmTrusted": 16,
+        "within8km": 50,
+        "within8kmTrusted": 17,
+        "within8kmDc": 22,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 7,
+            "trusted": 0
+          },
+          "100": {
+            "all": 43,
+            "trusted": 17
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 119.5,
+        "fromKm": 0,
+        "toKm": 119.5
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 119.5,
+        "fromKm": 0,
+        "toKm": 119.5
+      },
+      "strictPlan": {
+        "feasible": true,
+        "stops": 1,
+        "gapAtKm": null,
+        "arrivalSocPct": 35,
+        "chargeMinutes": 29,
+        "driveMinutes": 195,
+        "stopDetail": [
+          {
+            "km": 131.1,
+            "station": "Aditya School",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 10,
+            "depart": 40,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "loosePlan": {
+        "feasible": true,
+        "stops": 1,
+        "gapAtKm": null,
+        "arrivalSocPct": 35,
+        "chargeMinutes": 29,
+        "driveMinutes": 195,
+        "stopDetail": [
+          {
+            "km": 131.1,
+            "station": "Aditya School",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 10,
+            "depart": 40,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "journey8hStrict": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 141.1,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "journey8hLoose": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 141.1,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "freePlanSingleDay": {
+        "feasible": true,
+        "days": 1,
+        "stops": 1
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "delhi-jaipur",
+      "name": "Delhi - Jaipur",
+      "points": [
+        {
+          "name": "Delhi",
+          "lat": 28.6139,
+          "lng": 77.209
+        },
+        {
+          "name": "Jaipur",
+          "lat": 26.9124,
+          "lng": 75.7873
+        }
+      ],
+      "car": "tata-nexon-ev-45",
+      "batteryKwh": 45,
+      "routeKm": 339.6,
+      "routeDriveHours": 5.4,
+      "chargers": {
+        "within3km": 65,
+        "within3kmTrusted": 13,
+        "within8km": 131,
+        "within8kmTrusted": 23,
+        "within8kmDc": 28,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 125,
+            "trusted": 17
+          },
+          "100": {
+            "all": 3,
+            "trusted": 3
+          },
+          "200": {
+            "all": 0,
+            "trusted": 0
+          },
+          "300": {
+            "all": 3,
+            "trusted": 3
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 135.6,
+        "fromKm": 169.6,
+        "toKm": 305.2
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 135.6,
+        "fromKm": 169.6,
+        "toKm": 305.2
+      },
+      "strictPlan": {
+        "feasible": true,
+        "stops": 1,
+        "gapAtKm": null,
+        "arrivalSocPct": 22,
+        "chargeMinutes": 41,
+        "driveMinutes": 322,
+        "stopDetail": [
+          {
+            "km": 169.6,
+            "station": "Volttic Charging Station",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 23,
+            "depart": 80,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "loosePlan": {
+        "feasible": true,
+        "stops": 1,
+        "gapAtKm": null,
+        "arrivalSocPct": 22,
+        "chargeMinutes": 41,
+        "driveMinutes": 322,
+        "stopDetail": [
+          {
+            "km": 169.6,
+            "station": "Volttic Charging Station",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 23,
+            "depart": 80,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "journey8hStrict": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 339.6,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "journey8hLoose": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 339.6,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "freePlanSingleDay": {
+        "feasible": true,
+        "days": 1,
+        "stops": 1
+      },
+      "staysNearDestination15km": 0
+    },
+    {
+      "route": "delhi-jaipur",
+      "name": "Delhi - Jaipur",
+      "points": [
+        {
+          "name": "Delhi",
+          "lat": 28.6139,
+          "lng": 77.209
+        },
+        {
+          "name": "Jaipur",
+          "lat": 26.9124,
+          "lng": 75.7873
+        }
+      ],
+      "car": "tata-tiago-ev-24",
+      "batteryKwh": 24,
+      "routeKm": 339.6,
+      "routeDriveHours": 5.4,
+      "chargers": {
+        "within3km": 65,
+        "within3kmTrusted": 13,
+        "within8km": 131,
+        "within8kmTrusted": 23,
+        "within8kmDc": 28,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 125,
+            "trusted": 17
+          },
+          "100": {
+            "all": 3,
+            "trusted": 3
+          },
+          "200": {
+            "all": 0,
+            "trusted": 0
+          },
+          "300": {
+            "all": 3,
+            "trusted": 3
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 135.6,
+        "fromKm": 169.6,
+        "toKm": 305.2
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 135.6,
+        "fromKm": 169.6,
+        "toKm": 305.2
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 2,
+        "gapAtKm": 170,
+        "arrivalSocPct": 10,
+        "chargeMinutes": 118,
+        "driveMinutes": 322,
+        "stopDetail": [
+          {
+            "km": 114.4,
+            "station": "NE-4 KFC Parking",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 19,
+            "depart": 80,
+            "trusted": true,
+            "backups": 2
+          },
+          {
+            "km": 169.6,
+            "station": "Volttic Charging Station",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 51,
+            "depart": 100,
+            "trusted": true,
+            "backups": 1
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 170. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 2,
+        "gapAtKm": 170,
+        "arrivalSocPct": 10,
+        "chargeMinutes": 118,
+        "driveMinutes": 322,
+        "stopDetail": [
+          {
+            "km": 114.4,
+            "station": "NE-4 KFC Parking",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 19,
+            "depart": 80,
+            "trusted": true,
+            "backups": 2
+          },
+          {
+            "km": 169.6,
+            "station": "Volttic Charging Station",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 51,
+            "depart": 100,
+            "trusted": true,
+            "backups": 1
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 170. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 2,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 339.6,
+            "feasible": false,
+            "stops": 2,
+            "gapAtKm": 170,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 170. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 2,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 339.6,
+            "feasible": false,
+            "stops": 2,
+            "gapAtKm": 170,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 170. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 2
+      },
+      "staysNearDestination15km": 0
+    },
+    {
+      "route": "bengaluru-chennai",
+      "name": "Bengaluru - Chennai",
+      "points": [
+        {
+          "name": "Bengaluru",
+          "lat": 12.9716,
+          "lng": 77.5946
+        },
+        {
+          "name": "Chennai",
+          "lat": 13.0827,
+          "lng": 80.2707
+        }
+      ],
+      "car": "tata-nexon-ev-45",
+      "batteryKwh": 45,
+      "routeKm": 357.4,
+      "routeDriveHours": 8.3,
+      "chargers": {
+        "within3km": 46,
+        "within3kmTrusted": 31,
+        "within8km": 110,
+        "within8kmTrusted": 70,
+        "within8kmDc": 86,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 100,
+            "trusted": 69
+          },
+          "100": {
+            "all": 0,
+            "trusted": 0
+          },
+          "200": {
+            "all": 0,
+            "trusted": 0
+          },
+          "300": {
+            "all": 10,
+            "trusted": 1
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 323.4,
+        "fromKm": 21.6,
+        "toKm": 345
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 335.6,
+        "fromKm": 21.6,
+        "toKm": 357.2
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 22,
+        "arrivalSocPct": -14,
+        "chargeMinutes": 38,
+        "driveMinutes": 500,
+        "stopDetail": [
+          {
+            "km": 21.6,
+            "station": "Orion Uptown Mall",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 73,
+            "depart": 100,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 22. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 22,
+        "arrivalSocPct": -14,
+        "chargeMinutes": 38,
+        "driveMinutes": 500,
+        "stopDetail": [
+          {
+            "km": 21.6,
+            "station": "Orion Uptown Mall",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 73,
+            "depart": 100,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 22. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 357.4,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 22,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 22. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 357.4,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 22,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 22. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 1
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "bengaluru-chennai",
+      "name": "Bengaluru - Chennai",
+      "points": [
+        {
+          "name": "Bengaluru",
+          "lat": 12.9716,
+          "lng": 77.5946
+        },
+        {
+          "name": "Chennai",
+          "lat": 13.0827,
+          "lng": 80.2707
+        }
+      ],
+      "car": "tata-tiago-ev-24",
+      "batteryKwh": 24,
+      "routeKm": 357.4,
+      "routeDriveHours": 8.3,
+      "chargers": {
+        "within3km": 46,
+        "within3kmTrusted": 31,
+        "within8km": 110,
+        "within8kmTrusted": 70,
+        "within8kmDc": 86,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 100,
+            "trusted": 69
+          },
+          "100": {
+            "all": 0,
+            "trusted": 0
+          },
+          "200": {
+            "all": 0,
+            "trusted": 0
+          },
+          "300": {
+            "all": 10,
+            "trusted": 1
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 323.4,
+        "fromKm": 21.6,
+        "toKm": 345
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 335.6,
+        "fromKm": 21.6,
+        "toKm": 357.2
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 22,
+        "arrivalSocPct": -78,
+        "chargeMinutes": 51,
+        "driveMinutes": 500,
+        "stopDetail": [
+          {
+            "km": 21.6,
+            "station": "Orion Uptown Mall",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 69,
+            "depart": 100,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 22. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 22,
+        "arrivalSocPct": -78,
+        "chargeMinutes": 51,
+        "driveMinutes": 500,
+        "stopDetail": [
+          {
+            "km": 21.6,
+            "station": "Orion Uptown Mall",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 69,
+            "depart": 100,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 22. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 357.4,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 22,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 22. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 357.4,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 22,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 22. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 1
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "bengaluru-mysuru",
+      "name": "Bengaluru - Mysuru",
+      "points": [
+        {
+          "name": "Bengaluru",
+          "lat": 12.9716,
+          "lng": 77.5946
+        },
+        {
+          "name": "Mysuru",
+          "lat": 12.2958,
+          "lng": 76.6394
+        }
+      ],
+      "car": "tata-nexon-ev-45",
+      "batteryKwh": 45,
+      "routeKm": 148.3,
+      "routeDriveHours": 3.1,
+      "chargers": {
+        "within3km": 49,
+        "within3kmTrusted": 37,
+        "within8km": 96,
+        "within8kmTrusted": 70,
+        "within8kmDc": 78,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 74,
+            "trusted": 52
+          },
+          "100": {
+            "all": 22,
+            "trusted": 18
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 38.8,
+        "fromKm": 73.2,
+        "toKm": 112
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 38.8,
+        "fromKm": 73.2,
+        "toKm": 112
+      },
+      "strictPlan": {
+        "feasible": true,
+        "stops": 0,
+        "gapAtKm": null,
+        "arrivalSocPct": 30,
+        "chargeMinutes": 0,
+        "driveMinutes": 186,
+        "stopDetail": [],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "loosePlan": {
+        "feasible": true,
+        "stops": 0,
+        "gapAtKm": null,
+        "arrivalSocPct": 30,
+        "chargeMinutes": 0,
+        "driveMinutes": 186,
+        "stopDetail": [],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "journey8hStrict": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 148.3,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "journey8hLoose": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 148.3,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "freePlanSingleDay": {
+        "feasible": true,
+        "days": 1,
+        "stops": 0
+      },
+      "staysNearDestination15km": 0
+    },
+    {
+      "route": "bengaluru-mysuru",
+      "name": "Bengaluru - Mysuru",
+      "points": [
+        {
+          "name": "Bengaluru",
+          "lat": 12.9716,
+          "lng": 77.5946
+        },
+        {
+          "name": "Mysuru",
+          "lat": 12.2958,
+          "lng": 76.6394
+        }
+      ],
+      "car": "tata-tiago-ev-24",
+      "batteryKwh": 24,
+      "routeKm": 148.3,
+      "routeDriveHours": 3.1,
+      "chargers": {
+        "within3km": 49,
+        "within3kmTrusted": 37,
+        "within8km": 96,
+        "within8kmTrusted": 70,
+        "within8kmDc": 78,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 74,
+            "trusted": 52
+          },
+          "100": {
+            "all": 22,
+            "trusted": 18
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 38.8,
+        "fromKm": 73.2,
+        "toKm": 112
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 38.8,
+        "fromKm": 73.2,
+        "toKm": 112
+      },
+      "strictPlan": {
+        "feasible": true,
+        "stops": 1,
+        "gapAtKm": null,
+        "arrivalSocPct": 21,
+        "chargeMinutes": 20,
+        "driveMinutes": 186,
+        "stopDetail": [
+          {
+            "km": 112,
+            "station": "Udupi Utsav",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 21,
+            "depart": 40,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "loosePlan": {
+        "feasible": true,
+        "stops": 1,
+        "gapAtKm": null,
+        "arrivalSocPct": 21,
+        "chargeMinutes": 20,
+        "driveMinutes": 186,
+        "stopDetail": [
+          {
+            "km": 112,
+            "station": "Udupi Utsav",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 21,
+            "depart": 40,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "journey8hStrict": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 148.3,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "journey8hLoose": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 148.3,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "freePlanSingleDay": {
+        "feasible": true,
+        "days": 1,
+        "stops": 1
+      },
+      "staysNearDestination15km": 0
+    },
+    {
+      "route": "mumbai-goa",
+      "name": "Mumbai - Goa (Panaji)",
+      "points": [
+        {
+          "name": "Mumbai",
+          "lat": 19.076,
+          "lng": 72.8777
+        },
+        {
+          "name": "Panaji (Goa)",
+          "lat": 15.4909,
+          "lng": 73.8278
+        }
+      ],
+      "car": "tata-nexon-ev-45",
+      "batteryKwh": 45,
+      "routeKm": 561.4,
+      "routeDriveHours": 15.9,
+      "chargers": {
+        "within3km": 3,
+        "within3kmTrusted": 0,
+        "within8km": 7,
+        "within8kmTrusted": 0,
+        "within8kmDc": 3,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 7,
+            "trusted": 0
+          },
+          "100": {
+            "all": 0,
+            "trusted": 0
+          },
+          "200": {
+            "all": 0,
+            "trusted": 0
+          },
+          "300": {
+            "all": 0,
+            "trusted": 0
+          },
+          "400": {
+            "all": 0,
+            "trusted": 0
+          },
+          "500": {
+            "all": 0,
+            "trusted": 0
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 561.4,
+        "fromKm": 0,
+        "toKm": 561.4
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 561.4,
+        "fromKm": 0,
+        "toKm": 561.4
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 0,
+        "gapAtKm": 0,
+        "arrivalSocPct": -110,
+        "chargeMinutes": 0,
+        "driveMinutes": 957,
+        "stopDetail": [],
+        "extras": 1,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 40,
+        "arrivalSocPct": -77,
+        "chargeMinutes": 159,
+        "driveMinutes": 957,
+        "stopDetail": [
+          {
+            "km": 40.2,
+            "station": "Tata Power",
+            "mode": "ac",
+            "powerKw": 7,
+            "arrive": 66,
+            "depart": 100,
+            "trusted": false,
+            "backups": 0
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 40. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km.",
+          "Some stops have little recent data and no backup nearby. Check recent reports or call the operator before relying on them."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 561.4,
+            "feasible": false,
+            "stops": 0,
+            "gapAtKm": 0,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 561.4,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 40,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 40. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km.",
+          "Some stops have little recent data and no backup nearby. Check recent reports or call the operator before relying on them."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 0
+      },
+      "staysNearDestination15km": 0
+    },
+    {
+      "route": "mumbai-goa",
+      "name": "Mumbai - Goa (Panaji)",
+      "points": [
+        {
+          "name": "Mumbai",
+          "lat": 19.076,
+          "lng": 72.8777
+        },
+        {
+          "name": "Panaji (Goa)",
+          "lat": 15.4909,
+          "lng": 73.8278
+        }
+      ],
+      "car": "tata-tiago-ev-24",
+      "batteryKwh": 24,
+      "routeKm": 561.4,
+      "routeDriveHours": 15.9,
+      "chargers": {
+        "within3km": 3,
+        "within3kmTrusted": 0,
+        "within8km": 7,
+        "within8kmTrusted": 0,
+        "within8kmDc": 3,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 7,
+            "trusted": 0
+          },
+          "100": {
+            "all": 0,
+            "trusted": 0
+          },
+          "200": {
+            "all": 0,
+            "trusted": 0
+          },
+          "300": {
+            "all": 0,
+            "trusted": 0
+          },
+          "400": {
+            "all": 0,
+            "trusted": 0
+          },
+          "500": {
+            "all": 0,
+            "trusted": 0
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 561.4,
+        "fromKm": 0,
+        "toKm": 561.4
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 561.4,
+        "fromKm": 0,
+        "toKm": 561.4
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 0,
+        "gapAtKm": 0,
+        "arrivalSocPct": -217,
+        "chargeMinutes": 0,
+        "driveMinutes": 957,
+        "stopDetail": [],
+        "extras": 1,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 40,
+        "arrivalSocPct": -176,
+        "chargeMinutes": 105,
+        "driveMinutes": 957,
+        "stopDetail": [
+          {
+            "km": 40.2,
+            "station": "Tata Power",
+            "mode": "ac",
+            "powerKw": 7,
+            "arrive": 58,
+            "depart": 100,
+            "trusted": false,
+            "backups": 0
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 40. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km.",
+          "Some stops have little recent data and no backup nearby. Check recent reports or call the operator before relying on them."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 561.4,
+            "feasible": false,
+            "stops": 0,
+            "gapAtKm": 0,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 561.4,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 40,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 40. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km.",
+          "Some stops have little recent data and no backup nearby. Check recent reports or call the operator before relying on them."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 0
+      },
+      "staysNearDestination15km": 0
+    },
+    {
+      "route": "delhi-chandigarh-manali",
+      "name": "Delhi - Chandigarh - Manali",
+      "points": [
+        {
+          "name": "Delhi",
+          "lat": 28.6139,
+          "lng": 77.209
+        },
+        {
+          "name": "Chandigarh",
+          "lat": 30.7333,
+          "lng": 76.7794
+        },
+        {
+          "name": "Manali",
+          "lat": 32.2432,
+          "lng": 77.1892
+        }
+      ],
+      "car": "tata-nexon-ev-45",
+      "batteryKwh": 45,
+      "routeKm": 576.6,
+      "routeDriveHours": 13.9,
+      "chargers": {
+        "within3km": 54,
+        "within3kmTrusted": 4,
+        "within8km": 130,
+        "within8kmTrusted": 13,
+        "within8kmDc": 15,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 126,
+            "trusted": 10
+          },
+          "100": {
+            "all": 0,
+            "trusted": 0
+          },
+          "200": {
+            "all": 2,
+            "trusted": 1
+          },
+          "300": {
+            "all": 2,
+            "trusted": 2
+          },
+          "400": {
+            "all": 0,
+            "trusted": 0
+          },
+          "500": {
+            "all": 0,
+            "trusted": 0
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 261,
+        "fromKm": 315.6,
+        "toKm": 576.6
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 261,
+        "fromKm": 315.6,
+        "toKm": 576.6
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 3,
+        "gapAtKm": 316,
+        "arrivalSocPct": 11,
+        "chargeMinutes": 204,
+        "driveMinutes": 833,
+        "stopDetail": [
+          {
+            "km": 2.9,
+            "station": "Le Méridien",
+            "mode": "dc",
+            "powerKw": 30,
+            "arrive": 79,
+            "depart": 100,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 240.6,
+            "station": "The Gillz-Hotel & Restaurant",
+            "mode": "dc",
+            "powerKw": 30,
+            "arrive": 19,
+            "depart": 80,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 315.6,
+            "station": "Powerbank Charging Station",
+            "mode": "dc",
+            "powerKw": 50,
+            "arrive": 54,
+            "depart": 100,
+            "trusted": true,
+            "backups": 1
+          }
+        ],
+        "extras": 1,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 316. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 3,
+        "gapAtKm": 316,
+        "arrivalSocPct": 11,
+        "chargeMinutes": 254,
+        "driveMinutes": 833,
+        "stopDetail": [
+          {
+            "km": 13.9,
+            "station": "EV charging station",
+            "mode": "ac",
+            "powerKw": 7,
+            "arrive": 75,
+            "depart": 100,
+            "trusted": false,
+            "backups": 1
+          },
+          {
+            "km": 240.6,
+            "station": "The Gillz-Hotel & Restaurant",
+            "mode": "dc",
+            "powerKw": 30,
+            "arrive": 23,
+            "depart": 80,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 315.6,
+            "station": "Powerbank Charging Station",
+            "mode": "dc",
+            "powerKw": 50,
+            "arrive": 54,
+            "depart": 100,
+            "trusted": true,
+            "backups": 1
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 316. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Some stops have little or poor recent data. Keep the backup chargers in mind."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 2,
+        "nights": 1,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 2,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 240.6,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "The Gillz-Hotel & Restaurant",
+              "km": 240.6,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 240.6,
+            "toKm": 576.6,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 315.6,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 2's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 75. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 2,
+        "nights": 1,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 2,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 240.6,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "The Gillz-Hotel & Restaurant",
+              "km": 240.6,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 240.6,
+            "toKm": 576.6,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 315.6,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 2's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Some stops have little or poor recent data. Keep the backup chargers in mind.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 75. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 3
+      },
+      "staysNearDestination15km": 0
+    },
+    {
+      "route": "delhi-chandigarh-manali",
+      "name": "Delhi - Chandigarh - Manali",
+      "points": [
+        {
+          "name": "Delhi",
+          "lat": 28.6139,
+          "lng": 77.209
+        },
+        {
+          "name": "Chandigarh",
+          "lat": 30.7333,
+          "lng": 76.7794
+        },
+        {
+          "name": "Manali",
+          "lat": 32.2432,
+          "lng": 77.1892
+        }
+      ],
+      "car": "tata-tiago-ev-24",
+      "batteryKwh": 24,
+      "routeKm": 576.6,
+      "routeDriveHours": 13.9,
+      "chargers": {
+        "within3km": 54,
+        "within3kmTrusted": 4,
+        "within8km": 130,
+        "within8kmTrusted": 13,
+        "within8kmDc": 15,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 126,
+            "trusted": 10
+          },
+          "100": {
+            "all": 0,
+            "trusted": 0
+          },
+          "200": {
+            "all": 2,
+            "trusted": 1
+          },
+          "300": {
+            "all": 2,
+            "trusted": 2
+          },
+          "400": {
+            "all": 0,
+            "trusted": 0
+          },
+          "500": {
+            "all": 0,
+            "trusted": 0
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 261,
+        "fromKm": 315.6,
+        "toKm": 576.6
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 261,
+        "fromKm": 315.6,
+        "toKm": 576.6
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 3,
+        "arrivalSocPct": -204,
+        "chargeMinutes": 43,
+        "driveMinutes": 833,
+        "stopDetail": [
+          {
+            "km": 2.9,
+            "station": "Le Méridien",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 78,
+            "depart": 100,
+            "trusted": true,
+            "backups": 0
+          }
+        ],
+        "extras": 1,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 3. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 14,
+        "arrivalSocPct": -198,
+        "chargeMinutes": 72,
+        "driveMinutes": 833,
+        "stopDetail": [
+          {
+            "km": 13.9,
+            "station": "EV charging station",
+            "mode": "ac",
+            "powerKw": 7,
+            "arrive": 73,
+            "depart": 100,
+            "trusted": false,
+            "backups": 1
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 14. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Some stops have little or poor recent data. Keep the backup chargers in mind."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 1,
+        "nights": 1,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 240.6,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 3,
+            "overnight": {
+              "station": "The Gillz-Hotel & Restaurant",
+              "km": 240.6,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          }
+        ],
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 3. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 1,
+        "nights": 1,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 240.6,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 14,
+            "overnight": {
+              "station": "The Gillz-Hotel & Restaurant",
+              "km": 240.6,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          }
+        ],
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 14. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Some stops have little or poor recent data. Keep the backup chargers in mind."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 1
+      },
+      "staysNearDestination15km": 0
+    },
+    {
+      "route": "ahmedabad-mumbai",
+      "name": "Ahmedabad - Mumbai",
+      "points": [
+        {
+          "name": "Ahmedabad",
+          "lat": 23.0225,
+          "lng": 72.5714
+        },
+        {
+          "name": "Mumbai",
+          "lat": 19.076,
+          "lng": 72.8777
+        }
+      ],
+      "car": "tata-nexon-ev-45",
+      "batteryKwh": 45,
+      "routeKm": 533.9,
+      "routeDriveHours": 12.2,
+      "chargers": {
+        "within3km": 9,
+        "within3kmTrusted": 5,
+        "within8km": 13,
+        "within8kmTrusted": 6,
+        "within8kmDc": 12,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 2,
+            "trusted": 0
+          },
+          "100": {
+            "all": 4,
+            "trusted": 3
+          },
+          "200": {
+            "all": 0,
+            "trusted": 0
+          },
+          "300": {
+            "all": 2,
+            "trusted": 2
+          },
+          "400": {
+            "all": 1,
+            "trusted": 1
+          },
+          "500": {
+            "all": 4,
+            "trusted": 0
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 180.6,
+        "fromKm": 125.2,
+        "toKm": 305.8
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 180.6,
+        "fromKm": 125.2,
+        "toKm": 305.8
+      },
+      "strictPlan": {
+        "feasible": true,
+        "stops": 3,
+        "gapAtKm": null,
+        "arrivalSocPct": 23,
+        "chargeMinutes": 119,
+        "driveMinutes": 733,
+        "stopDetail": [
+          {
+            "km": 125.2,
+            "station": "Rest Area Mumbai - Vadodara Expressway",
+            "mode": "dc",
+            "powerKw": 30,
+            "arrive": 38,
+            "depart": 80,
+            "trusted": true,
+            "backups": 1
+          },
+          {
+            "km": 305.8,
+            "station": "Hotel Empire ChargeZone",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 19,
+            "depart": 80,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 439.9,
+            "station": "Hyundai EV Chg Stn Manor",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 35,
+            "depart": 55,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "loosePlan": {
+        "feasible": true,
+        "stops": 3,
+        "gapAtKm": null,
+        "arrivalSocPct": 23,
+        "chargeMinutes": 119,
+        "driveMinutes": 733,
+        "stopDetail": [
+          {
+            "km": 125.2,
+            "station": "Rest Area Mumbai - Vadodara Expressway",
+            "mode": "dc",
+            "powerKw": 30,
+            "arrive": 38,
+            "depart": 80,
+            "trusted": true,
+            "backups": 1
+          },
+          {
+            "km": 305.8,
+            "station": "Hotel Empire ChargeZone",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 19,
+            "depart": 80,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 439.9,
+            "station": "Hyundai EV Chg Stn Manor",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 35,
+            "depart": 55,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "journey8hStrict": {
+        "feasible": true,
+        "days": 3,
+        "nights": 2,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 125.2,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Rest Area Mumbai - Vadodara Expressway",
+              "km": 125.2,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 125.2,
+            "toKm": 353.6,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Tata.Ev Vapi",
+              "km": 353.6,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 353.6,
+            "toKm": 533.9,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "journey8hLoose": {
+        "feasible": true,
+        "days": 3,
+        "nights": 2,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 125.2,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Rest Area Mumbai - Vadodara Expressway",
+              "km": 125.2,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 125.2,
+            "toKm": 353.6,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Tata.Ev Vapi",
+              "km": 353.6,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 353.6,
+            "toKm": 533.9,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "freePlanSingleDay": {
+        "feasible": true,
+        "days": 1,
+        "stops": 3
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "ahmedabad-mumbai",
+      "name": "Ahmedabad - Mumbai",
+      "points": [
+        {
+          "name": "Ahmedabad",
+          "lat": 23.0225,
+          "lng": 72.5714
+        },
+        {
+          "name": "Mumbai",
+          "lat": 19.076,
+          "lng": 72.8777
+        }
+      ],
+      "car": "tata-tiago-ev-24",
+      "batteryKwh": 24,
+      "routeKm": 533.9,
+      "routeDriveHours": 12.2,
+      "chargers": {
+        "within3km": 9,
+        "within3kmTrusted": 5,
+        "within8km": 13,
+        "within8kmTrusted": 6,
+        "within8kmDc": 12,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 2,
+            "trusted": 0
+          },
+          "100": {
+            "all": 4,
+            "trusted": 3
+          },
+          "200": {
+            "all": 0,
+            "trusted": 0
+          },
+          "300": {
+            "all": 2,
+            "trusted": 2
+          },
+          "400": {
+            "all": 1,
+            "trusted": 1
+          },
+          "500": {
+            "all": 4,
+            "trusted": 0
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 180.6,
+        "fromKm": 125.2,
+        "toKm": 305.8
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 180.6,
+        "fromKm": 125.2,
+        "toKm": 305.8
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 125,
+        "arrivalSocPct": -116,
+        "chargeMinutes": 95,
+        "driveMinutes": 733,
+        "stopDetail": [
+          {
+            "km": 125.2,
+            "station": "Rest Area Mumbai - Vadodara Expressway",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 14,
+            "depart": 100,
+            "trusted": true,
+            "backups": 1
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 125. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 125,
+        "arrivalSocPct": -116,
+        "chargeMinutes": 95,
+        "driveMinutes": 733,
+        "stopDetail": [
+          {
+            "km": 125.2,
+            "station": "Rest Area Mumbai - Vadodara Expressway",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 14,
+            "depart": 100,
+            "trusted": true,
+            "backups": 1
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 125. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 2,
+        "nights": 2,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 125.2,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Rest Area Mumbai - Vadodara Expressway",
+              "km": 125.2,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 125.2,
+            "toKm": 353.6,
+            "feasible": false,
+            "stops": 0,
+            "gapAtKm": 125.2,
+            "overnight": {
+              "station": "Tata.Ev Vapi",
+              "km": 353.6,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          }
+        ],
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 2,
+        "nights": 2,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 125.2,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Rest Area Mumbai - Vadodara Expressway",
+              "km": 125.2,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 125.2,
+            "toKm": 353.6,
+            "feasible": false,
+            "stops": 0,
+            "gapAtKm": 125.2,
+            "overnight": {
+              "station": "Tata.Ev Vapi",
+              "km": 353.6,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          }
+        ],
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 1
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "hyderabad-bengaluru",
+      "name": "Hyderabad - Bengaluru",
+      "points": [
+        {
+          "name": "Hyderabad",
+          "lat": 17.385,
+          "lng": 78.4867
+        },
+        {
+          "name": "Bengaluru",
+          "lat": 12.9716,
+          "lng": 77.5946
+        }
+      ],
+      "car": "tata-nexon-ev-45",
+      "batteryKwh": 45,
+      "routeKm": 569.6,
+      "routeDriveHours": 14.9,
+      "chargers": {
+        "within3km": 50,
+        "within3kmTrusted": 36,
+        "within8km": 93,
+        "within8kmTrusted": 64,
+        "within8kmDc": 69,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 3,
+            "trusted": 2
+          },
+          "100": {
+            "all": 0,
+            "trusted": 0
+          },
+          "200": {
+            "all": 1,
+            "trusted": 1
+          },
+          "300": {
+            "all": 1,
+            "trusted": 1
+          },
+          "400": {
+            "all": 2,
+            "trusted": 2
+          },
+          "500": {
+            "all": 86,
+            "trusted": 58
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 152.5,
+        "fromKm": 316.4,
+        "toKm": 468.8
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 152.5,
+        "fromKm": 316.4,
+        "toKm": 468.8
+      },
+      "strictPlan": {
+        "feasible": true,
+        "stops": 3,
+        "gapAtKm": null,
+        "arrivalSocPct": 23,
+        "chargeMinutes": 100,
+        "driveMinutes": 894,
+        "stopDetail": [
+          {
+            "km": 203.6,
+            "station": "NH44",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 11,
+            "depart": 80,
+            "trusted": true,
+            "backups": 2
+          },
+          {
+            "km": 316.4,
+            "station": "Hotel Bluemoon",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 42,
+            "depart": 80,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 490.4,
+            "station": "Jio-BP Pulse",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 21,
+            "depart": 50,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "loosePlan": {
+        "feasible": true,
+        "stops": 3,
+        "gapAtKm": null,
+        "arrivalSocPct": 23,
+        "chargeMinutes": 100,
+        "driveMinutes": 894,
+        "stopDetail": [
+          {
+            "km": 203.6,
+            "station": "NH44",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 11,
+            "depart": 80,
+            "trusted": true,
+            "backups": 2
+          },
+          {
+            "km": 316.4,
+            "station": "Hotel Bluemoon",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 42,
+            "depart": 80,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 490.4,
+            "station": "Jio-BP Pulse",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 21,
+            "depart": 50,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "journey8hStrict": {
+        "feasible": true,
+        "days": 3,
+        "nights": 2,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 203.6,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "NH44",
+              "km": 203.6,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 203.6,
+            "toKm": 316.4,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Hotel Bluemoon",
+              "km": 316.4,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 316.4,
+            "toKm": 569.6,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "journey8hLoose": {
+        "feasible": true,
+        "days": 3,
+        "nights": 2,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 203.6,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "NH44",
+              "km": 203.6,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 203.6,
+            "toKm": 316.4,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Hotel Bluemoon",
+              "km": 316.4,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 316.4,
+            "toKm": 569.6,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "freePlanSingleDay": {
+        "feasible": true,
+        "days": 1,
+        "stops": 3
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "hyderabad-bengaluru",
+      "name": "Hyderabad - Bengaluru",
+      "points": [
+        {
+          "name": "Hyderabad",
+          "lat": 17.385,
+          "lng": 78.4867
+        },
+        {
+          "name": "Bengaluru",
+          "lat": 12.9716,
+          "lng": 77.5946
+        }
+      ],
+      "car": "tata-tiago-ev-24",
+      "batteryKwh": 24,
+      "routeKm": 569.6,
+      "routeDriveHours": 14.9,
+      "chargers": {
+        "within3km": 50,
+        "within3kmTrusted": 36,
+        "within8km": 93,
+        "within8kmTrusted": 64,
+        "within8kmDc": 69,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 3,
+            "trusted": 2
+          },
+          "100": {
+            "all": 0,
+            "trusted": 0
+          },
+          "200": {
+            "all": 1,
+            "trusted": 1
+          },
+          "300": {
+            "all": 1,
+            "trusted": 1
+          },
+          "400": {
+            "all": 2,
+            "trusted": 2
+          },
+          "500": {
+            "all": 86,
+            "trusted": 58
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 152.5,
+        "fromKm": 316.4,
+        "toKm": 468.8
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 152.5,
+        "fromKm": 316.4,
+        "toKm": 468.8
+      },
+      "strictPlan": {
+        "feasible": true,
+        "stops": 4,
+        "gapAtKm": null,
+        "arrivalSocPct": 22,
+        "chargeMinutes": 235,
+        "driveMinutes": 894,
+        "stopDetail": [
+          {
+            "km": 78.6,
+            "station": "Driftnatuon Food Court NH44",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 38,
+            "depart": 80,
+            "trusted": true,
+            "backups": 1
+          },
+          {
+            "km": 203.6,
+            "station": "NH44",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 14,
+            "depart": 80,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 316.4,
+            "station": "Hotel Bluemoon",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 20,
+            "depart": 100,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 468.8,
+            "station": "Samara's Veg",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 19,
+            "depart": 75,
+            "trusted": true,
+            "backups": 1
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "loosePlan": {
+        "feasible": true,
+        "stops": 4,
+        "gapAtKm": null,
+        "arrivalSocPct": 22,
+        "chargeMinutes": 235,
+        "driveMinutes": 894,
+        "stopDetail": [
+          {
+            "km": 78.6,
+            "station": "Driftnatuon Food Court NH44",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 38,
+            "depart": 80,
+            "trusted": true,
+            "backups": 1
+          },
+          {
+            "km": 203.6,
+            "station": "NH44",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 14,
+            "depart": 80,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 316.4,
+            "station": "Hotel Bluemoon",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 20,
+            "depart": 100,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 468.8,
+            "station": "Samara's Veg",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 19,
+            "depart": 75,
+            "trusted": true,
+            "backups": 1
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "journey8hStrict": {
+        "feasible": true,
+        "days": 3,
+        "nights": 2,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 2,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 203.6,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "NH44",
+              "km": 203.6,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 203.6,
+            "toKm": 316.4,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Hotel Bluemoon",
+              "km": 316.4,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 316.4,
+            "toKm": 569.6,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "journey8hLoose": {
+        "feasible": true,
+        "days": 3,
+        "nights": 2,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 2,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 203.6,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "NH44",
+              "km": 203.6,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 203.6,
+            "toKm": 316.4,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Hotel Bluemoon",
+              "km": 316.4,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 316.4,
+            "toKm": 569.6,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "freePlanSingleDay": {
+        "feasible": true,
+        "days": 1,
+        "stops": 4
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "delhi-agra-lucknow",
+      "name": "Delhi - Agra - Lucknow",
+      "points": [
+        {
+          "name": "Delhi",
+          "lat": 28.6139,
+          "lng": 77.209
+        },
+        {
+          "name": "Agra",
+          "lat": 27.1767,
+          "lng": 78.0081
+        },
+        {
+          "name": "Lucknow",
+          "lat": 26.8467,
+          "lng": 80.9462
+        }
+      ],
+      "car": "tata-nexon-ev-45",
+      "batteryKwh": 45,
+      "routeKm": 554,
+      "routeDriveHours": 9.3,
+      "chargers": {
+        "within3km": 78,
+        "within3kmTrusted": 8,
+        "within8km": 153,
+        "within8kmTrusted": 17,
+        "within8kmDc": 29,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 141,
+            "trusted": 12
+          },
+          "100": {
+            "all": 5,
+            "trusted": 2
+          },
+          "200": {
+            "all": 3,
+            "trusted": 1
+          },
+          "300": {
+            "all": 0,
+            "trusted": 0
+          },
+          "400": {
+            "all": 0,
+            "trusted": 0
+          },
+          "500": {
+            "all": 4,
+            "trusted": 2
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 311.6,
+        "fromKm": 231.7,
+        "toKm": 543.3
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 311.6,
+        "fromKm": 231.7,
+        "toKm": 543.3
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 2,
+        "gapAtKm": 232,
+        "arrivalSocPct": -9,
+        "chargeMinutes": 88,
+        "driveMinutes": 560,
+        "stopDetail": [
+          {
+            "km": 148.9,
+            "station": "Tata Power Yamuna Expressway Mathura Exit LHS",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 30,
+            "depart": 80,
+            "trusted": true,
+            "backups": 2
+          },
+          {
+            "km": 231.7,
+            "station": "Statiq Jaypee Agra",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 52,
+            "depart": 100,
+            "trusted": true,
+            "backups": 0
+          }
+        ],
+        "extras": 1,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 232. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 3,
+        "gapAtKm": 259,
+        "arrivalSocPct": 0,
+        "chargeMinutes": 198,
+        "driveMinutes": 560,
+        "stopDetail": [
+          {
+            "km": 148.9,
+            "station": "Tata Power Yamuna Expressway Mathura Exit LHS",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 30,
+            "depart": 80,
+            "trusted": true,
+            "backups": 2
+          },
+          {
+            "km": 231.7,
+            "station": "Statiq Jaypee Agra",
+            "mode": "dc",
+            "powerKw": 60,
+            "arrive": 52,
+            "depart": 80,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 258.7,
+            "station": "Adani Total Energies charging station",
+            "mode": "ac",
+            "powerKw": 7,
+            "arrive": 71,
+            "depart": 100,
+            "trusted": false,
+            "backups": 0
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 259. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Some stops have little recent data and no backup nearby. Check recent reports or call the operator before relying on them."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 2,
+        "nights": 1,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 231.7,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Statiq Jaypee Agra",
+              "km": 231.7,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 231.7,
+            "toKm": 554,
+            "feasible": false,
+            "stops": 0,
+            "gapAtKm": 231.7,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 2,
+        "nights": 1,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 258.7,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Adani Total Energies charging station",
+              "km": 258.7,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 258.7,
+            "toKm": 554,
+            "feasible": false,
+            "stops": 0,
+            "gapAtKm": 258.7,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 2
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "delhi-agra-lucknow",
+      "name": "Delhi - Agra - Lucknow",
+      "points": [
+        {
+          "name": "Delhi",
+          "lat": 28.6139,
+          "lng": 77.209
+        },
+        {
+          "name": "Agra",
+          "lat": 27.1767,
+          "lng": 78.0081
+        },
+        {
+          "name": "Lucknow",
+          "lat": 26.8467,
+          "lng": 80.9462
+        }
+      ],
+      "car": "tata-tiago-ev-24",
+      "batteryKwh": 24,
+      "routeKm": 554,
+      "routeDriveHours": 9.3,
+      "chargers": {
+        "within3km": 78,
+        "within3kmTrusted": 8,
+        "within8km": 153,
+        "within8kmTrusted": 17,
+        "within8kmDc": 29,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 141,
+            "trusted": 12
+          },
+          "100": {
+            "all": 5,
+            "trusted": 2
+          },
+          "200": {
+            "all": 3,
+            "trusted": 1
+          },
+          "300": {
+            "all": 0,
+            "trusted": 0
+          },
+          "400": {
+            "all": 0,
+            "trusted": 0
+          },
+          "500": {
+            "all": 4,
+            "trusted": 2
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 311.6,
+        "fromKm": 231.7,
+        "toKm": 543.3
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 311.6,
+        "fromKm": 231.7,
+        "toKm": 543.3
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 3,
+        "gapAtKm": 232,
+        "arrivalSocPct": -70,
+        "chargeMinutes": 152,
+        "driveMinutes": 560,
+        "stopDetail": [
+          {
+            "km": 40.7,
+            "station": "Savoy Suites Charging Station",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 57,
+            "depart": 80,
+            "trusted": true,
+            "backups": 2
+          },
+          {
+            "km": 148.9,
+            "station": "Tata Power Yamuna Expressway Mathura Exit LHS",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 21,
+            "depart": 80,
+            "trusted": true,
+            "backups": 1
+          },
+          {
+            "km": 231.7,
+            "station": "Statiq Jaypee Agra",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 36,
+            "depart": 100,
+            "trusted": true,
+            "backups": 0
+          }
+        ],
+        "extras": 2,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 232. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 4,
+        "gapAtKm": 259,
+        "arrivalSocPct": -56,
+        "chargeMinutes": 202,
+        "driveMinutes": 560,
+        "stopDetail": [
+          {
+            "km": 41,
+            "station": "Mansavi SuperCharge Point",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 58,
+            "depart": 80,
+            "trusted": false,
+            "backups": 2
+          },
+          {
+            "km": 148.9,
+            "station": "Tata Power Yamuna Expressway Mathura Exit LHS",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 22,
+            "depart": 80,
+            "trusted": true,
+            "backups": 1
+          },
+          {
+            "km": 231.7,
+            "station": "Statiq Jaypee Agra",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 36,
+            "depart": 80,
+            "trusted": true,
+            "backups": 0
+          },
+          {
+            "km": 258.7,
+            "station": "Adani Total Energies charging station",
+            "mode": "ac",
+            "powerKw": 7,
+            "arrive": 66,
+            "depart": 100,
+            "trusted": false,
+            "backups": 0
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 259. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Some stops have little or poor recent data. Keep the backup chargers in mind."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 2,
+        "nights": 1,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 2,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 231.7,
+            "feasible": true,
+            "stops": 2,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Statiq Jaypee Agra",
+              "km": 231.7,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 231.7,
+            "toKm": 554,
+            "feasible": false,
+            "stops": 0,
+            "gapAtKm": 231.7,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 2,
+        "nights": 1,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 2,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 258.7,
+            "feasible": true,
+            "stops": 2,
+            "gapAtKm": null,
+            "overnight": {
+              "station": "Adani Total Energies charging station",
+              "km": 258.7,
+              "stays": 0,
+              "food": 0,
+              "morningSocPct": 100
+            }
+          },
+          {
+            "fromKm": 258.7,
+            "toKm": 554,
+            "feasible": false,
+            "stops": 0,
+            "gapAtKm": 258.7,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "Some stops have little or poor recent data. Keep the backup chargers in mind.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 3
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "chennai-pondicherry",
+      "name": "Chennai - Puducherry",
+      "points": [
+        {
+          "name": "Chennai",
+          "lat": 13.0827,
+          "lng": 80.2707
+        },
+        {
+          "name": "Puducherry",
+          "lat": 11.9416,
+          "lng": 79.8083
+        }
+      ],
+      "car": "tata-nexon-ev-45",
+      "batteryKwh": 45,
+      "routeKm": 152.5,
+      "routeDriveHours": 4.6,
+      "chargers": {
+        "within3km": 15,
+        "within3kmTrusted": 4,
+        "within8km": 22,
+        "within8kmTrusted": 4,
+        "within8kmDc": 9,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 17,
+            "trusted": 4
+          },
+          "100": {
+            "all": 5,
+            "trusted": 0
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 75.3,
+        "fromKm": 60.7,
+        "toKm": 136
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 91.8,
+        "fromKm": 60.7,
+        "toKm": 152.5
+      },
+      "strictPlan": {
+        "feasible": true,
+        "stops": 0,
+        "gapAtKm": null,
+        "arrivalSocPct": 28,
+        "chargeMinutes": 0,
+        "driveMinutes": 277,
+        "stopDetail": [],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "loosePlan": {
+        "feasible": true,
+        "stops": 0,
+        "gapAtKm": null,
+        "arrivalSocPct": 28,
+        "chargeMinutes": 0,
+        "driveMinutes": 277,
+        "stopDetail": [],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "journey8hStrict": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 152.5,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "journey8hLoose": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 152.5,
+            "feasible": true,
+            "stops": 0,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "freePlanSingleDay": {
+        "feasible": true,
+        "days": 1,
+        "stops": 0
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "chennai-pondicherry",
+      "name": "Chennai - Puducherry",
+      "points": [
+        {
+          "name": "Chennai",
+          "lat": 13.0827,
+          "lng": 80.2707
+        },
+        {
+          "name": "Puducherry",
+          "lat": 11.9416,
+          "lng": 79.8083
+        }
+      ],
+      "car": "tata-tiago-ev-24",
+      "batteryKwh": 24,
+      "routeKm": 152.5,
+      "routeDriveHours": 4.6,
+      "chargers": {
+        "within3km": 15,
+        "within3kmTrusted": 4,
+        "within8km": 22,
+        "within8kmTrusted": 4,
+        "within8kmDc": 9,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 17,
+            "trusted": 4
+          },
+          "100": {
+            "all": 5,
+            "trusted": 0
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 75.3,
+        "fromKm": 60.7,
+        "toKm": 136
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 91.8,
+        "fromKm": 60.7,
+        "toKm": 152.5
+      },
+      "strictPlan": {
+        "feasible": true,
+        "stops": 1,
+        "gapAtKm": null,
+        "arrivalSocPct": 21,
+        "chargeMinutes": 23,
+        "driveMinutes": 277,
+        "stopDetail": [
+          {
+            "km": 60.7,
+            "station": "Four Points By Sheraton",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 48,
+            "depart": 70,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "loosePlan": {
+        "feasible": true,
+        "stops": 1,
+        "gapAtKm": null,
+        "arrivalSocPct": 21,
+        "chargeMinutes": 23,
+        "driveMinutes": 277,
+        "stopDetail": [
+          {
+            "km": 60.7,
+            "station": "Four Points By Sheraton",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 48,
+            "depart": 70,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": []
+      },
+      "journey8hStrict": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 152.5,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "journey8hLoose": {
+        "feasible": true,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 152.5,
+            "feasible": true,
+            "stops": 1,
+            "gapAtKm": null,
+            "overnight": null
+          }
+        ],
+        "warnings": []
+      },
+      "freePlanSingleDay": {
+        "feasible": true,
+        "days": 1,
+        "stops": 1
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "nadiad-hyderabad",
+      "name": "Nadiad - Hyderabad",
+      "points": [
+        {
+          "name": "Nadiad",
+          "lat": 22.69,
+          "lng": 72.86
+        },
+        {
+          "name": "Hyderabad",
+          "lat": 17.35,
+          "lng": 78.47
+        }
+      ],
+      "car": "tata-nexon-ev-45",
+      "batteryKwh": 45,
+      "routeKm": 1196.1,
+      "routeDriveHours": 27.5,
+      "chargers": {
+        "within3km": 3,
+        "within3kmTrusted": 2,
+        "within8km": 8,
+        "within8kmTrusted": 3,
+        "within8kmDc": 4,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 4,
+            "trusted": 3
+          },
+          "100": {
+            "all": 0,
+            "trusted": 0
+          },
+          "200": {
+            "all": 0,
+            "trusted": 0
+          },
+          "300": {
+            "all": 0,
+            "trusted": 0
+          },
+          "400": {
+            "all": 0,
+            "trusted": 0
+          },
+          "500": {
+            "all": 3,
+            "trusted": 0
+          },
+          "600": {
+            "all": 0,
+            "trusted": 0
+          },
+          "700": {
+            "all": 0,
+            "trusted": 0
+          },
+          "800": {
+            "all": 0,
+            "trusted": 0
+          },
+          "900": {
+            "all": 0,
+            "trusted": 0
+          },
+          "1000": {
+            "all": 0,
+            "trusted": 0
+          },
+          "1100": {
+            "all": 1,
+            "trusted": 0
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 1118.5,
+        "fromKm": 77.6,
+        "toKm": 1196.1
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 1118.5,
+        "fromKm": 77.6,
+        "toKm": 1196.1
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 78,
+        "arrivalSocPct": -278,
+        "chargeMinutes": 95,
+        "driveMinutes": 1652,
+        "stopDetail": [
+          {
+            "km": 77.6,
+            "station": "Rest Area Mumbai - Vadodara Expressway",
+            "mode": "dc",
+            "powerKw": 30,
+            "arrive": 54,
+            "depart": 100,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 78. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 78,
+        "arrivalSocPct": -278,
+        "chargeMinutes": 95,
+        "driveMinutes": 1652,
+        "stopDetail": [
+          {
+            "km": 77.6,
+            "station": "Rest Area Mumbai - Vadodara Expressway",
+            "mode": "dc",
+            "powerKw": 30,
+            "arrive": 54,
+            "depart": 100,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 78. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 1196.1,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 78,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 78. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 1196.1,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 78,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 78. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 1
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "nadiad-hyderabad",
+      "name": "Nadiad - Hyderabad",
+      "points": [
+        {
+          "name": "Nadiad",
+          "lat": 22.69,
+          "lng": 72.86
+        },
+        {
+          "name": "Hyderabad",
+          "lat": 17.35,
+          "lng": 78.47
+        }
+      ],
+      "car": "tata-tiago-ev-24",
+      "batteryKwh": 24,
+      "routeKm": 1196.1,
+      "routeDriveHours": 27.5,
+      "chargers": {
+        "within3km": 3,
+        "within3kmTrusted": 2,
+        "within8km": 8,
+        "within8kmTrusted": 3,
+        "within8kmDc": 4,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 4,
+            "trusted": 3
+          },
+          "100": {
+            "all": 0,
+            "trusted": 0
+          },
+          "200": {
+            "all": 0,
+            "trusted": 0
+          },
+          "300": {
+            "all": 0,
+            "trusted": 0
+          },
+          "400": {
+            "all": 0,
+            "trusted": 0
+          },
+          "500": {
+            "all": 3,
+            "trusted": 0
+          },
+          "600": {
+            "all": 0,
+            "trusted": 0
+          },
+          "700": {
+            "all": 0,
+            "trusted": 0
+          },
+          "800": {
+            "all": 0,
+            "trusted": 0
+          },
+          "900": {
+            "all": 0,
+            "trusted": 0
+          },
+          "1000": {
+            "all": 0,
+            "trusted": 0
+          },
+          "1100": {
+            "all": 1,
+            "trusted": 0
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 1118.5,
+        "fromKm": 77.6,
+        "toKm": 1196.1
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 1118.5,
+        "fromKm": 77.6,
+        "toKm": 1196.1
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 78,
+        "arrivalSocPct": -491,
+        "chargeMinutes": 74,
+        "driveMinutes": 1652,
+        "stopDetail": [
+          {
+            "km": 77.6,
+            "station": "Rest Area Mumbai - Vadodara Expressway",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 39,
+            "depart": 100,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 78. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 78,
+        "arrivalSocPct": -491,
+        "chargeMinutes": 74,
+        "driveMinutes": 1652,
+        "stopDetail": [
+          {
+            "km": 77.6,
+            "station": "Rest Area Mumbai - Vadodara Expressway",
+            "mode": "dc",
+            "powerKw": 25,
+            "arrive": 39,
+            "depart": 100,
+            "trusted": true,
+            "backups": 2
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 78. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 1196.1,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 78,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 78. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 1196.1,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 78,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 78. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 1
+      },
+      "staysNearDestination15km": 6
+    },
+    {
+      "route": "kolkata-bhubaneswar",
+      "name": "Kolkata - Bhubaneswar",
+      "points": [
+        {
+          "name": "Kolkata",
+          "lat": 22.5726,
+          "lng": 88.3639
+        },
+        {
+          "name": "Bhubaneswar",
+          "lat": 20.2961,
+          "lng": 85.8245
+        }
+      ],
+      "car": "tata-nexon-ev-45",
+      "batteryKwh": 45,
+      "routeKm": 438.9,
+      "routeDriveHours": 11.4,
+      "chargers": {
+        "within3km": 2,
+        "within3kmTrusted": 0,
+        "within8km": 8,
+        "within8kmTrusted": 1,
+        "within8kmDc": 1,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 8,
+            "trusted": 1
+          },
+          "100": {
+            "all": 0,
+            "trusted": 0
+          },
+          "200": {
+            "all": 0,
+            "trusted": 0
+          },
+          "300": {
+            "all": 0,
+            "trusted": 0
+          },
+          "400": {
+            "all": 0,
+            "trusted": 0
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 438.4,
+        "fromKm": 0.5,
+        "toKm": 438.9
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 438.4,
+        "fromKm": 0.5,
+        "toKm": 438.9
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 0,
+        "gapAtKm": 0,
+        "arrivalSocPct": -68,
+        "chargeMinutes": 0,
+        "driveMinutes": 682,
+        "stopDetail": [],
+        "extras": 1,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 3,
+        "arrivalSocPct": -47,
+        "chargeMinutes": 103,
+        "driveMinutes": 682,
+        "stopDetail": [
+          {
+            "km": 3.4,
+            "station": "Electric Vehicle Charging Station",
+            "mode": "ac",
+            "powerKw": 7,
+            "arrive": 79,
+            "depart": 100,
+            "trusted": false,
+            "backups": 0
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 3. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km.",
+          "Some stops have little recent data and no backup nearby. Check recent reports or call the operator before relying on them."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 438.9,
+            "feasible": false,
+            "stops": 0,
+            "gapAtKm": 0,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 438.9,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 3,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 3. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km.",
+          "Some stops have little recent data and no backup nearby. Check recent reports or call the operator before relying on them."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 0
+      },
+      "staysNearDestination15km": 0
+    },
+    {
+      "route": "kolkata-bhubaneswar",
+      "name": "Kolkata - Bhubaneswar",
+      "points": [
+        {
+          "name": "Kolkata",
+          "lat": 22.5726,
+          "lng": 88.3639
+        },
+        {
+          "name": "Bhubaneswar",
+          "lat": 20.2961,
+          "lng": 85.8245
+        }
+      ],
+      "car": "tata-tiago-ev-24",
+      "batteryKwh": 24,
+      "routeKm": 438.9,
+      "routeDriveHours": 11.4,
+      "chargers": {
+        "within3km": 2,
+        "within3kmTrusted": 0,
+        "within8km": 8,
+        "within8kmTrusted": 1,
+        "within8kmDc": 1,
+        "per100kmWithin8km": {
+          "0": {
+            "all": 8,
+            "trusted": 1
+          },
+          "100": {
+            "all": 0,
+            "trusted": 0
+          },
+          "200": {
+            "all": 0,
+            "trusted": 0
+          },
+          "300": {
+            "all": 0,
+            "trusted": 0
+          },
+          "400": {
+            "all": 0,
+            "trusted": 0
+          }
+        }
+      },
+      "largestGapUsable8km": {
+        "gapKm": 438.4,
+        "fromKm": 0.5,
+        "toKm": 438.9
+      },
+      "largestGapTrusted8km": {
+        "gapKm": 438.4,
+        "fromKm": 0.5,
+        "toKm": 438.9
+      },
+      "strictPlan": {
+        "feasible": false,
+        "stops": 0,
+        "gapAtKm": 0,
+        "arrivalSocPct": -152,
+        "chargeMinutes": 0,
+        "driveMinutes": 682,
+        "stopDetail": [],
+        "extras": 1,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km."
+        ]
+      },
+      "loosePlan": {
+        "feasible": false,
+        "stops": 1,
+        "gapAtKm": 3,
+        "arrivalSocPct": -130,
+        "chargeMinutes": 59,
+        "driveMinutes": 682,
+        "stopDetail": [
+          {
+            "km": 3.4,
+            "station": "Electric Vehicle Charging Station",
+            "mode": "ac",
+            "powerKw": 7,
+            "arrive": 78,
+            "depart": 100,
+            "trusted": false,
+            "backups": 0
+          }
+        ],
+        "extras": 0,
+        "extrasFeasible": false,
+        "warnings": [
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 3. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km.",
+          "Some stops have little recent data and no backup nearby. Check recent reports or call the operator before relying on them."
+        ]
+      },
+      "journey8hStrict": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 0,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 438.9,
+            "feasible": false,
+            "stops": 0,
+            "gapAtKm": 0,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 0. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km."
+        ]
+      },
+      "journey8hLoose": {
+        "feasible": false,
+        "days": 1,
+        "nights": 0,
+        "nightsWithStay": 0,
+        "nightsWithFood": 0,
+        "stopCount": 1,
+        "tooLong": false,
+        "dayDetail": [
+          {
+            "fromKm": 0,
+            "toKm": 438.9,
+            "feasible": false,
+            "stops": 1,
+            "gapAtKm": 3,
+            "overnight": null
+          }
+        ],
+        "warnings": [
+          "No charger near the end of day 1's driving, so that day runs longer than 8 h. Consider a hotel with a 3-pin socket for slow overnight charging.",
+          "Not safe to drive as planned: there's no known compatible charger in reach after km 3. Start with more charge, pick a different route, or add a charger you know on this route.",
+          "Few chargers sit right on this route, so some stops need a detour of a few km.",
+          "Some stops have little recent data and no backup nearby. Check recent reports or call the operator before relying on them."
+        ]
+      },
+      "freePlanSingleDay": {
+        "feasible": false,
+        "days": 1,
+        "stops": 0
+      },
+      "staysNearDestination15km": 0
+    }
+  ]
+}
