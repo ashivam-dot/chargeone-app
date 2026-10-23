@@ -74,10 +74,20 @@ test.describe('charger data you can trust', () => {
   });
 
   test('an old link with a merged osm- or ocm- id still opens the charger, through the alias buckets', async ({ page }) => {
-    const index = (await (await page.request.get('/data/index.json')).json()) as { columns: { id: string[]; c1: string[]; name: string[] } };
+    const index = (await (await page.request.get('/data/index.json')).json()) as {
+      columns: { id: string[]; c1: string[]; name: string[]; vehicleClass: number[]; vehicles: number[] };
+      vehicleClasses: string[];
+    };
     // The index lists each station's own ids, shortened (n123 = osm-n123, bare digits = ocm-<digits>).
     const own = new Set(index.columns.id.map((s) => (/^[nwr]\d+$/.test(s) ? `osm-${s}` : /^\d+$/.test(s) ? `ocm-${s}` : s)));
-    const nameOf = new Map(index.columns.c1.map((c, i) => [`c1_${c}`, index.columns.name[i]]));
+    // Only chargers a car can use: the app leaves out 2-wheeler, 3-wheeler and bus-only ones.
+    const forCar = (i: number) => {
+      const vc = index.vehicleClasses[index.columns.vehicleClass[i]];
+      if (vc !== 'unknown') return vc === 'car' || vc === 'mixed';
+      const v = index.columns.vehicles[i];
+      return v === 0 || (v & 1) === 1;
+    };
+    const nameOf = new Map(index.columns.c1.flatMap((c, i) => (forCar(i) ? [[`c1_${c}`, index.columns.name[i]] as const] : [])));
     const bucket = (await (await page.request.get('/data/aliases/0.json')).json()) as { aliases: Record<string, string> };
     for (const prefix of ['osm-', 'ocm-']) {
       const found = Object.entries(bucket.aliases).find(([old, c1]) => old.startsWith(prefix) && !own.has(old) && nameOf.get(c1));
