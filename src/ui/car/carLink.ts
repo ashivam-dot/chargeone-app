@@ -113,11 +113,22 @@ export interface DemoOptions {
   scenario?: DemoScenario;
   chargeStops?: DemoChargeStop[];
   speedup?: number;
+  chargeSpeedup?: number;
 }
 
 export async function connectDemo(o: DemoOptions): Promise<void> {
   const { DemoCarSource } = await import('../../vehicle/demoCar.ts');
-  await attach(new DemoCarSource({ vehicle: o.vehicle, route: o.route ?? DEMO_ROUTE, startSocPct: o.startSocPct, scenario: o.scenario, chargeStops: o.chargeStops, speedup: o.speedup ?? 30 }));
+  await attach(
+    new DemoCarSource({
+      vehicle: o.vehicle,
+      route: o.route ?? DEMO_ROUTE,
+      startSocPct: o.startSocPct,
+      scenario: o.scenario,
+      chargeStops: o.chargeStops,
+      speedup: o.speedup ?? 30,
+      chargeSpeedup: o.chargeSpeedup,
+    }),
+  );
 }
 
 export async function connectPhone(vehicle: MyVehicle, startSocPct: number): Promise<void> {

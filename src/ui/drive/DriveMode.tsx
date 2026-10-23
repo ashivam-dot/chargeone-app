@@ -56,6 +56,11 @@ export function planStops(req: DriveRequest): PlanStops {
   return { stops, demo, startSocPct: req.journey.days[0]?.startSocPct ?? 80 };
 }
 
+/** The demo drive runs at this many simulated seconds per second... */
+export const DEMO_SPEEDUP = 60;
+/** ...and charging stops this many times faster again (600×: a 40-minute charge takes 4 s). */
+export const DEMO_CHARGE_BOOST = 10;
+
 const LIVE_TEXT: Record<LiveState, string> = { working: 'Available', in_use: 'Occupied', problem: 'Reported not working', unknown: 'Status unknown' };
 
 function fmtEta(min: number): string {
@@ -122,7 +127,7 @@ export function DriveMode({ request, vehicle, stations, statuses, canDriveLive, 
     try {
       if (useDemo) {
         ownsLink.current = true;
-        await connectDemo({ vehicle, route: request.route, startSocPct: plan.startSocPct, scenario: 'range_drop', chargeStops: plan.demo, speedup: 60 });
+        await connectDemo({ vehicle, route: request.route, startSocPct: plan.startSocPct, scenario: 'range_drop', chargeStops: plan.demo, speedup: DEMO_SPEEDUP, chargeSpeedup: DEMO_CHARGE_BOOST });
       } else if (link.state !== 'connected' || link.kind === 'demo') {
         ownsLink.current = true;
         await connectPhone(vehicle, plan.startSocPct);
@@ -217,7 +222,9 @@ export function DriveMode({ request, vehicle, stations, statuses, canDriveLive, 
             </span>
             <span class="drive-option__text">
               <strong>Watch a demo drive</strong>
-              <span>A simulated car on this route at 60× speed. Partway through, consumption jumps so you can see an alert.</span>
+              <span>
+                A simulated car on this route at {DEMO_SPEEDUP}× speed, with charging stops sped up further. Partway through, consumption jumps so you can see an alert.
+              </span>
             </span>
             <span class="pill pill--demo">Demo</span>
           </button>
@@ -305,7 +312,7 @@ export function DriveMode({ request, vehicle, stations, statuses, canDriveLive, 
           </div>
         </div>
         <div class="drive-top__actions">
-          {demo && <span class="pill pill--demo">Demo · 60×</span>}
+          {demo && <span class="pill pill--demo">{t?.charging ? `Demo · charging ${DEMO_SPEEDUP * DEMO_CHARGE_BOOST}×` : `Demo · ${DEMO_SPEEDUP}×`}</span>}
           <button class="icon-btn icon-btn--glass" onClick={() => setVoiceOn((v) => !v)} aria-label={voiceOn ? 'Mute voice alerts' : 'Turn on voice alerts'} aria-pressed={voiceOn}>
             {voiceOn ? <Volume2 size={18} /> : <VolumeX size={18} />}
           </button>

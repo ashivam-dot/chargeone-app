@@ -100,6 +100,32 @@ describe('DemoCarSource', () => {
     expect(c.step(10).speedKmh).toBe(0);
   });
 
+  it('fast-forwards a charge stop by the charge boost, keeping simulated time true', () => {
+    const stops = [{ alongKm: 150, toPct: 90, powerKw: 50 }];
+    const plain = car({ chargeStops: stops });
+    const boosted = car({ chargeStops: stops });
+    driveTo(plain, 150);
+    driveTo(boosted, 150);
+    plain.step(5);
+    boosted.step(5);
+    let plainSteps = 0;
+    while (plain.reading().charging) {
+      plain.step(30);
+      plainSteps++;
+    }
+    let boostedSteps = 0;
+    let t = boosted.reading();
+    while (t.charging) {
+      t = boosted.step(30, 10);
+      boostedSteps++;
+    }
+    expect(boostedSteps).toBeLessThanOrEqual(Math.ceil(plainSteps / 10) + 1);
+    expect(t.socPct).toBeGreaterThan(89);
+    // The charge took as long in simulated time either way; the step that drives off isn't boosted.
+    expect(Math.abs(t.at - plain.reading().at)).toBeLessThanOrEqual(30_000);
+    expect(boosted.kmDone - 150).toBeLessThan(1);
+  });
+
   it('is deterministic for a seed', () => {
     const a = driveTo(car({ seed: 7 }), 80);
     const b = driveTo(car({ seed: 7 }), 80);
