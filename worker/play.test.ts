@@ -122,6 +122,31 @@ describe('Google Play billing', () => {
     expect((await api('GET', '/api/me')).body.plan).toBe('free');
   });
 
+  it('keeps an admin revoke when the app syncs the same subscription again', async () => {
+    const admin = 'owner-admin-token-0123456789abcdef';
+    const { env, sqlite } = fakeEnv({ PLAY_SERVICE_ACCOUNT_JSON: serviceAccount, ADMIN_TOKEN: admin } as Partial<Env>);
+    const api = client(worker, env);
+    await api('POST', '/api/auth/dev', { email: 'revoked@local.test' });
+    const { body } = await api('GET', '/api/billing/store-account');
+    subs[TOKEN_A] = {
+      subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+      acknowledgementState: 'ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED',
+      externalAccountIdentifiers: { obfuscatedExternalAccountId: body.appAccountToken },
+      lineItems: [{ productId: 'plus', expiryTime: new Date(Date.now() + 20 * 86400_000).toISOString(), offerDetails: { basePlanId: 'monthly' } }],
+    };
+    await api('POST', '/api/billing/play/verify', { productId: 'plus', purchaseToken: TOKEN_A });
+    expect((await api('GET', '/api/me')).body.plan).toBe('plus_monthly');
+
+    const id = await userId(sqlite, 'revoked@local.test');
+    const owner = client(worker, env, { Authorization: `Bearer ${admin}` });
+    expect((await owner('POST', `/api/admin/users/${id}/grant`, { plan: 'plus_yearly', days: 30 })).status).toBe(409);
+    expect((await owner('POST', `/api/admin/users/${id}/revoke`, {})).status).toBe(200);
+    expect((await api('GET', '/api/me')).body.plan).toBe('free');
+
+    await api('POST', '/api/billing/play/sync', {});
+    expect((await api('GET', '/api/me')).body).toMatchObject({ plan: 'free', entitlement: { status: 'revoked' } });
+  });
+
   it('grants a Trip Pass once per purchase', async () => {
     const { api, sqlite } = setup();
     await api('POST', '/api/auth/dev', { email: 'pass@local.test' });

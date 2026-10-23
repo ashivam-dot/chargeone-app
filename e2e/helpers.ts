@@ -49,3 +49,14 @@ export function watchErrors(page: Page): string[] {
   page.on('pageerror', (e) => errors.push(e.message));
   return errors;
 }
+
+/**
+ * Waits until every time-based animation that will end has ended: entrance fades and slides. Looping
+ * animations and scroll-driven ones (they never "finish") are ignored. Use before measuring boxes or contrast,
+ * which read whatever transform and opacity they catch.
+ */
+export async function animationsSettled(page: Page): Promise<void> {
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => a.playState !== 'running' || !(a.timeline instanceof DocumentTimeline) || a.effect?.getComputedTiming().endTime === Infinity),
+  );
+}

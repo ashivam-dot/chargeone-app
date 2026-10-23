@@ -6,7 +6,7 @@ import { currentPlan } from './entitlements.ts';
 import { isDev, type Env } from './env.ts';
 import { HttpError, claimSlot, indianDayStart, json, num, readJson, releaseSlot, str } from './http.ts';
 import { STATION_ID, recentStatuses } from './reports.ts';
-import { stationIndex, stationsNear, type StationPoint } from './stations.ts';
+import { stationById, stationsNear, type StationPoint } from './stations.ts';
 
 export const DEFAULT_MODEL = '@cf/google/gemma-4-26b-a4b-it';
 export const DEFAULT_FALLBACK_MODEL = '@cf/zai-org/glm-4.7-flash';
@@ -21,7 +21,8 @@ export const PARSES_PER_USER_PER_DAY = 60;
  * about 9 to 14 neurons a run this stays inside the free 10,000-neuron Workers AI allowance.
  */
 export const AGENT_CALLS_PER_DAY = 400;
-const GLOBAL_SLOT = 'agent-global';
+/** The rate_limits key counting model runs across everyone today (read by the admin overview). */
+export const AGENT_GLOBAL_SLOT = 'agent-global';
 const MAX_TOOL_ROUNDS = 2;
 const MAX_TOOL_CALLS_PER_ROUND = 3;
 const MAX_CHARGERS = 8;
@@ -86,7 +87,7 @@ interface RunBudget {
 async function claimAgentCall(env: Env, userSlot: string, perUser: number, limitMessage: string): Promise<RunBudget> {
   const day = indianDayStart();
   if ((await claimSlot(env.DB, userSlot, perUser, day)) === null) throw new HttpError(429, 'agent_limit', limitMessage);
-  if ((await claimSlot(env.DB, GLOBAL_SLOT, AGENT_CALLS_PER_DAY, day)) === null) {
+  if ((await claimSlot(env.DB, AGENT_GLOBAL_SLOT, AGENT_CALLS_PER_DAY, day)) === null) {
     await releaseSlot(env.DB, userSlot, day);
     throw busy();
   }
@@ -96,7 +97,7 @@ async function claimAgentCall(env: Env, userSlot: string, perUser: number, limit
 /** Tool rounds and the fallback model each cost a run, so every run after the first takes a slot. */
 async function takeRun(env: Env, budget: RunBudget): Promise<void> {
   if (budget.runs++ === 0) return;
-  if ((await claimSlot(env.DB, GLOBAL_SLOT, AGENT_CALLS_PER_DAY, indianDayStart())) === null) throw busy();
+  if ((await claimSlot(env.DB, AGENT_GLOBAL_SLOT, AGENT_CALLS_PER_DAY, indianDayStart())) === null) throw busy();
 }
 
 // ---- Model calls ----
@@ -251,7 +252,7 @@ const TOOLS = [
       description: 'Live status of one charger from recent driver reports.',
       parameters: {
         type: 'object',
-        properties: { station_id: { type: 'string', description: 'Charger id from find_chargers, such as osm-n123.' } },
+        properties: { station_id: { type: 'string', description: 'Charger id from find_chargers, such as c1_abcdefghijkl or osm-n123.' } },
         required: ['station_id'],
       },
     },
@@ -299,14 +300,14 @@ class ToolRunner {
         const [found, statuses] = await Promise.all([stationsNear(this.env, at, radius, args.dc_only === true), this.liveStatuses()]);
         return {
           radius_km: radius,
-          chargers: found.slice(0, MAX_CHARGERS).map((s) => describeCharger(s, statuses.get(s.id), now, s.km)),
+          chargers: found.slice(0, MAX_CHARGERS).map((s) => describeCharger(s, statuses.get(s.c1Id) ?? statuses.get(s.id), now, s.km)),
         };
       }
       if (call.name === 'charger_status') {
         const id = str(args, 'station_id', { max: 32, pattern: STATION_ID })!;
-        const [station, statuses] = await Promise.all([stationIndex(this.env).then((m) => m.get(id)), this.liveStatuses()]);
+        const [station, statuses] = await Promise.all([stationById(this.env, id), this.liveStatuses()]);
         if (!station) return { error: 'No charger with this id.' };
-        return describeCharger(station, statuses.get(id), now);
+        return describeCharger(station, statuses.get(station.c1Id) ?? statuses.get(station.id), now);
       }
       return { error: 'Unknown tool.' };
     } catch (err) {

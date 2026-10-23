@@ -5,8 +5,18 @@ export interface Env {
   AI?: Ai;
   ENVIRONMENT: 'production' | 'development';
   GOOGLE_CLIENT_ID: string;
+  /**
+   * Firebase Auth (email and password, phone with a one-time code). The public web config, not
+   * secrets. API key and project id both set = those sign-in options on; either empty = off.
+   */
+  FIREBASE_API_KEY?: string;
+  FIREBASE_PROJECT_ID?: string;
+  FIREBASE_AUTH_DOMAIN?: string;
+  FIREBASE_APP_ID?: string;
   SESSION_SECRET?: string;
   ORS_API_KEY?: string;
+  /** Keyless router when ORS_API_KEY is unset: 'valhalla' (production default), 'osrm-demo' (development only, the default there) or 'off'. */
+  PUBLIC_ROUTER?: 'valhalla' | 'osrm-demo' | 'off';
   RAZORPAY_KEY_ID: string;
   RAZORPAY_KEY_SECRET?: string;
   RAZORPAY_WEBHOOK_SECRET?: string;
@@ -15,7 +25,7 @@ export interface Env {
   /** Business UPI ID that direct UPI payments go to, e.g. chargeone@okaxis. Unset = UPI off. */
   UPI_VPA?: string;
   UPI_PAYEE_NAME?: string;
-  /** Bearer token for the owner's payment tools (scripts/upi-admin.ts). At least 24 characters. */
+  /** The owner's admin console (/admin) and scripts/upi-admin.ts. At least 24 characters. Unset = admin off (503). */
   ADMIN_TOKEN?: string;
   /** Google Play Developer API service account key (JSON). Unset = Play billing off. */
   PLAY_SERVICE_ACCOUNT_JSON?: string;
@@ -34,6 +44,8 @@ export interface Env {
   CASHFREE_SANDBOX?: string;
   AGENT_MODEL?: string;
   AGENT_FALLBACK_MODEL?: string;
+  /** Free Plus weeks one network may start a day (default 20). Raised for local end-to-end runs. */
+  TRIAL_NETWORK_DAILY_LIMIT?: string;
 }
 
 export const isDev = (env: Env) => env.ENVIRONMENT === 'development';

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Capacitor } from '@capacitor/core';
 import { ApiError, api } from '../lib/api.ts';
 import { hdVoiceOn, setHdVoice } from './hd.ts';
-import { listen, pickVoice, speak, speechSupport, stopSpeaking } from './speech.ts';
+import { HD_WAIT_MS, listen, pickVoice, speak, speechSupport, stopSpeaking } from './speech.ts';
 
 const native = vi.hoisted(() => {
   const listeners = new Map<string, (data: never) => void>();
@@ -283,7 +283,7 @@ describe('HD voice', () => {
     tts.mockImplementation(async (text) => clip(text));
     const [a, b] = ['Charge at Zeon Charging in Salem.', 'Then drive on to Chennai.'];
     await speak(`${a} ${b}`, 'en');
-    expect(tts.mock.calls).toEqual([[a, 'en'], [b, 'en']]);
+    expect(tts.mock.calls.map((c) => c.slice(0, 2))).toEqual([[a, 'en'], [b, 'en']]);
     expect(FakeAudio.played).toEqual([`data:audio/mpeg;base64,${btoa(a)}`, `data:audio/mpeg;base64,${btoa(b)}`]);
     expect(vi.mocked(speechSynthesis.speak)).not.toHaveBeenCalled();
   });
@@ -312,6 +312,23 @@ describe('HD voice', () => {
     await speak('Limit reached now.', 'en');
     expect(hdVoiceOn()).toBe(false);
     expect(vi.mocked(speechSynthesis.speak)).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads with the phone voice at once when the server stalls, so a drive alert is never held back', async () => {
+    // A weak signal: the request stays open and nothing arrives.
+    tts.mockImplementation(() => new Promise(() => undefined));
+    vi.useFakeTimers();
+    try {
+      const done = speak('Charge soon. Battery is at 15 percent.', 'en');
+      await vi.advanceTimersByTimeAsync(HD_WAIT_MS + 10);
+      // The phone voice may wait a moment for its voice list.
+      await vi.advanceTimersByTimeAsync(5000);
+      await done;
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(FakeAudio.played).toEqual([]);
+    expect(vi.mocked(speechSynthesis.speak).mock.calls.map((c) => (c[0] as unknown as FakeUtterance).text)).toEqual(['Charge soon. Battery is at 15 percent.']);
   });
 
   it('falls back when the WebView refuses to play audio', async () => {

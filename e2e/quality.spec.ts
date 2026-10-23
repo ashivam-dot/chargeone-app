@@ -1,11 +1,14 @@
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures.ts';
-import { openApp, watchErrors } from './helpers.ts';
+import { animationsSettled, openApp, watchErrors } from './helpers.ts';
 
 const TABS = ['explore', 'trip', 'car', 'copilot', 'you'] as const;
 
 async function seriousViolations(page: Page) {
+  // Let entrance animations finish first: axe measures contrast through whatever opacity it catches, so a
+  // button halfway through fading in (the Plan a trip button's fab-in) reads as grey on grey.
+  await animationsSettled(page);
   const r = await new AxeBuilder({ page }).exclude('.maplibregl-map').withTags(['wcag2a', 'wcag2aa']).analyze();
   return r.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious').map((v) => `${v.id}: ${v.nodes.length} (${v.nodes[0]?.target.join(' ')})`);
 }
@@ -25,6 +28,26 @@ test.describe('every tab', () => {
       expect(bar && bar.y + bar.height <= vp.height + 1, `tab bar inside the viewport on ${tab}`).toBe(true);
     }
     expect(errors).toEqual([]);
+  });
+
+  test('Escape closes a sheet from the moment it appears', async ({ page }) => {
+    await openApp(page);
+    // Press Escape in the same task the sheet is added, before the browser can paint it: the listener
+    // must already be there (a plain useEffect only attached it after the first paint).
+    await page.evaluate(() => {
+      const seen = new MutationObserver(() => {
+        if (!document.querySelector('.sheet')) return;
+        seen.disconnect();
+        (window as unknown as { __sheetSeen: boolean }).__sheetSeen = true;
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      });
+      seen.observe(document.body, { childList: true, subtree: true });
+    });
+    await page.getByRole('button', { name: 'About ChargeOne' }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __sheetSeen?: boolean }).__sheetSeen ?? false)).toBe(true);
+    await expect(page.locator('.sheet')).toHaveCount(0);
+    await page.getByRole('button', { name: 'About ChargeOne' }).click();
+    await expect(page.getByRole('dialog', { name: 'About ChargeOne' })).toBeVisible();
   });
 
   test('has no serious accessibility problems', async ({ page }) => {

@@ -289,13 +289,26 @@ let generation = 0;
 let playing: HTMLAudioElement | null = null;
 const HD_CACHE_MAX = 40;
 const hdCache = new Map<string, Promise<string | null>>();
+/** How long a sentence waits for its HD clip before the phone's own voice reads it: drive alerts can't wait on a weak signal. */
+export const HD_WAIT_MS = 3500;
+/** The clip request itself gives up after this, so a stalled one doesn't sit in the cache. */
+const HD_FETCH_TIMEOUT_MS = 12_000;
+
+/** The clip, or null if it isn't ready in time (it stays cached for the next time the sentence comes up). */
+function inTime(clip: Promise<string | null>, ms = HD_WAIT_MS): Promise<string | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  return Promise.race([clip, late]).finally(() => clearTimeout(timer));
+}
 
 /** One sentence from the HD voice as a data: URL, or null when the server can't read it now. */
 function hdClip(sentence: string, lang: AgentLang): Promise<string | null> {
   const key = `${lang}\n${sentence}`;
   const cached = hdCache.get(key);
   if (cached) return cached;
-  const clip = api.voiceTts(sentence, lang).then(
+  const clip = api.voiceTts(sentence, lang, HD_FETCH_TIMEOUT_MS).then(
     (r) => `data:${r.mime};base64,${r.audio}`,
     (err: unknown) => {
       hdCache.delete(key);
@@ -329,7 +342,7 @@ function playClip(url: string): Promise<boolean> {
 async function speakHd(parts: string[], lang: AgentLang, mine: number): Promise<number> {
   let next = hdClip(parts[0], lang);
   for (let i = 0; i < parts.length; i++) {
-    const url = await next;
+    const url = await inTime(next);
     if (mine !== generation) return parts.length;
     if (!url) return i;
     if (i + 1 < parts.length) next = hdClip(parts[i + 1], lang);

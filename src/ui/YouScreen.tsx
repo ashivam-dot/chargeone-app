@@ -1,9 +1,10 @@
 import { CarFront, ChevronRight, Info, LogIn, MessageSquareHeart, Moon, Sparkles, Sun, Tag } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { api, type Me } from '../lib/api.ts';
+import { freshFirebaseToken } from '../lib/firebaseSession.ts';
 import { BASIC, FEATURE_ROWS, PLANS, TRIAL_DAYS, isPlus } from '../shared/plans.ts';
 import type { MyVehicle } from '../shared/vehicles.ts';
-import { PerkItem } from './Plans.tsx';
+import { PerkItem } from './PerkItem.tsx';
 import { Page } from './shell/Page.tsx';
 import './screens.css';
 
@@ -15,6 +16,12 @@ interface Props {
   onChanged: () => void;
   onSignedOut: () => void;
   onSignIn: () => void;
+  /** Opens "choose a username" for a signed-in account that has none. */
+  onSetUsername?: () => void;
+  /** Opens "Sign-in methods": add Google, remove a method. */
+  onSignInMethods?: () => void;
+  /** Sign-in works on this server; the trial and free account are only offered then. */
+  signInReady: boolean;
   onPlans: () => void;
   onGarage: () => void;
   onAbout: () => void;
@@ -76,7 +83,9 @@ export function YouScreen(p: Props) {
   const e = me?.entitlement;
   const onTrial = e?.source === 'trial' && Boolean(me?.trial?.endsAt);
   const subscribed = e?.source === 'razorpay' && e.status === 'active' && me !== null && isPlus(me.plan);
-  const trialOpen = !onTrial && (me?.trial?.eligible ?? !signedIn) && !(me && isPlus(me.plan));
+  /** Plus was ended by ChargeOne, but the Razorpay subscription renews until it is cancelled. */
+  const revokedRenewing = e?.source === 'razorpay' && e.status === 'revoked';
+  const trialOpen = !onTrial && (me?.trial?.eligible ?? (!signedIn && p.signInReady)) && !(me && isPlus(me.plan));
 
   const act = async (label: string, fn: () => Promise<unknown>, after: () => void) => {
     setBusy(label);
@@ -91,7 +100,10 @@ export function YouScreen(p: Props) {
     }
   };
 
-  const name = me?.user?.name ?? me?.user?.email ?? 'Guest';
+  const u = me?.user;
+  const name = u?.name || (u?.username ? `@${u.username}` : null) || u?.email || u?.phone || 'Guest';
+  /** Under the name: how this account signs in, e.g. "@asha · asha@example.com" or "+91•••••••001". */
+  const handle = [u?.username && u.name ? `@${u.username}` : null, u?.email ?? u?.phone].filter(Boolean).join(' · ');
   const tierName = onTrial ? 'Plus trial' : plan ? plan.name : BASIC.name;
 
   return (
@@ -102,7 +114,20 @@ export function YouScreen(p: Props) {
         </span>
         <div class="you__who">
           <strong>{signedIn ? name : 'Using ChargeOne Basic'}</strong>
-          <span class="muted">{signedIn ? me?.user?.email : 'No sign-in needed. Sign in free for more trips.'}</span>
+          <span class="muted" data-testid="you-handle">
+            {signedIn ? handle : p.signInReady ? 'No sign-in needed. Sign in free for more trips.' : 'No sign-in needed. Free accounts are coming soon.'}
+          </span>
+          {/* A username stands in for the email at password sign-in, so only password accounts get one. */}
+          {signedIn && u?.username === null && u.methods?.includes('password') && p.onSetUsername && (
+            <button class="link link--inline small" onClick={p.onSetUsername} data-testid="you-set-username">
+              Choose a username
+            </button>
+          )}
+          {signedIn && p.signInReady && p.onSignInMethods && (
+            <button class="link link--inline small" onClick={p.onSignInMethods} data-testid="you-signin-methods">
+              Sign-in methods
+            </button>
+          )}
         </div>
         {!signedIn && (
           <button class="btn btn--primary" onClick={p.onSignIn} data-testid="you-signin">
@@ -183,6 +208,17 @@ export function YouScreen(p: Props) {
             }}
           >
             {busy === 'cancel' ? 'Cancelling…' : 'Cancel subscription'}
+          </button>
+        )}
+        {revokedRenewing && (
+          <button
+            class="link danger"
+            disabled={busy !== null}
+            onClick={() => {
+              if (confirm('Your Plus was ended. Stop the Razorpay subscription so it is not charged again?')) void act('cancel', api.cancel, p.onChanged);
+            }}
+          >
+            {busy === 'cancel' ? 'Stopping…' : 'Stop Razorpay renewals'}
           </button>
         )}
         {e?.source === 'play' && me !== null && isPlus(me.plan) && (
@@ -270,7 +306,7 @@ export function YouScreen(p: Props) {
             disabled={busy !== null}
             onClick={() => {
               if (confirm('Delete your account? Your trips are erased and any subscription is cancelled. Payment records are kept as the law requires.')) {
-                void act('delete', api.deleteAccount, p.onSignedOut);
+                void act('delete', () => api.deleteAccount(freshFirebaseToken()), p.onSignedOut);
               }
             }}
           >

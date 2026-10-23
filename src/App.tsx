@@ -1,6 +1,8 @@
 import { Route } from 'lucide-preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { EMPTY_FILTERS, filterStations, operatorsByCount } from './data/filters.ts';
+import { DEFAULT_FILTERS, filterStations, hiddenBySettings, operatorsByCount, type MapMode } from './data/filters.ts';
+import { loadDataset, loadStationDetail, type DataManifest } from './data/loader.ts';
+import { keepIfSame, statusesByStation, unknownStatusIds } from './data/statusIds.ts';
 import type { Dataset, Station } from './data/model.ts';
 import type { Place, PlacesData } from './data/places.ts';
 import { api, type Config, type Me } from './lib/api.ts';
@@ -8,27 +10,26 @@ import { setHdVoice } from './voice/hd.ts';
 import { loadPlaces } from './lib/places.ts';
 import { clearSavedTrips } from './lib/savedTrips.ts';
 import { isObject, loadJson, removeJson, saveJson } from './lib/storage.ts';
-import { MapView, type FlyTarget, type PlaceMarker, type StopMarker } from './map/MapView.tsx';
+import { MapView, type FlyTarget, type MapViewport, type PlaceMarker, type StopMarker } from './map/MapView.tsx';
 import { PLATFORM } from './native/bridge.ts';
 import { BACK_EVENT, haptic, initNativeShell, onAppResume } from './native/platform.ts';
 import { PLANS, isPlus, type PlanId } from './shared/plans.ts';
 import { liveState, type StationStatus } from './shared/status.ts';
 import type { MyVehicle } from './shared/vehicles.ts';
-import { About } from './ui/About.tsx';
-import { DEFAULT_PAINTS } from './ui/car/carDesigns.ts';
+import { StateCoverage } from './ui/Coverage.tsx';
+import { DEFAULT_PAINTS } from './ui/car/carPaints.ts';
 import { useCarLink } from './ui/car/carLink.ts';
 import type { VoiceTrip } from './ui/copilot/CopilotScreen.tsx';
 import type { CarPosition } from './ui/drive/DriveMode.tsx';
-import { Feedback } from './ui/Feedback.tsx';
 import { FilterBar, type MapFilters } from './ui/FilterBar.tsx';
-import { Garage } from './ui/Garage.tsx';
 import { Onboarding } from './ui/onboarding/Onboarding.tsx';
 import { PlaceInput, type PickedPlace } from './ui/PlaceInput.tsx';
 import { PlaceSheet } from './ui/PlaceSheet.tsx';
-import { Plans, type Paywall } from './ui/Plans.tsx';
+import type { Paywall } from './ui/Plans.tsx';
 import { lazy } from './ui/shell/lazy.tsx';
 import { TabBar, type Tab } from './ui/shell/TabBar.tsx';
-import { SignIn } from './ui/SignIn.tsx';
+import { SignIn, signInReady } from './ui/SignIn.tsx';
+import { forgetFirebaseToken } from './lib/firebaseSession.ts';
 import { StationSheet } from './ui/StationSheet.tsx';
 import { TripPlanner, type DriveRequest, type PlannedTrip, type TripView } from './ui/TripPlanner.tsx';
 import { YouScreen } from './ui/YouScreen.tsx';
@@ -36,8 +37,15 @@ import { YouScreen } from './ui/YouScreen.tsx';
 const CarScreen = lazy(() => import('./ui/car/CarScreen.tsx').then((m) => m.CarScreen));
 const CopilotScreen = lazy(() => import('./ui/copilot/CopilotScreen.tsx').then((m) => m.CopilotScreen));
 const DriveMode = lazy(() => import('./ui/drive/DriveMode.tsx').then((m) => m.DriveMode));
+// Feedback and the garage open on a tap, so they load then: it keeps the start-up bundle in budget.
+const Feedback = lazy(() => import('./ui/Feedback.tsx').then((m) => m.Feedback));
+const Garage = lazy(() => import('./ui/Garage.tsx').then((m) => m.Garage));
+const About = lazy(() => import('./ui/About.tsx').then((m) => m.About));
+const Plans = lazy(() => import('./ui/Plans.tsx').then((m) => m.Plans));
+/** Alias buckets, fetched only for an id the index doesn't list (src/data/aliasLookup.ts). */
+const resolveAlias = (id: string) => import('./data/aliasLookup.ts').then((m) => m.resolveAlias(id));
 
-type Overlay = 'plans' | 'signin' | 'about' | 'garage' | null;
+type Overlay = 'plans' | 'signin' | 'username' | 'methods' | 'about' | 'garage' | null;
 
 const STATUS_POLL_MS = 60_000;
 /** Must match the side panel width plus margin in styles.css (min-width: 820px). */
@@ -49,12 +57,16 @@ const NO_ALTS: [number, number][][] = [];
 const TOAST_MS = 3800;
 /** Ask how the app is going once, after this many planned trips. */
 const FEEDBACK_AFTER_PLANS = 2;
+const CHARGER_CREDITS = ['Chargers © OpenStreetMap contributors (ODbL)', 'Contains data from Open Charge Map contributors (CC BY 4.0)'];
 const readViewport = () => ({ height: window.innerHeight, desktop: window.innerWidth >= 820 });
 const isVehicle = (v: unknown): v is MyVehicle => isObject(v) && typeof v.modelId === 'string' && typeof v.batteryKwh === 'number';
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
+const isMode = (v: unknown): v is MapMode => v === 'car' || v === '2w' || v === 'all';
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 /** Any solid colour: each model has its own official paints, and number lookup brings the car's own. */
 const isPaint = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+/** Forgets chargers whose details failed to load, so the next look at one reads it again. */
+const withoutFailed = (m: Map<string, Station | null>) => ([...m.values()].includes(null) ? new Map([...m].filter(([, v]) => v !== null)) : m);
 
 /** The last plan /api/me reported, so a paid user offline (or before /api/me answers) still gets their features. */
 interface CachedPlan {
@@ -81,11 +93,23 @@ interface TripSeed {
 
 export function App() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
+  const [manifest, setManifest] = useState<DataManifest | null>(null);
+  /** Chargers with their shard details read, by id. */
+  const [details, setDetails] = useState<Map<string, Station | null>>(new Map());
+  const [mapView, setMapView] = useState<MapViewport | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [statuses, setStatuses] = useState<Map<string, StationStatus>>(new Map());
+  const [rawStatuses, setRawStatuses] = useState<StationStatus[]>([]);
+  /** Report ids the index doesn't list (old source ids, retired c1 ids) -> the station's c1 id. */
+  const [aliasOf, setAliasOf] = useState<Map<string, string | null>>(() => new Map());
   const [config, setConfig] = useState<Config | null>(null);
   const [me, setMe] = useState<Me | null>(null);
-  const [filters, setFilters] = useState<MapFilters>({ ...EMPTY_FILTERS, workingOnly: false, showFood: false, showStays: false });
+  const [filters, setFilters] = useState<MapFilters>(() => ({
+    ...DEFAULT_FILTERS,
+    mode: loadJson<MapMode>('map-mode', 'car', isMode),
+    workingOnly: false,
+    showFood: false,
+    showStays: false,
+  }));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [places, setPlaces] = useState<PlacesData | null>(null);
   const [placesLoading, setPlacesLoading] = useState(false);
@@ -117,6 +141,9 @@ export function App() {
     const q = new URLSearchParams(location.search);
     return !loadJson('welcomed', false, isBool) && !q.has('s') && !q.has('p');
   });
+  // The map waits until the full-screen welcome is closed: it can't be seen behind it, and on a slow phone its
+  // first seconds of style, tile and shader set-up made the welcome's buttons lag. Once shown it stays mounted.
+  const mapShown = useRef(!onboard);
   const [viewport, setViewport] = useState(readViewport);
   /** A trial the driver asked for before signing in or adding a car; started once both are done. */
   const trialWanted = useRef(false);
@@ -127,7 +154,7 @@ export function App() {
   // Fetch the other screens once the map is up, so they open instantly and still open offline.
   useEffect(() => {
     if (!dataset) return;
-    const t = setTimeout(() => [CarScreen, CopilotScreen, DriveMode].forEach((c) => c.preload()), 2000);
+    const t = setTimeout(() => [CarScreen, CopilotScreen, DriveMode, SignIn].forEach((c) => c.preload()), 2000);
     return () => clearTimeout(t);
   }, [dataset]);
 
@@ -149,22 +176,37 @@ export function App() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  useEffect(() => {
-    fetch('/data/stations.json')
-      .then((r) => {
-        if (!r.ok) throw new Error(String(r.status));
-        return r.json() as Promise<Dataset>;
-      })
-      .then((d) => {
+  const dataLoading = useRef(false);
+  const dataLoaded = useRef(false);
+  /** Reads the charger data; again from Retry or when the connection comes back, if it failed. */
+  const loadData = useCallback(() => {
+    if (dataLoading.current || dataLoaded.current) return;
+    dataLoading.current = true;
+    setLoadError(null);
+    loadDataset()
+      .then(({ dataset: d, manifest: m }) => {
+        dataLoaded.current = true;
         setDataset(d);
+        setManifest(m);
         const id = new URLSearchParams(location.search).get('s');
-        const s = id ? d.stations.find((x) => x.id === id) : undefined;
-        if (s) {
+        const open = (s: (typeof d.stations)[number] | undefined) => {
+          if (!s) return;
           setSelectedId(s.id);
           setFlyTarget({ kind: 'point', lat: s.lat, lng: s.lng, zoom: 14 });
-        }
+        };
+        const s = id ? d.stations.find((x) => x.id === id || x.c1Id === id || x.aliases?.includes(id)) : undefined;
+        if (s) open(s);
+        // The index lists each station's own ids only; a link may use a merged record's or a retired one.
+        else if (id) void resolveAlias(id).then((r) => r && open(d.stations.find((x) => x.c1Id === r.c1Id || x.id === r.legacyId)));
       })
-      .catch(() => setLoadError("Couldn't load the charger map. Check your connection and reload."));
+      .catch(() => setLoadError("Couldn't load the charger map. Check your connection and try again."))
+      .finally(() => {
+        dataLoading.current = false;
+      });
+  }, []);
+
+  useEffect(() => {
+    loadData();
     const placeId = new URLSearchParams(location.search).get('p');
     if (placeId) {
       ensurePlaces().then((d) => {
@@ -209,7 +251,8 @@ export function App() {
   const refreshStatuses = useCallback(() => {
     api
       .statuses()
-      .then((r) => setStatuses(new Map(r.statuses.map((s) => [s.stationId, s]))))
+      // Most polls return what the last one did: keep the same array so nothing downstream redraws.
+      .then((r) => setRawStatuses((prev) => keepIfSame(prev, r.statuses)))
       .catch(() => undefined);
   }, []);
 
@@ -224,7 +267,13 @@ export function App() {
       refreshStatuses();
       refreshMe();
     });
-    const onOnline = () => setOnline(true);
+    const onOnline = () => {
+      setOnline(true);
+      // Back in signal: what failed while out of it is read again.
+      loadData();
+      setDetails((prev) => withoutFailed(prev));
+      refreshStatuses();
+    };
     const onOffline = () => setOnline(false);
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
@@ -234,7 +283,7 @@ export function App() {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, [refreshStatuses, refreshMe]);
+  }, [refreshStatuses, refreshMe, loadData]);
 
   useEffect(() => {
     if (!me) return;
@@ -246,10 +295,27 @@ export function App() {
   const plan = PLANS[planId];
   const signedIn = Boolean(me?.user);
   const plusNow = isPlus(planId);
-  const trialAvailable = !plusNow && (signedIn ? Boolean(me?.trial?.eligible) : true);
+  const canSignIn = signInReady(config);
+  // The trial needs an account, so guests are only offered it once sign-in works here.
+  const trialAvailable = !plusNow && (signedIn ? Boolean(me?.trial?.eligible) : canSignIn);
 
   const stations = dataset?.stations ?? [];
   const byId = useMemo(() => new Map(stations.map((s) => [s.id, s])), [stations]);
+  // Reports are kept under stable c1 ids (older ones under osm-/ocm- ids); the app keys stations by id.
+  const statuses = useMemo(() => statusesByStation(stations, rawStatuses, aliasOf), [stations, rawStatuses, aliasOf]);
+  // Reports under an id the index doesn't list: look each up once in the alias buckets.
+  useEffect(() => {
+    if (!stations.length) return;
+    const unknown = unknownStatusIds(stations, rawStatuses, aliasOf);
+    if (!unknown.length) return;
+    let live = true;
+    void Promise.all(unknown.map(async (id) => [id, (await resolveAlias(id))?.c1Id ?? null] as const)).then((pairs) => {
+      if (live) setAliasOf((prev) => new Map([...prev, ...pairs]));
+    });
+    return () => {
+      live = false;
+    };
+  }, [stations, rawStatuses, aliasOf]);
   const operators = useMemo(() => operatorsByCount(stations), [stations]);
   const dcCount = useMemo(() => stations.filter((s) => s.speed === 'dc').length, [stations]);
   const shown = useMemo(() => {
@@ -261,7 +327,27 @@ export function App() {
       return state === 'working' || state === 'in_use';
     });
   }, [stations, filters, statuses]);
-  const selected = selectedId ? byId.get(selectedId) ?? null : null;
+  const selectedLite = selectedId ? byId.get(selectedId) ?? null : null;
+  const selectedDetail = selectedId ? details.get(selectedId) : undefined;
+  const selected = selectedDetail ?? selectedLite;
+  const detailFailed = selectedDetail === null;
+
+  // A charger read from the index gets its hours, price, address and sources from its shard when opened.
+  useEffect(() => {
+    if (!selectedLite || selectedLite.detail !== 'pending' || details.has(selectedLite.id)) return;
+    let live = true;
+    void loadStationDetail(selectedLite, dataset?.version).then((full) => {
+      if (live) setDetails((prev) => new Map(prev).set(selectedLite.id, full));
+    });
+    return () => {
+      live = false;
+    };
+  }, [selectedLite, details, dataset]);
+  const hiddenCount = useMemo(() => hiddenBySettings(stations, filters), [stations, filters.mode, filters.showRestricted]);
+  const changeFilters = (f: MapFilters) => {
+    if (f.mode !== filters.mode) saveJson('map-mode', f.mode);
+    setFilters(f);
+  };
   const placeIndexById = useMemo(() => new Map(places?.places.map((p, i) => [p.id, i]) ?? []), [places]);
 
   // Places are a separate, larger file: fetch it only once something needs it.
@@ -274,6 +360,8 @@ export function App() {
       userPicked.current = true;
       setSelectedId(id);
       setSelectedPlace(null);
+      // Opening a charger whose details failed before (say, in a dead zone) tries again.
+      setDetails(withoutFailed);
       const url = new URL(location.href);
       url.searchParams.delete('p');
       if (id) url.searchParams.set('s', id);
@@ -307,12 +395,10 @@ export function App() {
 
   const go = (next: Tab) => {
     if (next === tab) return;
-    const swap = () => {
-      setTab(next);
-      if (next === 'trip' && !tripOpen) openTrip({ to: null, from: null, soc: null, autoRun: false }, false);
-    };
-    if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) document.startViewTransition(swap);
-    else swap();
+    // No View Transition here: while one runs the whole page ignores taps (<html> takes them), and on a slow
+    // phone it ran for seconds, so the tab bar swallowed taps. Each page animates itself in (`page-in`).
+    setTab(next);
+    if (next === 'trip' && !tripOpen) openTrip({ to: null, from: null, soc: null, autoRun: false }, false);
   };
 
   const openTrip = (seed: TripSeed, switchTab = true) => {
@@ -431,7 +517,6 @@ export function App() {
     });
   }, [places, filters.showFood, filters.showStays, selectedId, selectedPlace, tripView, placeIndexById]);
 
-  const attribution = useMemo(() => (dataset ? dataset.sources.map((s) => s.attribution) : []), [dataset]);
   const mapTab = tab === 'explore' || tab === 'trip';
   const placeOpen = selectedPlace !== null && places !== null;
   const stationOpen = mapTab && (selected !== null || placeOpen);
@@ -463,30 +548,36 @@ export function App() {
     saveJson('paint', hex);
   };
   const canConnect = plan.carConnect;
+  // If the charger data can't load, the welcome never opens, so the map (with its error notice) shows at once.
+  if (!onboard || loadError) mapShown.current = true;
+  const mapWanted = mapShown.current;
 
   return (
     <div class={`app app--${tab}${drive ? ' app--driving' : ''}`}>
-      <MapView
-        stations={shown}
-        statuses={statuses}
-        selectedId={selectedId}
-        flyTarget={flyTarget}
-        dark={dark}
-        attribution={attribution}
-        insets={insets}
-        route={drive ? drive.route : tripView?.route ?? null}
-        altRoutes={drive ? NO_ALTS : tripView?.altRoutes ?? NO_ALTS}
-        stops={stopMarkers}
-        places={placeMarkers}
-        selectedPlace={selectedPlace}
-        car={drive ? carPos : null}
-        follow={Boolean(drive && carPos)}
-        onSelect={(id) => {
-          if (tab !== 'explore' && tab !== 'trip') setTab('explore');
-          select(id);
-        }}
-        onSelectPlace={(i) => selectPlace(i)}
-      />
+      {mapWanted && (
+        <MapView
+          stations={shown}
+          statuses={statuses}
+          selectedId={selectedId}
+          flyTarget={flyTarget}
+          dark={dark}
+          attribution={CHARGER_CREDITS}
+          insets={insets}
+          route={drive ? drive.route : tripView?.route ?? null}
+          altRoutes={drive ? NO_ALTS : tripView?.altRoutes ?? NO_ALTS}
+          stops={stopMarkers}
+          places={placeMarkers}
+          selectedPlace={selectedPlace}
+          car={drive ? carPos : null}
+          follow={Boolean(drive && carPos)}
+          onSelect={(id) => {
+            if (tab !== 'explore' && tab !== 'trip') setTab('explore');
+            select(id);
+          }}
+          onSelectPlace={(i) => selectPlace(i)}
+          onViewport={setMapView}
+        />
+      )}
 
       {mapTab && !drive && (
         <header class="topbar">
@@ -509,14 +600,19 @@ export function App() {
         </header>
       )}
 
-      {tab === 'explore' && !drive && <FilterBar filters={filters} operators={operators} shown={shown.length} total={stations.length} onChange={setFilters} />}
+      {tab === 'explore' && !drive && <FilterBar filters={filters} operators={operators} shown={shown.length} total={stations.length} hidden={hiddenCount} vehicle={vehicle} onChange={changeFilters} />}
 
       {!online && <div class="banner" role="status">You're offline. The map and saved chargers still work; status may be out of date.</div>}
       {loadError && (
         <div class="banner banner--error" role="alert">
-          {loadError}
+          {loadError}{' '}
+          <button type="button" class="link link--inline" onClick={loadData} data-testid="retry-data">
+            Try again
+          </button>
         </div>
       )}
+
+      {tab === 'explore' && !stationOpen && !drive && dataset && <StateCoverage view={mapView} stations={stations} onAddCharger={() => setFeedback({ screen: 'missing-charger', title: 'Tell us about a missing charger' })} />}
 
       {tab === 'explore' && !stationOpen && !drive && (
         <button class="fab" onClick={() => openTrip({ to: null, from: null, soc: null, autoRun: false })} data-testid="plan-trip">
@@ -530,6 +626,8 @@ export function App() {
           <TripPlanner
             key={tripKey}
             stations={stations}
+            dataState={dataset ? 'ready' : loadError ? 'failed' : 'loading'}
+            onRetryData={loadData}
             statuses={statuses}
             vehicle={vehicle}
             me={me}
@@ -551,6 +649,8 @@ export function App() {
             onPlanned={onPlanned}
             onNeedVehicle={() => setOverlay('garage')}
             onRequireSignIn={() => setOverlay('signin')}
+            signInReady={canSignIn}
+            onStartTrial={trialAvailable ? () => void beginTrial() : undefined}
             onPaywall={unlock}
             onPlans={() => unlock()}
             onShow={showTrip}
@@ -575,6 +675,8 @@ export function App() {
           placesLoading={placesLoading}
           placesFailed={placesFailed}
           onOpenPlace={openPlace}
+          detailFailed={detailFailed}
+          onRetryDetail={() => setDetails(withoutFailed)}
         />
       )}
 
@@ -599,7 +701,7 @@ export function App() {
       {tab === 'copilot' && !drive && (
         <CopilotScreen
           signedIn={signedIn}
-          account={me?.user?.email ?? null}
+          account={me?.user ? me.user.email || me.user.phone || (me.user.username ? `@${me.user.username}` : null) || me.user.name || null : null}
           canUse={plan.copilot}
           trialAvailable={trialAvailable}
           vehicle={vehicle}
@@ -619,6 +721,7 @@ export function App() {
           onToggleDark={toggleDark}
           onChanged={refreshMe}
           onSignedOut={() => {
+            forgetFirebaseToken();
             clearSavedTrips();
             removeJson('plan');
             setTripOpen(false);
@@ -627,6 +730,9 @@ export function App() {
             refreshMe();
           }}
           onSignIn={() => setOverlay('signin')}
+          onSetUsername={() => setOverlay('username')}
+          onSignInMethods={() => setOverlay('methods')}
+          signInReady={canSignIn}
           onPlans={() => unlock()}
           onGarage={() => setOverlay('garage')}
           onAbout={() => setOverlay('about')}
@@ -655,10 +761,11 @@ export function App() {
         />
       )}
 
-      {overlay === 'signin' && (
+      {(overlay === 'signin' || overlay === 'username' || overlay === 'methods') && (
         <SignIn
           config={config}
-          dark={dark}
+          start={overlay === 'signin' ? undefined : overlay}
+          me={me}
           onClose={() => {
             trialWanted.current = false;
             setOverlay(null);
@@ -713,7 +820,17 @@ export function App() {
           }}
         />
       )}
-      {overlay === 'about' && <About dataset={dataset} onClose={() => setOverlay(null)} />}
+      {overlay === 'about' && (
+        <About
+          dataset={dataset}
+          manifest={manifest}
+          onClose={() => setOverlay(null)}
+          onAddCharger={() => {
+            setOverlay(null);
+            setFeedback({ screen: 'missing-charger', title: 'Tell us about a missing charger' });
+          }}
+        />
+      )}
 
       {feedback && <Feedback signedIn={signedIn} screen={feedback.screen} title={feedback.title} onClose={() => setFeedback(null)} />}
 

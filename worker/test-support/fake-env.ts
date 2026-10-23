@@ -1,6 +1,6 @@
 // A D1 stand-in on Node's built-in SQLite, with the real migrations applied, so tests run
 // the actual SQL. SQLite binds ?N to the Nth argument, the same as D1.
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import type { Env } from '../env.ts';
 
@@ -32,9 +32,9 @@ class Statement {
 }
 
 /** Migrations contain no semicolons inside literals, so splitting on ';' is safe here. */
-function applyMigrations(db: DatabaseSync): void {
+export function applyMigrations(db: DatabaseSync, only: (file: string) => boolean = () => true): void {
   const dir = new URL('../migrations/', import.meta.url);
-  for (const file of readdirSync(dir).sort()) {
+  for (const file of readdirSync(dir).sort().filter(only)) {
     for (const sql of readFileSync(new URL(file, dir), 'utf8').split(';')) {
       if (sql.trim()) db.prepare(sql).run();
     }
@@ -62,17 +62,25 @@ export function fakeD1() {
   };
 }
 
-export function fakeEnv(overrides: Partial<Env> = {}) {
+/** Serves public/data like the ASSETS binding. `legacyOnly` hides everything but stations.json, like an older deployment. */
+export function fakeAssets(legacyOnly = false) {
+  const dir = new URL('../../public/data/', import.meta.url);
+  return {
+    fetch: async (input: Request | string) => {
+      const path = new URL(typeof input === 'string' ? input : input.url, 'http://x').pathname;
+      const name = path.startsWith('/data/') ? decodeURIComponent(path.slice('/data/'.length)) : '';
+      const allowed = legacyOnly ? name === 'stations.json' : /^[a-z0-9-]+(\/[a-z0-9]+)?\.json$/i.test(name);
+      if (!allowed || !existsSync(new URL(name, dir))) return new Response('not found', { status: 404 });
+      return new Response(readFileSync(new URL(name, dir), 'utf8'));
+    },
+  };
+}
+
+export function fakeEnv(overrides: Partial<Env> = {}, opts: { legacyOnly?: boolean } = {}) {
   const d1 = fakeD1();
-  const stations = readFileSync(new URL('../../public/data/stations.json', import.meta.url), 'utf8');
   const env = {
     DB: d1,
-    ASSETS: {
-      fetch: async (input: Request | string) => {
-        const path = new URL(typeof input === 'string' ? input : input.url, 'http://x').pathname;
-        return path === '/data/stations.json' ? new Response(stations) : new Response('not found', { status: 404 });
-      },
-    },
+    ASSETS: fakeAssets(opts.legacyOnly),
     ENVIRONMENT: 'development',
     GOOGLE_CLIENT_ID: '',
     SESSION_SECRET: 'test-session-secret-'.padEnd(48, 'x'),
@@ -92,15 +100,21 @@ export function fakeEnv(overrides: Partial<Env> = {}) {
  */
 export function client(worker: { fetch: (req: Request, env: Env) => Promise<Response> }, env: Env, defaults: Record<string, string> = {}) {
   const origin = 'https://chargeone.test';
-  let cookie = '';
+  // One value per cookie name (the session and the admin console's), dropped when cleared.
+  const jar = new Map<string, string>();
   return async (method: string, path: string, body?: unknown, headers: Record<string, string> = {}) => {
     const h: Record<string, string> = { Origin: origin, ...defaults, ...headers };
     if (body !== undefined && !h['Content-Type']) h['Content-Type'] = 'application/json';
-    if (cookie) h.Cookie = cookie;
+    if (jar.size && !h.Cookie) h.Cookie = [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
     const payload = body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body);
     const res = await worker.fetch(new Request(`${origin}${path}`, { method, headers: h, body: payload }), env);
     const set = res.headers.get('Set-Cookie');
-    if (set) cookie = set.split(';')[0];
+    if (set) {
+      const [name, ...rest] = set.split(';')[0].split('=');
+      const value = rest.join('=');
+      if (value) jar.set(name, value);
+      else jar.delete(name);
+    }
     const text = await res.text();
     const isJson = (res.headers.get('Content-Type') ?? '').includes('application/json');
     return { status: res.status, body: (isJson ? JSON.parse(text) : {}) as Record<string, any>, text, headers: res.headers };

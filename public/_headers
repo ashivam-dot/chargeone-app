@@ -1,5 +1,5 @@
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://*.razorpay.com https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://tiles.openfreemap.org https://tiles.mapterhorn.com https://photon.komoot.io https://accounts.google.com/gsi/ https://*.razorpay.com; frame-src https://accounts.google.com/gsi/ https://api.razorpay.com https://checkout.razorpay.com; worker-src 'self' blob:; child-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client https://checkout.razorpay.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://*.razorpay.com https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://tiles.openfreemap.org https://tiles.mapterhorn.com https://photon.komoot.io https://accounts.google.com/gsi/ https://*.razorpay.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.google.com/recaptcha/; frame-src https://accounts.google.com/gsi/ https://api.razorpay.com https://checkout.razorpay.com https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/ https://chargeone-512418.firebaseapp.com; worker-src 'self' blob:; child-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
@@ -18,3 +18,13 @@
 
 /ev-charging/*
   Cache-Control: public, max-age=3600
+
+/admin
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
+  Referrer-Policy: no-referrer
+
+/admin.html
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
+  Referrer-Policy: no-referrer

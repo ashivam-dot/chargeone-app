@@ -62,22 +62,28 @@ html {
   -webkit-backdrop-filter: var(--surface-blur);
   backdrop-filter: var(--surface-blur);
 }
+/* A pill behind the active icon that slides between tabs. */
 .tabbar__indicator {
-  top: -1px;
+  top: 7px;
   bottom: auto;
   left: 8px;
   width: calc((100% - 16px) / var(--n));
-  height: 2px;
+  height: 30px;
   border: 0;
-  border-radius: 0 0 2px 2px;
-  background: var(--text);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
   box-shadow: none;
-  clip-path: inset(0 32%);
+  clip-path: inset(0 calc(50% - 30px) round 15px);
 }
 .tabbar__tab {
-  font-size: 0.66rem;
+  font-size: 0.68rem;
   font-weight: 550;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  gap: 6px;
+  padding-top: 2px;
+}
+.tabbar__tab.is-active {
+  font-weight: 650;
 }
 .tabbar__tab.is-active .lucide,
 .tabbar__tab--copilot.is-active .lucide {
@@ -101,7 +107,7 @@ html {
 }
 .sheet h3 {
   font: var(--label);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -119,7 +125,6 @@ html {
 .plan,
 .compare,
 .route-card,
-.verdict,
 .live {
   background: var(--bg-elev);
   border-color: var(--line);
@@ -336,6 +341,40 @@ html {
   color: var(--text);
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
+.find-car__rto {
+  margin: 0;
+  color: var(--text);
+}
+.find-car__pick {
+  display: grid;
+  gap: 8px;
+}
+.find-car__pick p {
+  margin: 0;
+  color: var(--muted);
+}
+.find-car__models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.find-car__model {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.find-car__model:hover,
+.find-car__model:focus-visible {
+  border-color: var(--accent);
+}
 .detected {
   display: flex;
   align-items: center;
@@ -371,4 +410,244 @@ html {
     -webkit-backdrop-filter: none;
     backdrop-filter: none !important;
   }
+}
+
+/* ---------- Polish: elevation, hierarchy and state (2026-10-23) ---------- */
+:root {
+  --card-top: rgba(255, 255, 255, 0.9);
+  --card-edge: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+[data-theme='dark'] {
+  --card-top: rgba(255, 255, 255, 0.045);
+  --card-edge: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Containers focused from script (sheets, pages) don't need a ring; their controls keep theirs. */
+[tabindex='-1']:focus-visible {
+  outline: none;
+}
+
+/* Cards catch a little light along the top edge, like brushed metal under a cabin lamp. */
+.tile,
+.rows,
+.page .card,
+.page .list {
+  background: linear-gradient(180deg, var(--card-top), transparent 70%), var(--bg-elev);
+  box-shadow: var(--card-edge);
+}
+[data-theme='light'] :is(.tile, .rows, .page .card, .page .list) {
+  background: var(--bg-elev);
+}
+
+/* A quiet glow behind each page title instead of a flat black header. */
+.page__aurora {
+  display: block;
+  inset: 0 0 auto;
+  height: 340px;
+  filter: none;
+  opacity: 1;
+  animation: none;
+  background:
+    radial-gradient(80% 90% at 10% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(60% 70% at 100% 0%, color-mix(in srgb, var(--plus) 9%, transparent), transparent 70%);
+}
+[data-theme='light'] .page__aurora {
+  opacity: 0.6;
+}
+.page__head {
+  margin: 32px auto 24px;
+}
+.section-title,
+.tile__label {
+  font: var(--label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.section-title {
+  margin: 32px 0 12px;
+}
+
+/* Sheets: a lit top edge, and a hairline under the title once the body scrolls under it. */
+.sheet {
+  box-shadow:
+    0 -12px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent);
+}
+.sheet__head h2 {
+  font-size: 1.375rem;
+  line-height: 1.2;
+}
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+@supports (animation-timeline: scroll()) {
+  .sheet {
+    timeline-scope: --sheet;
+  }
+  .sheet__body {
+    scroll-timeline: --sheet block;
+  }
+  .sheet__head {
+    animation: head-line linear both;
+    animation-timeline: --sheet;
+    animation-range: 0 24px;
+  }
+}
+@keyframes head-line {
+  to {
+    box-shadow: 0 1px 0 var(--line);
+  }
+}
+
+/* Trip verdict: a status colour you can read at a glance. */
+.verdict {
+  position: relative;
+  padding: 16px 18px 16px 22px;
+  overflow: hidden;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+}
+.verdict::before {
+  content: '';
+  position: absolute;
+  inset: 12px auto 12px 0;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--muted);
+}
+.verdict--ok {
+  background: linear-gradient(100deg, color-mix(in srgb, var(--good) 16%, transparent), transparent 75%), var(--bg-elev);
+  border-color: color-mix(in srgb, var(--good) 30%, transparent);
+}
+.verdict--ok::before {
+  background: var(--good);
+}
+.verdict--bad {
+  background: linear-gradient(100deg, color-mix(in srgb, var(--bad) 16%, transparent), transparent 75%), var(--bg-elev);
+  border-color: color-mix(in srgb, var(--bad) 32%, transparent);
+}
+.verdict--bad::before {
+  background: var(--bad);
+}
+
+/* Locked perks: a calm card that names the plan, not a dashed warning. */
+.perk-lock {
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--plus) 26%, var(--line));
+  background: linear-gradient(100deg, color-mix(in srgb, var(--plus) 11%, transparent), transparent 80%), var(--bg-elev);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  transition: transform 0.3s var(--spring), border-color 0.2s;
+}
+.perk-lock:active {
+  transform: scale(0.98);
+}
+.perk-lock > .lucide {
+  box-sizing: content-box;
+  padding: 7px;
+  border-radius: 50%;
+  color: var(--plus);
+  background: color-mix(in srgb, var(--plus) 14%, transparent);
+}
+.perk-lock__plan {
+  padding: 4px 10px;
+  font-weight: 700;
+  background: var(--grad-plus);
+  color: #fff;
+}
+
+/* "More options" reads as a settings row, not a paragraph of link text. */
+.disclose {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  margin: 8px 0;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.disclose__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+}
+.disclose__text strong {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.disclose__chev {
+  transition: transform 0.35s var(--spring);
+}
+.disclose[aria-expanded='true'] .disclose__chev {
+  transform: rotate(180deg);
+}
+
+/* Buttons: a clear disabled state and a lift under a mouse. */
+.btn--primary:disabled,
+.btn--plus:disabled {
+  opacity: 1;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--muted);
+}
+@media (hover: hover) {
+  .btn:not(:disabled):hover {
+    filter: brightness(1.08);
+  }
+  .rows__item:hover,
+  .disclose:hover,
+  .perk-lock:hover {
+    border-color: var(--line-strong);
+    background-color: color-mix(in srgb, var(--text) 3%, transparent);
+  }
+}
+.find-car__model {
+  min-height: 40px;
+}
+
+/* Filter chips fade out at the edge, so the row reads as scrollable. */
+.filters {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+}
+
+/* Lazy screens open on a skeleton of the page, not a spinner. */
+.page-loading[aria-busy='true'] {
+  place-content: start stretch;
+  gap: 16px;
+  padding: calc(76px + var(--safe-top)) 18px 0;
+  text-align: left;
+}
+.page-loading[aria-busy='true']::before,
+.page-loading[aria-busy='true']::after {
+  content: '';
+  width: auto;
+  margin: 0;
+  border: 0;
+  border-radius: 22px;
+  background: linear-gradient(100deg, color-mix(in srgb, var(--text) 5%, transparent) 30%, color-mix(in srgb, var(--text) 10%, transparent) 50%, color-mix(in srgb, var(--text) 5%, transparent) 70%);
+  background-size: 300% 100%;
+  animation: skeleton 1.4s ease-in-out infinite;
+}
+.page-loading[aria-busy='true']::before {
+  width: 55%;
+  height: 40px;
+  border-radius: 12px;
+}
+.page-loading[aria-busy='true']::after {
+  height: min(420px, 55vh);
 }

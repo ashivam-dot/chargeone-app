@@ -1,4 +1,5 @@
 import type { Station } from '../data/model.ts';
+import { PLAN_MIN_CONFIDENCE, trustScore } from '../data/trust.ts';
 import { liveState, timeAgo, type LiveState, type StationStatus } from '../shared/status.ts';
 import { baseWhPerKm, type MyVehicle } from '../shared/vehicles.ts';
 import { RouteIndex, type Coord, type RouteGeometry } from './geometry.ts';
@@ -16,6 +17,11 @@ export interface PlanOptions {
   acOn: boolean;
   extraPassengers: number;
   style: DrivingStyle;
+  /**
+   * Also plan stops at chargers we're not sure of (trust below PLAN_MIN_CONFIDENCE, plug not confirmed,
+   * or AC when the car takes DC). Off by default: the driver opts in after seeing the extra options.
+   */
+  allowUnverified?: boolean;
 }
 
 export const DEFAULT_OPTIONS: PlanOptions = {
@@ -49,6 +55,10 @@ export interface Candidate {
   connectorVerified: boolean;
   live: LiveState;
   tier: 1 | 2 | 3;
+  /** trustScore: pipeline confidence plus recent driver reports. */
+  trust: number;
+  /** Good enough to plan a stop at: see isTrusted. */
+  trusted: boolean;
 }
 
 export interface Backup {
@@ -58,6 +68,7 @@ export interface Backup {
   powerKw: number;
   mode: ChargeMode;
   live: LiveState;
+  trusted: boolean;
 }
 
 export interface Stop {
@@ -75,6 +86,8 @@ export interface Stop {
   mode: ChargeMode;
   live: LiveState;
   confidence: Confidence;
+  /** A charger we're fairly sure of. False only when the driver allowed unverified stops. */
+  trusted: boolean;
   notes: string[];
   backups: Backup[];
 }
@@ -91,6 +104,13 @@ export interface TripPlan {
   warnings: string[];
   /** Where the car would run below reserve when the plan isn't feasible. */
   gapAtKm: number | null;
+  /**
+   * When chargers we're sure of can't cover the trip: the unverified chargers a plan would also need.
+   * Shown as "extra options" only; never planned unless the driver sets allowUnverified.
+   */
+  extras: Stop[];
+  /** Whether the trip works once the extra options are allowed. */
+  extrasFeasible: boolean;
 }
 
 const CORRIDOR_KM = 3;
@@ -170,6 +190,23 @@ export function chargeOption(
   return null;
 }
 
+/**
+ * A charger we'd plan a stop at: trusted (PLAN_MIN_CONFIDENCE), the car's plug confirmed, no recent
+ * problem, open to the public (a hotel's or showroom's own charger may turn a passing driver away),
+ * and DC, unless the car can only charge on AC.
+ */
+export function isTrusted(
+  mode: ChargeMode,
+  verified: boolean,
+  live: LiveState,
+  trust: number,
+  vehicle: MyVehicle,
+  access: Station['access'] = 'unknown',
+): boolean {
+  if (live === 'problem' || !verified || trust < PLAN_MIN_CONFIDENCE || access === 'customers') return false;
+  return mode === 'dc' || !(vehicle.dcConnector && vehicle.maxDcKw);
+}
+
 function tierFor(mode: ChargeMode, verified: boolean, live: LiveState): 1 | 2 | 3 {
   if (live === 'problem') return 3;
   if (mode === 'dc' && (verified || live === 'working')) return 1;
@@ -184,7 +221,9 @@ export function findCandidates(index: RouteIndex, input: PlanInput, maxOffKm: nu
     if (!option) continue;
     const p = index.project(station.lng, station.lat, maxOffKm);
     if (!p) continue;
-    const live = liveState(input.statuses.get(station.id), input.now);
+    const status = input.statuses.get(station.id);
+    const live = liveState(status, input.now);
+    const trust = trustScore(station, status, input.now);
     out.push({
       station,
       alongKm: p.alongKm,
@@ -195,6 +234,8 @@ export function findCandidates(index: RouteIndex, input: PlanInput, maxOffKm: nu
       connectorVerified: option.verified,
       live,
       tier: tierFor(option.mode, option.verified, live),
+      trust,
+      trusted: isTrusted(option.mode, option.verified, live, trust, input.vehicle, station.access),
     });
   }
   return out.sort((a, b) => a.alongKm - b.alongKm);
@@ -221,6 +262,14 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
+interface Pass {
+  stops: Stop[];
+  gapAtKm: number | null;
+  posKm: number;
+  posEnergy: number;
+  socKwh: number;
+}
+
 export function planTrip(input: PlanInput): TripPlan {
   const { route, vehicle, options } = input;
   const index = new RouteIndex(route.coords);
@@ -230,161 +279,201 @@ export function planTrip(input: PlanInput): TripPlan {
   const cap = vehicle.batteryKwh;
   const pct = (kwh: number) => (kwh / cap) * 100;
   const kwhOf = (p: number) => (p / 100) * cap;
+  const strict = !options.allowUnverified;
 
   let candidates = findCandidates(index, input, CORRIDOR_KM);
   const warnings: string[] = [];
-  if (candidates.filter((c) => c.tier < 3).length < Math.floor(totalKm / 250)) {
-    candidates = findCandidates(index, input, WIDE_CORRIDOR_KM);
-    if (candidates.length) warnings.push('Few chargers sit right on this route, so some stops need a detour of a few km.');
+  const usable = (list: Candidate[]) => list.filter((c) => (strict ? c.trusted : c.tier < 3));
+  if (usable(candidates).length < Math.floor(totalKm / 250)) {
+    const wide = findCandidates(index, input, WIDE_CORRIDOR_KM);
+    if (usable(wide).length > usable(candidates).length) {
+      candidates = wide;
+      warnings.push('Few chargers sit right on this route, so some stops need a detour of a few km.');
+    }
   }
-
-  const stops: Stop[] = [];
-  let posKm = 0;
-  let posEnergy = 0;
-  let socKwh = kwhOf(options.startSocPct);
-  let gapAtKm: number | null = null;
-  const used = new Set<string>();
 
   const arrival = (c: Candidate, fromEnergy: number, fromSoc: number) => {
     const need = energyAt(index, cumKwh, c.alongKm) - fromEnergy + (c.detourKm * baseWhPerKm(vehicle)) / 1000;
     return fromSoc - need;
   };
 
-  for (let guard = 0; guard < 40; guard++) {
-    const toDest = destEnergy - posEnergy;
-    if (socKwh - toDest >= kwhOf(options.arriveReservePct)) break;
+  // Backups come from every compatible charger without a recent problem, ours-to-trust first.
+  const backupPool = candidates.filter((c) => c.live !== 'problem' && (c.trusted || c.tier <= 2));
+  // A charger a driver just reported broken is never a stop, even among the extra options: it is
+  // only ever shown as a warning on the map.
+  const plannable = candidates.filter((c) => c.live !== 'problem');
+  const main = greedy(strict ? plannable.filter((c) => c.trusted) : plannable);
+  let extras: Stop[] = [];
+  let extrasFeasible = false;
+  if (strict && main.gapAtKm !== null) {
+    const loose = greedy(plannable);
+    extras = loose.stops.filter((s) => !s.trusted);
+    extrasFeasible = loose.gapAtKm === null && loose.socKwh - (destEnergy - loose.posEnergy) >= kwhOf(Math.min(options.arriveReservePct, 5));
+  }
+  return finish(main);
 
-    const reachable = candidates.filter(
-      (c) => c.alongKm > posKm + 1 && !used.has(c.station.id) && arrival(c, posEnergy, socKwh) >= kwhOf(options.stopReservePct),
-    );
-    if (reachable.length === 0) {
-      gapAtKm = posKm;
-      break;
-    }
-    const farthest = reachable[reachable.length - 1].alongKm;
-    let choice: Candidate | undefined;
-    for (const tier of [1, 2, 3] as const) {
-      const inTier = reachable.filter((c) => c.tier === tier);
-      const best = inTier[inTier.length - 1];
-      if (best && best.alongKm - posKm >= 0.5 * (farthest - posKm)) {
-        choice = best;
+  function greedy(pool: Candidate[]): Pass {
+    const stops: Stop[] = [];
+    let posKm = 0;
+    let posEnergy = 0;
+    let socKwh = kwhOf(options.startSocPct);
+    let gapAtKm: number | null = null;
+    const used = new Set<string>();
+
+    for (let guard = 0; guard < 40; guard++) {
+      const toDest = destEnergy - posEnergy;
+      if (socKwh - toDest >= kwhOf(options.arriveReservePct)) break;
+
+      const reachable = pool.filter(
+        (c) => c.alongKm > posKm + 1 && !used.has(c.station.id) && arrival(c, posEnergy, socKwh) >= kwhOf(options.stopReservePct),
+      );
+      if (reachable.length === 0) {
+        gapAtKm = posKm;
         break;
       }
+      const farthest = reachable[reachable.length - 1].alongKm;
+      let choice: Candidate | undefined;
+      for (const tier of [1, 2, 3] as const) {
+        const inTier = reachable.filter((c) => c.tier === tier);
+        const best = inTier[inTier.length - 1];
+        if (best && best.alongKm - posKm >= 0.5 * (farthest - posKm)) {
+          choice = best;
+          break;
+        }
+      }
+      choice ??= reachable[reachable.length - 1];
+
+      const arriveKwh = arrival(choice, posEnergy, socKwh);
+      const stopEnergy = energyAt(index, cumKwh, choice.alongKm);
+      const remaining = destEnergy - stopEnergy + (choice.detourKm * baseWhPerKm(vehicle)) / 1000;
+      const needForDest = remaining + kwhOf(options.arriveReservePct) + kwhOf(5);
+
+      // Getting back to the route from a charger off it uses charge too.
+      const returnKwh = (choice.detourKm * baseWhPerKm(vehicle)) / 1000;
+      let departPct: number;
+      if (needForDest <= kwhOf(options.chargeToPct)) {
+        departPct = Math.max(pct(needForDest), pct(arriveKwh) + 10, 40);
+      } else {
+        departPct = options.chargeToPct;
+        const nextReachable = pool.some(
+          (c) => c.alongKm > choice.alongKm + 1 && arrival(c, stopEnergy, kwhOf(departPct) - returnKwh) >= kwhOf(options.stopReservePct),
+        );
+        if (!nextReachable) departPct = 100;
+      }
+      departPct = Math.min(100, Math.ceil(departPct / 5) * 5);
+      const arrivePct = pct(arriveKwh);
+      const minutes = chargeMinutes(arrivePct, departPct, cap, choice.powerKw, choice.mode);
+      const energyKwh = kwhOf(departPct - arrivePct) / CHARGING_LOSS;
+      const status = input.statuses.get(choice.station.id);
+
+      const notes: string[] = [];
+      if (choice.mode === 'dc') notes.push(`DC ${Math.round(choice.powerKw)} kW for your car`);
+      else notes.push(`AC only (${round1(choice.powerKw)} kW), slow`);
+      if (!choice.trusted) notes.push('Unverified: nobody has confirmed this charger recently, so check before you rely on it');
+      if (!choice.connectorVerified) notes.push('Connector type not confirmed on the map');
+      if (status?.lastWorkedAt) notes.push(`Last charged fine ${timeAgo(status.lastWorkedAt, input.now)}`);
+      if (choice.live === 'problem') notes.push('A problem was reported recently, so check the backup');
+      if (choice.live === 'in_use') notes.push('Reported in use recently, so you may have to wait');
+      if (departPct > options.chargeToPct) notes.push(`Charge to ${departPct}% to reach the next charger`);
+      if (choice.detourKm >= 1) notes.push(`${round1(choice.detourKm)} km off the route`);
+      if (choice.station.access === 'customers') notes.push('Customers only: the site may charge only its own guests or buyers, so call ahead');
+
+      const confidence: Confidence = !choice.trusted
+        ? 'low'
+        : choice.tier === 1 && (choice.live === 'working' || choice.live === 'in_use')
+          ? 'high'
+          : choice.tier === 1 || (choice.tier === 2 && choice.live !== 'problem')
+            ? 'medium'
+            : 'low';
+
+      const backups: Backup[] = backupPool
+        .filter((c) => c.station.id !== choice.station.id && c.alongKm > posKm + 1)
+        .map((c) => ({ c, arrive: arrival(c, posEnergy, socKwh) }))
+        .filter(({ arrive }) => arrive >= kwhOf(5))
+        .sort(
+          (a, b) =>
+            Number(b.c.trusted) - Number(a.c.trusted) || a.c.tier - b.c.tier || Math.abs(a.c.alongKm - choice.alongKm) - Math.abs(b.c.alongKm - choice.alongKm),
+        )
+        .slice(0, 2)
+        .map(({ c, arrive }) => ({
+          station: c.station,
+          alongKm: round1(c.alongKm),
+          arriveSocPct: Math.round(pct(arrive)),
+          powerKw: Math.round(c.powerKw),
+          mode: c.mode,
+          live: c.live,
+          trusted: c.trusted,
+        }));
+      if (backups.length === 0) notes.push('No backup charger within reach. Charge a little extra at the previous stop.');
+
+      stops.push({
+        station: choice.station,
+        lng: choice.station.lng,
+        lat: choice.station.lat,
+        alongKm: round1(choice.alongKm),
+        detourKm: round1(choice.detourKm),
+        arriveSocPct: Math.round(arrivePct),
+        departSocPct: departPct,
+        chargeMinutes: Math.round(minutes),
+        energyKwh: round1(energyKwh),
+        costInr: Math.round(energyKwh * PRICE_PER_KWH[choice.mode]),
+        powerKw: Math.round(choice.powerKw),
+        mode: choice.mode,
+        live: choice.live,
+        confidence,
+        trusted: choice.trusted,
+        notes,
+        backups,
+      });
+      used.add(choice.station.id);
+      posKm = choice.alongKm;
+      posEnergy = stopEnergy;
+      socKwh = kwhOf(departPct) - returnKwh;
     }
-    choice ??= reachable[reachable.length - 1];
+    return { stops, gapAtKm, posKm, posEnergy, socKwh };
+  }
 
-    const arriveKwh = arrival(choice, posEnergy, socKwh);
-    const stopEnergy = energyAt(index, cumKwh, choice.alongKm);
-    const remaining = destEnergy - stopEnergy + (choice.detourKm * baseWhPerKm(vehicle)) / 1000;
-    const needForDest = remaining + kwhOf(options.arriveReservePct) + kwhOf(5);
-
-    let departPct: number;
-    if (needForDest <= kwhOf(options.chargeToPct)) {
-      departPct = Math.max(pct(needForDest), pct(arriveKwh) + 10, 40);
-    } else {
-      departPct = options.chargeToPct;
-      const nextReachable = candidates.some(
-        (c) => c.alongKm > choice.alongKm + 1 && arrival(c, stopEnergy, kwhOf(departPct)) >= kwhOf(options.stopReservePct),
+  function finish({ stops, gapAtKm, posKm, posEnergy, socKwh }: Pass): TripPlan {
+    const arrivalKwh = socKwh - (destEnergy - posEnergy);
+    const feasible = gapAtKm === null && arrivalKwh >= kwhOf(Math.min(options.arriveReservePct, 5));
+    if (!feasible) {
+      const at = gapAtKm ?? posKm;
+      warnings.unshift(
+        extrasFeasible
+          ? `We can't plan this trip only on chargers we're sure of: none is in reach after km ${Math.round(at)}. ` +
+              'The extra options below would get you there, but nobody has confirmed them recently.'
+          : `Not safe to drive as planned: there's no known compatible charger in reach after km ${Math.round(at)}. ` +
+              'Start with more charge, pick a different route, or add a charger you know on this route.',
       );
-      if (!nextReachable) departPct = 100;
+    } else if (arrivalKwh < kwhOf(options.arriveReservePct)) {
+      warnings.push(`You'd arrive with about ${Math.round(pct(arrivalKwh))}%, below your ${options.arriveReservePct}% reserve.`);
     }
-    departPct = Math.min(100, Math.ceil(departPct / 5) * 5);
-    const arrivePct = pct(arriveKwh);
-    const minutes = chargeMinutes(arrivePct, departPct, cap, choice.powerKw, choice.mode);
-    const energyKwh = kwhOf(departPct - arrivePct) / CHARGING_LOSS;
-    const status = input.statuses.get(choice.station.id);
+    const lowStops = stops.filter((s) => s.confidence === 'low');
+    if (lowStops.length) {
+      warnings.push(
+        lowStops.some((s) => s.backups.length > 0)
+          ? 'Some stops have little or poor recent data. Keep the backup chargers in mind.'
+          : 'Some stops have little recent data and no backup nearby. Check recent reports or call the operator before relying on them.',
+      );
+    }
 
-    const notes: string[] = [];
-    if (choice.mode === 'dc') notes.push(`DC ${Math.round(choice.powerKw)} kW for your car`);
-    else notes.push(`AC only (${round1(choice.powerKw)} kW), slow`);
-    if (!choice.connectorVerified) notes.push('Connector type not confirmed on the map');
-    if (status?.lastWorkedAt) notes.push(`Last charged fine ${timeAgo(status.lastWorkedAt, input.now)}`);
-    if (choice.live === 'problem') notes.push('A problem was reported recently, so check the backup');
-    if (choice.live === 'in_use') notes.push('Reported in use recently, so you may have to wait');
-    if (departPct > options.chargeToPct) notes.push(`Charge to ${departPct}% to reach the next charger`);
-    if (choice.detourKm >= 1) notes.push(`${round1(choice.detourKm)} km off the route`);
-
-    const confidence: Confidence =
-      choice.tier === 1 && (choice.live === 'working' || choice.live === 'in_use')
-        ? 'high'
-        : choice.tier === 1 || (choice.tier === 2 && choice.live !== 'problem')
-          ? 'medium'
-          : 'low';
-
-    const backups: Backup[] = candidates
-      .filter((c) => c.station.id !== choice.station.id && c.alongKm > posKm + 1 && c.tier <= 2)
-      .map((c) => ({ c, arrive: arrival(c, posEnergy, socKwh) }))
-      .filter(({ arrive }) => arrive >= kwhOf(5))
-      .sort((a, b) => a.c.tier - b.c.tier || Math.abs(a.c.alongKm - choice.alongKm) - Math.abs(b.c.alongKm - choice.alongKm))
-      .slice(0, 2)
-      .map(({ c, arrive }) => ({
-        station: c.station,
-        alongKm: round1(c.alongKm),
-        arriveSocPct: Math.round(pct(arrive)),
-        powerKw: Math.round(c.powerKw),
-        mode: c.mode,
-        live: c.live,
-      }));
-    if (backups.length === 0) notes.push('No backup charger within reach. Charge a little extra at the previous stop.');
-
-    stops.push({
-      station: choice.station,
-      lng: choice.station.lng,
-      lat: choice.station.lat,
-      alongKm: round1(choice.alongKm),
-      detourKm: round1(choice.detourKm),
-      arriveSocPct: Math.round(arrivePct),
-      departSocPct: departPct,
-      chargeMinutes: Math.round(minutes),
-      energyKwh: round1(energyKwh),
-      costInr: Math.round(energyKwh * PRICE_PER_KWH[choice.mode]),
-      powerKw: Math.round(choice.powerKw),
-      mode: choice.mode,
-      live: choice.live,
-      confidence,
-      notes,
-      backups,
-    });
-    used.add(choice.station.id);
-    posKm = choice.alongKm;
-    posEnergy = stopEnergy;
-    socKwh = kwhOf(departPct);
+    const chargeMins = stops.reduce((a, s) => a + s.chargeMinutes, 0);
+    const totalEnergy = stops.reduce((a, s) => a + s.energyKwh, 0);
+    return {
+      feasible,
+      distanceKm: round1(totalKm),
+      driveMinutes: Math.round(route.durationMin),
+      chargeMinutes: chargeMins,
+      arrivalSocPct: Math.round(pct(arrivalKwh)),
+      totalEnergyKwh: round1(totalEnergy),
+      totalCostInr: stops.reduce((a, s) => a + s.costInr, 0),
+      stops,
+      warnings,
+      gapAtKm: feasible ? null : Math.round(gapAtKm ?? posKm),
+      extras,
+      extrasFeasible,
+    };
   }
-
-  const arrivalKwh = socKwh - (destEnergy - posEnergy);
-  const feasible = gapAtKm === null && arrivalKwh >= kwhOf(Math.min(options.arriveReservePct, 5));
-  if (!feasible) {
-    const at = gapAtKm ?? posKm;
-    warnings.unshift(
-      `Not safe to drive as planned: there's no known compatible charger in reach after km ${Math.round(at)}. ` +
-        'Start with more charge, pick a different route, or add a charger you know on this route.',
-    );
-  } else if (arrivalKwh < kwhOf(options.arriveReservePct)) {
-    warnings.push(`You'd arrive with about ${Math.round(pct(arrivalKwh))}%, below your ${options.arriveReservePct}% reserve.`);
-  }
-  const lowStops = stops.filter((s) => s.confidence === 'low');
-  if (lowStops.length) {
-    warnings.push(
-      lowStops.some((s) => s.backups.length > 0)
-        ? 'Some stops have little or poor recent data. Keep the backup chargers in mind.'
-        : 'Some stops have little recent data and no backup nearby. Check recent reports or call the operator before relying on them.',
-    );
-  }
-
-  const chargeMins = stops.reduce((a, s) => a + s.chargeMinutes, 0);
-  const totalEnergy = stops.reduce((a, s) => a + s.energyKwh, 0);
-  return {
-    feasible,
-    distanceKm: round1(totalKm),
-    driveMinutes: Math.round(route.durationMin),
-    chargeMinutes: chargeMins,
-    arrivalSocPct: Math.round(pct(arrivalKwh)),
-    totalEnergyKwh: round1(totalEnergy),
-    totalCostInr: stops.reduce((a, s) => a + s.costInr, 0),
-    stops,
-    warnings,
-    gapAtKm: feasible ? null : Math.round(gapAtKm ?? posKm),
-  };
 }
 
 /** Google Maps directions with charging stops as waypoints (the URL API allows up to 9). */

@@ -1,10 +1,14 @@
 // "Find my car" by registration number (licensed lookup, with consent) or VIN (decoded on the phone).
+// Without a lookup partner the number still shows where the car was registered, and a search
+// picks the model.
 import { Search } from 'lucide-preact';
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { ApiError, api } from '../../lib/api.ts';
 import { haptic } from '../../native/platform.ts';
 import { LOOKUP_CONSENT_VERSION } from '../../shared/contracts.ts';
+import { describePlate, parsePlate, platePrefix } from '../../shared/plate.ts';
 import { normalisePlate } from '../../shared/vehicleMatch.ts';
+import { searchVehicles } from '../../shared/vehicleSearch.ts';
 import { VEHICLES } from '../../shared/vehicles.ts';
 import { MAKER_NAMES, decodeVin, normaliseVin, type Maker } from '../../shared/vin.ts';
 
@@ -45,8 +49,17 @@ export function FindCar({ lookupOn, onFound }: Props) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
 
+  const [query, setQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+
   const raw = normaliseVin(value);
   const plate = raw.length < 17 ? normalisePlate(value) : null;
+  const parsed = raw.length < 17 ? parsePlate(value) : null;
+  /** While a plate is half typed, its state and district already say where it is from. */
+  const region = parsed ?? (raw.length < 17 ? platePrefix(value) : null);
+  /** Without a lookup partner, a plate leads to the model search instead. */
+  const picking = parsed !== null && !lookupOn;
+  const matches = picking ? searchVehicles(query) : [];
 
   const found = (ids: string[], text: string, colourHex: string | null = null) => {
     void haptic('success');
@@ -72,8 +85,13 @@ export function FindCar({ lookupOn, onFound }: Props) {
       if (!ids.length) return fail(`That VIN is from ${vin.maker === 'other' ? 'a maker ChargeOne does not list yet' : maker}. Pick "Other car" and enter its battery size.`);
       return found(ids, `A ${maker}${built(vin.year, vin.month)}. The VIN doesn't say which model, so pick it below.`);
     }
+    if (picking) return searchRef.current?.focus();
+    if (parsed?.kind === 'temporary') return fail("Temporary numbers can't be looked up. Enter the VIN instead (on your RC as Chassis No.), or pick your car below.");
     if (!plate) return fail('Enter a car number like MH12AB1234, or the 17-character VIN from your RC (Chassis No.).');
-    if (!lookupOn) return fail("Number lookup isn't switched on yet. Enter the VIN instead (on your RC as Chassis No.), or pick your car below.");
+    // Without a lookup partner only a plate parsePlate recognises leads anywhere (the model search).
+    if (!lookupOn) {
+      return fail("That doesn't look like an Indian car number (state code, RTO, series, number). Check it, enter the VIN, or pick your car below.");
+    }
     if (!consent) return fail('Tick the box first, so ChargeOne can check the number.');
     setBusy(true);
     try {
@@ -119,6 +137,39 @@ export function FindCar({ lookupOn, onFound }: Props) {
           </button>
         </span>
       </label>
+      {region && (
+        <p class="find-car__rto small" data-testid="find-car-rto">
+          {describePlate(region)}
+        </p>
+      )}
+      {picking && (
+        <div class="find-car__pick" data-testid="find-car-picker">
+          <p class="small">Automatic model lookup from the number plate needs a data partner - coming soon. Pick your model:</p>
+          <input
+            ref={searchRef}
+            type="search"
+            value={query}
+            autocomplete="off"
+            placeholder="Search models, e.g. Nexon or Windsor"
+            aria-label="Search car models"
+            onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+            data-testid="find-car-model-search"
+          />
+          {matches.length ? (
+            <ul class="find-car__models" aria-label="Matching models">
+              {matches.map((m) => (
+                <li key={m.id}>
+                  <button type="button" class="find-car__model" onClick={() => found([m.id], `${m.name}.`)} data-testid="find-car-model">
+                    {m.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p class="small">No match. Pick "Other car" below and enter its battery size.</p>
+          )}
+        </div>
+      )}
       {plate && lookupOn && (
         <label class="check find-car__consent">
           <input type="checkbox" checked={consent} onChange={(e) => setConsent((e.target as HTMLInputElement).checked)} />

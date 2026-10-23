@@ -67,7 +67,8 @@ export interface Grant {
 
 /**
  * Upserts the user's plan. For the same purchase (external id) it never shortens access, never
- * reopens a cancelled or completed subscription and never revives a refunded one, so late or
+ * reopens a cancelled or completed subscription and never revives a refunded one or one the admin
+ * revoked (a Play sync or Razorpay renewal of it brings nothing back), so late or
  * repeated webhooks and replayed confirms are harmless. Options, checked in the same statement:
  * `unlessPaymentId` skips the grant if that payment was already processed (run it in the same
  * batch as the payment insert); `notOverPlus` skips it while the user has active Plus (a running
@@ -92,13 +93,13 @@ export function grantStatement(
      ON CONFLICT(user_id) DO UPDATE SET
        plan = excluded.plan,
        active_until = CASE
-         WHEN ${same} AND (entitlements.status = 'refunded' OR entitlements.active_until > excluded.active_until)
+         WHEN ${same} AND (entitlements.status IN ('refunded', 'revoked') OR entitlements.active_until > excluded.active_until)
          THEN entitlements.active_until ELSE excluded.active_until END,
        period_start = COALESCE(excluded.period_start, entitlements.period_start),
        source = excluded.source,
        external_id = excluded.external_id,
        status = CASE
-         WHEN ${same} AND entitlements.status IN ('cancelled', 'completed', 'refunded')
+         WHEN ${same} AND entitlements.status IN ('cancelled', 'completed', 'refunded', 'revoked')
          THEN entitlements.status ELSE excluded.status END,
        updated_at = excluded.updated_at`,
   );

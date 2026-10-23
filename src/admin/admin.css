@@ -1,0 +1,431 @@
+/* Admin console: the app's dark tokens (near-black, electric blue accent, Geist), laid out for a phone first. */
+
+:root {
+  --bg: #05070b;
+  --bg-elev: #0d0d0f;
+  --panel: #121214;
+  --text: #f5f5f7;
+  --muted: #98989f;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --accent: #2b6bff;
+  --accent-strong: #7fb0ff;
+  --good: #30d158;
+  --bad: #ff453a;
+  --warn: #ffb340;
+  --radius: 14px;
+  --font: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.45;
+  background: var(--bg);
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  margin: 28px 0 10px;
+  font-size: 1.05rem;
+}
+
+p {
+  margin: 4px 0;
+}
+
+a {
+  color: var(--accent-strong);
+}
+
+code {
+  font-size: 0.85em;
+  word-break: break-all;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.ad-center {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+  text-align: center;
+}
+
+.ad-login .ad-card {
+  width: min(380px, 100%);
+  text-align: left;
+  display: grid;
+  gap: 14px;
+}
+
+.ad-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+}
+
+.ad-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: max(12px, env(safe-area-inset-top)) 0 12px;
+}
+
+.ad-brand span {
+  color: var(--accent-strong);
+  font-weight: 500;
+}
+
+.ad-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+}
+
+.ad-nav a {
+  flex: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ad-nav a[aria-current='page'] {
+  background: var(--accent);
+  color: #fff;
+}
+
+.ad-main {
+  padding-top: 18px;
+}
+
+.ad-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.ad-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.ad-grow {
+  flex: 1 1 220px;
+}
+
+.ad-card,
+.ad-tile,
+.ad-item {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.ad-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.ad-tile {
+  display: grid;
+  gap: 2px;
+}
+
+.ad-tile strong {
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.ad-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.ad-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.ad-grid .ad-card {
+  display: grid;
+  gap: 8px;
+  align-content: space-between;
+}
+
+.ad-list {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.ad-item-main {
+  display: flex;
+  gap: 10px;
+}
+
+.ad-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.ad-split > div:first-child {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.ad-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 50%;
+}
+
+.ad-dot.on {
+  background: var(--good);
+}
+
+.ad-dot.off {
+  background: var(--bad);
+}
+
+.ad-probe {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  justify-items: start;
+}
+
+.ad-rowbtn {
+  all: unset;
+  box-sizing: border-box;
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  cursor: pointer;
+  word-break: break-word;
+}
+
+.ad-rowbtn:focus-visible {
+  outline: 2px solid var(--accent-strong);
+}
+
+.ad-detail {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+}
+
+.ad-btn {
+  appearance: none;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font: 600 0.92rem/1 var(--font);
+  cursor: pointer;
+}
+
+.ad-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ad-ghost {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.ad-danger {
+  background: transparent;
+  border-color: rgba(255, 69, 58, 0.5);
+  color: var(--bad);
+}
+
+.ad-field {
+  display: grid;
+  gap: 6px;
+}
+
+.ad-field span,
+.ad-check span {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.ad-field input,
+.ad-field select {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font: inherit;
+}
+
+.ad-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 40px;
+}
+
+.ad-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.ad-muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.ad-error {
+  color: var(--bad);
+}
+
+.ad-good {
+  color: var(--good);
+}
+
+.ad-warn {
+  color: var(--warn);
+}
+
+.ad-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(43, 107, 255, 0.2);
+  color: var(--accent-strong);
+  font-size: 0.72rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.ad-pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ad-pager {
+  justify-content: center;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.ad-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.ad-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.ad-table th,
+.ad-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.ad-table th {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* On a phone each row becomes a small card with its labels. */
+@media (max-width: 640px) {
+  .ad-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .ad-table tr {
+    display: block;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .ad-table td {
+    display: flex;
+    gap: 12px;
+    padding: 4px 12px;
+    border: 0;
+  }
+  .ad-table td::before {
+    content: attr(data-label);
+    flex: 0 0 90px;
+    color: var(--muted);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ad-btn {
+    transition: opacity 0.15s ease;
+  }
+}

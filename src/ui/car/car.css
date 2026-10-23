@@ -304,9 +304,17 @@
   color: var(--text);
   mix-blend-mode: normal;
 }
+.battery__level {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+}
 .battery__pct {
   font-family: var(--font-num);
-  font-size: 2rem;
+  font-size: 1.6rem;
+  line-height: 1.1;
   font-weight: 600;
   letter-spacing: -0.04em;
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.35);
@@ -325,7 +333,9 @@
 .battery__range strong {
   display: block;
   font-family: var(--font-num);
-  font-size: 1.3rem;
+  font-size: 1.6rem;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
   font-weight: 600;
 }
 @keyframes wave {

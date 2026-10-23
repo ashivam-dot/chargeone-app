@@ -6,7 +6,7 @@ import { CUSTOM_VEHICLE_ID, VEHICLES, myVehicleFromModel, type MyVehicle } from 
 import { CarStage } from '../car/CarStage.tsx';
 import { FindCar } from '../car/FindCar.tsx';
 import { PaintSwatches } from '../car/PaintSwatches.tsx';
-import { paintsFor } from '../car/carDesigns.ts';
+import { paintsFor } from '../car/carPaints.ts';
 import './onboarding.css';
 
 interface Props {
@@ -43,9 +43,9 @@ export function Onboarding({ stationCount, dcCount, vehicle, paint, trialAvailab
   const model = VEHICLES.find((m) => m.id === modelId) ?? VEHICLES[0];
   const go = (s: Step) => {
     void haptic('light');
-    const swap = () => setStep(s);
-    if (document.startViewTransition) document.startViewTransition(swap);
-    else swap();
+    // The new step's children fade up by themselves (CSS); a View Transition would make the dialog ignore taps
+    // until it finished, which on a slow phone took seconds.
+    setStep(s);
   };
 
   const confirmCar = () => {

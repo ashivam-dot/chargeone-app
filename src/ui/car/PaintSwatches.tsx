@@ -1,5 +1,5 @@
 import { haptic } from '../../native/platform.ts';
-import { paintsFor } from './carDesigns.ts';
+import { paintsFor } from './carPaints.ts';
 
 interface Props {
   modelId: string;

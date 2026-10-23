@@ -4,7 +4,7 @@ import { liveState } from '../src/shared/status.ts';
 import { createSessionToken, resetGoogleKeyCache, verifyGoogleIdToken, verifySessionToken } from './auth.ts';
 import { signatureMatches } from './billing.ts';
 import { base64UrlEncode, constantTimeEqual } from './crypto.ts';
-import { HttpError, requireSameOrigin } from './http.ts';
+import { HttpError, clientNetwork, requireSameOrigin } from './http.ts';
 import { summarise, type CheckinRow } from './reports.ts';
 
 const SECRET = 'a'.repeat(48);
@@ -24,6 +24,24 @@ describe('session tokens', () => {
     expect(await verifySessionToken(`${body}.${sig}.x`, SECRET)).toBeNull();
     const later = Date.now() + 31 * 86400_000;
     expect(await verifySessionToken(token, SECRET, later)).toBeNull();
+  });
+});
+
+describe('clientNetwork', () => {
+  it('keeps IPv4 addresses as they are', () => {
+    expect(clientNetwork('203.0.113.7')).toBe('203.0.113.7');
+    expect(clientNetwork('::ffff:203.0.113.7')).toBe('203.0.113.7');
+    expect(clientNetwork('unknown')).toBe('unknown');
+  });
+
+  it('puts every IPv6 address in a /64 together, however it is written', () => {
+    const net = '2001:db8:0:1::/64';
+    for (const ip of ['2001:db8:0:1::1', '2001:db8:0:1::ffff', '2001:0db8:0000:0001:aaaa:bbbb:cccc:dddd', '2001:DB8:0:1:0:0:0:9', '2001:db8:0:1::5%eth0']) {
+      expect(clientNetwork(ip), ip).toBe(net);
+    }
+    expect(clientNetwork('2001:db8:0:2::1')).toBe('2001:db8:0:2::/64');
+    expect(clientNetwork('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(clientNetwork('::1')).toBe('0:0:0:0::/64');
   });
 });
 

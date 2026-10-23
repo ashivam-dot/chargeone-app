@@ -29,8 +29,12 @@ interface Props {
 
 const SOURCE_LABEL: Record<SourceKind, string> = { demo: 'Demo car', phone: 'Phone tracking', obd: 'OBD-II adapter' };
 
-/** Animates a number toward its new value so readings glide instead of jumping. */
-function useTween(value: number | null, ms = 700): number | null {
+/**
+ * Animates a number toward its new value so readings glide instead of jumping. The screen shows whole numbers,
+ * so it only re-renders when the shown value moves by a whole step, not on every frame: telemetry arrives twice a
+ * second and per-frame re-renders of the whole Car screen kept a slow phone's main thread busy all the time.
+ */
+function useTween(value: number | null, ms = 700, step = 1): number | null {
   const [shown, setShown] = useState(value);
   useEffect(() => {
     if (value === null || shown === null || matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -40,10 +44,17 @@ function useTween(value: number | null, ms = 700): number | null {
     const from = shown;
     const start = performance.now();
     let raf = 0;
+    let lastStep = Math.round(from / step);
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / ms);
       const e = 1 - (1 - t) ** 3;
-      setShown(from + (value - from) * e);
+      const v = from + (value - from) * e;
+      const s = Math.round(v / step);
+      if (t >= 1) setShown(value);
+      else if (s !== lastStep) {
+        lastStep = s;
+        setShown(s * step);
+      }
       if (t < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -89,13 +100,16 @@ export function BatteryGauge({ soc, rangeKm, charging, measured }: { soc: number
     <div class={`battery${level}${charging ? ' battery--charging' : ''}`} style={{ '--soc': pct }} role="meter" aria-label="Battery" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
       <div class="battery__fill" />
       <div class="battery__text">
-        <span class="battery__pct">
-          {s === null ? '--' : Math.round(pct)}
-          <small>%</small>
+        <span class="battery__level">
+          Battery
+          <span class="battery__pct">
+            {s === null ? '—' : Math.round(pct)}
+            {s !== null && <small>%</small>}
+          </span>
         </span>
         <span class="battery__range">
           {charging ? 'Charging' : measured ? 'Range' : 'Est. range'}
-          <strong>{r === null ? '--' : `${Math.round(r)} km`}</strong>
+          <strong>{r === null ? '—' : `${Math.round(r)} km`}</strong>
         </span>
       </div>
     </div>

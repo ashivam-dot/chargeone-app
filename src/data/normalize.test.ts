@@ -49,7 +49,7 @@ describe('osmConnectors', () => {
   it('accepts output-only tags and power written in the count field', () => {
     const c = osmConnectors({ 'socket:type7:output': '3.3 kW', 'socket:ccs': '24kw' });
     expect(c).toContainEqual({ type: 'CCS2', count: null, kw: 24 });
-    expect(c).toContainEqual({ type: 'Other', count: null, kw: 3.3 });
+    expect(c).toContainEqual({ type: 'LECCS', count: null, kw: 3.3 });
   });
   it('ignores sockets tagged no and the malformed socket:type key', () => {
     expect(osmConnectors({ 'socket:chademo': 'no', 'socket:type:output': '3.3' })).toEqual([]);

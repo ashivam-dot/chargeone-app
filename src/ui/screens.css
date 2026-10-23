@@ -203,3 +203,7 @@
     opacity: 0;
   }
 }
+.you__who .link {
+  align-self: flex-start;
+  padding-top: 2px;
+}

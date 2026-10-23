@@ -404,7 +404,8 @@ export async function handleWebhook(req: Request, env: Env): Promise<{ ok: true;
 /** Cancels at the end of the paid period, so the user keeps what they paid for. */
 export async function cancelSubscription(env: Env, user: User) {
   const e = await getEntitlement(env, user.id);
-  if (!e || e.source !== 'razorpay' || !e.externalId?.startsWith('sub_') || e.status !== 'active') {
+  // A subscription the admin revoked still renews at Razorpay until it is cancelled here.
+  if (!e || e.source !== 'razorpay' || !e.externalId?.startsWith('sub_') || (e.status !== 'active' && e.status !== 'revoked')) {
     throw new HttpError(404, 'no_subscription', 'No active subscription to cancel.');
   }
   try {

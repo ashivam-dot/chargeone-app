@@ -7,6 +7,17 @@ const SPEED_TEXT = { dc: 'DC fast', ac: 'AC', unknown: 'EV' } as const;
 const MAX_FOOD = 8;
 const MAX_STAYS = 6;
 const MAX_RELATED = 8;
+/**
+ * Charger pages are built for DC chargers and ones we're sure of. Cloudflare's Free plan allows 20,000
+ * files per deployment, so scripts/prerender.ts passes a lower cap when the rest of the build is big.
+ */
+export const PAGE_MIN_CONFIDENCE = 0.6;
+export const MAX_STATION_PAGES = 15_000;
+
+/** Whether a charger gets its own static page. The rest are still listed on city pages and open in the app. */
+export function hasPage(s: Station): boolean {
+  return s.speed === 'dc' || (s.confidence ?? 0) >= PAGE_MIN_CONFIDENCE;
+}
 
 export interface Page {
   /** Path under the site root, always ending in `/`. */
@@ -109,6 +120,19 @@ export interface SiteData {
   site: string;
   dataset: Dataset;
   places: PlacesData;
+  /** Most charger pages to build (default MAX_STATION_PAGES). */
+  maxStationPages?: number;
+}
+
+/**
+ * The chargers that get a page, best first when there are more than `cap`: DC before AC, then the most
+ * confident, then by id so the choice is stable between builds.
+ */
+export function pagedStations(stations: Station[], cap = MAX_STATION_PAGES): Set<string> {
+  const candidates = stations
+    .filter(hasPage)
+    .sort((a, b) => Number(b.speed === 'dc') - Number(a.speed === 'dc') || (b.confidence ?? 0) - (a.confidence ?? 0) || a.id.localeCompare(b.id));
+  return new Set(candidates.slice(0, Math.max(0, cap)).map((s) => s.id));
 }
 
 interface Indexed {
@@ -117,18 +141,24 @@ interface Indexed {
   citySlug: Map<string, string>;
 }
 
-function indexData({ dataset, places }: SiteData): Indexed {
+function indexData({ dataset, places, maxStationPages }: SiteData): Indexed {
   const pathOf = new Map<string, string>();
   const byCity = new Map<string, Station[]>();
+  // Counted over pages issued, not every station seen: the cap used to fill up with stations without one.
+  const paged = pagedStations(dataset.stations, maxStationPages);
   for (const s of dataset.stations) {
     const area = places.area[s.id] ?? null;
-    pathOf.set(s.id, stationPath(s, area));
-    if (area) byCity.set(area, [...(byCity.get(area) ?? []), s]);
+    pathOf.set(s.id, paged.has(s.id) ? stationPath(s, area) : appLink(s));
+    if (area) (byCity.get(area) ?? byCity.set(area, []).get(area)!).push(s);
   }
   const citySlug = new Map(places.cities.map((c) => [c.name, c.slug]));
   for (const name of byCity.keys()) if (!citySlug.has(name)) citySlug.set(name, slugify(name));
   return { pathOf, byCity, citySlug };
 }
+
+/** The app's own view of a charger, for chargers without a static page. */
+const appLink = (s: Station) => `/?s=${encodeURIComponent(s.id)}`;
+const isPage = (ix: Indexed, s: Station) => ix.pathOf.get(s.id)!.startsWith('/charger/');
 
 const rank = (s: Station) => (s.speed === 'dc' ? 0 : s.speed === 'ac' ? 1 : 2);
 
@@ -227,7 +257,7 @@ function cityPage(data: SiteData, ix: Indexed, name: string, stations: Station[]
     '@type': 'ItemList',
     name: `EV charging stations in ${name}`,
     numberOfItems: stations.length,
-    itemListElement: sorted.slice(0, 100).map((s, i) => ({ '@type': 'ListItem', position: i + 1, url: site + ix.pathOf.get(s.id) })),
+    itemListElement: sorted.filter((s) => isPage(ix, s)).slice(0, 100).map((s, i) => ({ '@type': 'ListItem', position: i + 1, url: site + ix.pathOf.get(s.id) })),
   };
   return { path, html: layout({ site, path, title, description, body, ld: [list, breadcrumbs(site, crumbs)] }) };
 }
@@ -255,7 +285,7 @@ export function buildPages(data: SiteData): Page[] {
   return [
     indexPage(data, ix),
     ...[...ix.byCity.entries()].map(([name, list]) => cityPage(data, ix, name, list)),
-    ...data.dataset.stations.map((s) => stationPage(data, ix, s)),
+    ...data.dataset.stations.filter((s) => isPage(ix, s)).map((s) => stationPage(data, ix, s)),
   ];
 }
 

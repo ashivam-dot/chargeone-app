@@ -40,16 +40,40 @@ export default defineConfig({
       },
       workbox: {
         // Charger and city pages are real documents for search engines, not app routes.
-        navigateFallbackDenylist: [/^\/api\//, /^\/charger\//, /^\/ev-charging\//],
-        globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
+        // The admin console is never cached or served offline.
+        navigateFallbackDenylist: [/^\/api\//, /^\/charger\//, /^\/ev-charging\//, /^\/admin/],
+        // The start-up data (charger index, manifest, cell list) and both map styles are installed with the
+        // app: the first visit fetches them before the service worker is in control, so the runtime cache
+        // never saw them, and a phone that opened the link once then went out of signal had an empty map.
+        // Workbox revisions each file by its hash, so a data build updates them with the next app update.
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}', 'data/{index,manifest,cells}.json', 'map/*.json'],
         // Font subsets for scripts the app never shows still load on demand, just not at install.
-        globIgnores: ['charger/**', 'ev-charging/**', 'seo.css', '**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
+        globIgnores: ['charger/**', 'ev-charging/**', 'seo.css', 'admin.html', 'assets/admin-*', '**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        // The server answers /terms.html and /index.html with a redirect to /terms and /. Precache those clean
+        // URLs, so installing doesn't chase a redirect (on an http origin with upgrade-insecure-requests the
+        // redirect went to https and the install never finished, so the app never worked offline).
+        manifestTransforms: [
+          async (entries) => ({
+            manifest: entries.map((e) =>
+              e.url === 'index.html' ? { ...e, url: '/' } : /^[^/]+\.html$/.test(e.url) ? { ...e, url: e.url.slice(0, -'.html'.length) } : e,
+            ),
+            warnings: [],
+          }),
+        ],
+        navigateFallback: '/',
         runtimeCaching: [
+          {
+            // A charger's details, read when it's opened. Keyed by data version (?v=), so old ones age out.
+            urlPattern: ({ url }) => url.pathname.startsWith('/data/shards/'),
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'station-details', expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 3600 } },
+          },
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/data/') || url.pathname.startsWith('/map/'),
             handler: 'StaleWhileRevalidate',
-            options: { cacheName: 'station-data', expiration: { maxEntries: 6 } },
+            // index, manifest, coverage, places, the stations.json fallback and the two map styles.
+            options: { cacheName: 'station-data', expiration: { maxEntries: 12 } },
           },
           {
             // OpenFreeMap's terms cap stored offline tiles at 3,000 per download.
@@ -78,6 +102,6 @@ export default defineConfig({
     proxy: { '/api': 'http://localhost:8787' },
   },
   test: {
-    include: ['src/**/*.test.ts', 'worker/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'worker/**/*.test.ts', 'pipeline/**/*.test.ts'],
   },
 });

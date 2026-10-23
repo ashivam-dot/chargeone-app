@@ -18,6 +18,11 @@ export interface DemoCarOptions {
   startSocPct: number;
   /** Simulated seconds per real second. */
   speedup?: number;
+  /**
+   * Extra speed-up while the car charges at a stop, on top of `speedup`: a demo shouldn't make you
+   * watch 40 minutes of charging. Readings stay stamped in simulated time, so charge durations stay true.
+   */
+  chargeSpeedup?: number;
   scenario?: DemoScenario;
   tickMs?: number;
   chargeStops?: DemoChargeStop[];
@@ -108,7 +113,7 @@ export class DemoCarSource implements VehicleSource {
       const now = Date.now();
       const realMs = Math.min(Math.max(now - last, this.tickMs), this.tickMs * 4);
       last = now;
-      this.step((realMs / 1000) * this.speedup);
+      this.step((realMs / 1000) * this.speedup, this.opts.chargeSpeedup ?? 1);
       if (this.finished) this.clearTimer();
     }, this.tickMs);
   }
@@ -131,12 +136,17 @@ export class DemoCarSource implements VehicleSource {
     this.listeners.emit(this.reading());
   }
 
-  /** Advances the simulation and emits (and returns) the new reading. */
-  step(simSeconds: number): Telemetry {
+  /**
+   * Advances the simulation and emits (and returns) the new reading. While charging, each second of the
+   * budget covers `chargeBoost` simulated seconds; once the car drives off the rest runs at 1:1, so a
+   * boosted tick never turns into a jump down the road.
+   */
+  step(simSeconds: number, chargeBoost = 1): Telemetry {
     let left = simSeconds;
-    while (left > 0) {
-      const dt = Math.min(MAX_SUBSTEP_S, left);
-      left -= dt;
+    while (left > 1e-9) {
+      const boost = this.chargingNow ? Math.max(1, chargeBoost) : 1;
+      const dt = Math.min(MAX_SUBSTEP_S, left * boost);
+      left -= dt / boost;
       this.simS += dt;
       this.substep(dt);
     }

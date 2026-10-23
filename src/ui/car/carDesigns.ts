@@ -1,4 +1,5 @@
 import type { BodyStyle, CarDesign, CarPaint, FaceItem, FacePt } from './carDesign.ts';
+import { PAINT_SPECS } from './carPaints.ts';
 
 // One design per car in the catalogue, keyed by the start of its vehicle id. Sizes, wheelbase, clearance and
 // rim are the makers' published figures; profile fractions, light layouts and paint colours were estimated
@@ -46,7 +47,6 @@ interface Spec {
   /** A bespoke light signature and face, replacing the `front` / `rear` preset. */
   frontItems?: (n: number) => FaceItem[];
   rearItems?: (t: number) => FaceItem[];
-  paints: Array<[name: string, hex: string]>;
 }
 
 // Bespoke faces for the cars whose signature carries their identity. Observed from the free-licence
@@ -433,7 +433,6 @@ const SPECS: Record<string, Spec> = {
     arch: { shape: 'round', gap: 0.013 },
     clad: { archWidth: 0.09, sillH: 0.125, proud: 0.014 },
     lampGlow: 1.2,
-    paints: [['Empowered Oxide', '#8A8F86'], ['Pristine White', '#F2F2EF'], ['Daytona Grey', '#5E6266'], ['Ocean Blue', '#1F4E79'], ['Pure Grey', '#9B9EA0']],
   },
   'tata-punch-ev': {
     name: 'Tata Punch EV',
@@ -472,7 +471,6 @@ const SPECS: Record<string, Spec> = {
     clad: { colour: '#4a4d52', archWidth: 0.09, sillH: 0.14, proud: 0.018 },
     handles: 'pillar-rear',
     lampGlow: 1.2,
-    paints: [['Fearless Yellow', '#E9B824'], ['Supernova Copper', '#B36A45'], ['Bengal Rouge', '#8E2430'], ['Empowered Oxide', '#8A8F86'], ['Pristine White', '#F2F2EF']],
   },
   'tata-tiago-ev': {
     name: 'Tata Tiago EV',
@@ -484,7 +482,6 @@ const SPECS: Record<string, Spec> = {
     cladding: true,
     spokes: 8,
     finish: 'silver',
-    paints: [['Dehradun Dew', '#7FA88B'], ['Sobo Surge', '#2F5D8A'], ['Pangong Pulse', '#4A86B8'], ['Pure Grey', '#9B9EA0'], ['Pristine White', '#F2F2EF']],
   },
   'tata-curvv-ev': {
     name: 'Tata Curvv EV',
@@ -499,7 +496,6 @@ const SPECS: Record<string, Spec> = {
     flushHandles: true,
     wheel: 'aero',
     finish: 'two-tone',
-    paints: [['Virtual Sunrise', '#C8643B'], ['Empowered Oxide', '#8A8F86'], ['Flame Red', '#B3202A'], ['Pure Grey', '#9B9EA0'], ['Pristine White', '#F2F2EF']],
   },
   'tata-harrier-ev': {
     name: 'Tata Harrier EV',
@@ -512,7 +508,6 @@ const SPECS: Record<string, Spec> = {
     roofRails: true,
     finish: 'two-tone',
     noseRound: 0.15,
-    paints: [['Nainital Nocturne', '#1E2A3A'], ['Empowered Oxide', '#8A8F86'], ['Seaweed Green', '#4E5E4A'], ['Pure Grey', '#9B9EA0'], ['Pristine White', '#F2F2EF']],
   },
   'mg-zs-ev': {
     name: 'MG ZS EV',
@@ -525,7 +520,6 @@ const SPECS: Record<string, Spec> = {
     roofRails: true,
     finish: 'two-tone',
     noseRound: 0.5,
-    paints: [['Glaze Red', '#A3212B'], ['Aurora Silver', '#B9BCBE'], ['Starry Black', '#16181B'], ['Candy White', '#F3F3F0']],
   },
   'mg-windsor': {
     name: 'MG Windsor EV',
@@ -541,7 +535,6 @@ const SPECS: Record<string, Spec> = {
     wheel: 'aero',
     finish: 'two-tone',
     noseRound: 0.7,
-    paints: [['Starburst Black', '#121315'], ['Pearl White', '#EFEFEA'], ['Clay Beige', '#B9A58C'], ['Turquoise Green', '#3E8B84'], ['Aurora Silver', '#B9BCBE']],
   },
   'mg-comet': {
     name: 'MG Comet EV',
@@ -556,7 +549,6 @@ const SPECS: Record<string, Spec> = {
     finish: 'silver',
     frontOverhang: 0.5,
     noseRound: 0.8,
-    paints: [['Apple Green', '#9BC33A'], ['Candy White', '#F3F3F0'], ['Aurora Silver', '#B9BCBE'], ['Starry Black', '#16181B']],
   },
   'mahindra-xuv400': {
     name: 'Mahindra XUV400',
@@ -570,7 +562,6 @@ const SPECS: Record<string, Spec> = {
     roofRails: true,
     finish: 'two-tone',
     noseRound: 0.3,
-    paints: [['Everest White', '#F1F1EE'], ['Nebula Blue', '#2A4A73'], ['Galaxy Grey', '#5B5F63'], ['Stealth Black', '#141517'], ['Arctic Blue', '#8DB7D6']],
   },
   'mahindra-be6': {
     name: 'Mahindra BE 6',
@@ -590,7 +581,6 @@ const SPECS: Record<string, Spec> = {
     finish: 'two-tone',
     frontOverhang: 0.5,
     noseRound: 0.2,
-    paints: [['Firestorm Orange', '#D9581F'], ['Tango Red', '#B01E2A'], ['Deep Forest', '#2F3B2C'], ['Desert Myst', '#B8AE9C'], ['Everest White', '#F1F1EE']],
   },
   'mahindra-xev9e': {
     name: 'Mahindra XEV 9e',
@@ -608,7 +598,6 @@ const SPECS: Record<string, Spec> = {
     wheel: 'turbine',
     finish: 'two-tone',
     noseRound: 0.35,
-    paints: [['Everest White', '#F1F1EE'], ['Nebula Blue', '#2A4A73'], ['Ruby Velvet', '#6E1F2E'], ['Desert Myst', '#B8AE9C'], ['Stealth Black', '#141517']],
   },
   'mahindra-xev9s': {
     name: 'Mahindra XEV 9S',
@@ -647,7 +636,6 @@ const SPECS: Record<string, Spec> = {
     glass: { rearPillar: 'body', trim: 'chrome', rearSlant: 0.05 },
     clad: { colour: '#0b0c0e', archWidth: 0.075, sillH: 0.13, proud: 0.014 },
     lampGlow: 1.3,
-    paints: [['Nebula Blue', '#2A4A73'], ['Ruby Velvet', '#6E1F2E'], ['Desert Myst', '#B8AE9C'], ['Midnight Black', '#151B2B'], ['Everest White', '#F1F1EE']],
   },
   'hyundai-creta-electric': {
     name: 'Hyundai Creta Electric',
@@ -660,7 +648,6 @@ const SPECS: Record<string, Spec> = {
     roofRails: true,
     wheel: 'aero',
     finish: 'two-tone',
-    paints: [['Ocean Blue', '#1E4F7C'], ['Atlas White', '#F0F0EC'], ['Fiery Red', '#B1202B'], ['Starry Night', '#232B3B'], ['Abyss Black', '#121314']],
   },
   'hyundai-ioniq5': {
     name: 'Hyundai Ioniq 5',
@@ -674,7 +661,6 @@ const SPECS: Record<string, Spec> = {
     finish: 'silver',
     frontOverhang: 0.5,
     noseRound: 0.3,
-    paints: [['Gravity Gold Matte', '#A49A78'], ['Midnight Black Pearl', '#141516'], ['Titan Grey', '#6A6D70'], ['Optic White', '#F2F2EF']],
   },
   'kia-ev6': {
     name: 'Kia EV6',
@@ -689,7 +675,6 @@ const SPECS: Record<string, Spec> = {
     wheel: 'aero',
     finish: 'gunmetal',
     noseRound: 0.6,
-    paints: [['Snow White Pearl', '#F1F1EC'], ['Wolf Gray', '#5E6164'], ['Runway Red', '#A71E2A'], ['Aurora Black Pearl', '#121314'], ['Yacht Blue Matte', '#25344B']],
   },
   'byd-atto3': {
     name: 'BYD Atto 3',
@@ -703,7 +688,6 @@ const SPECS: Record<string, Spec> = {
     roofRails: true,
     finish: 'two-tone',
     noseRound: 0.55,
-    paints: [['Ski White', '#F2F2EF'], ['Cosmos Black', '#131416'], ['Harbour Grey', '#6B7075'], ['Atlantis Gray', '#4B5A66']],
   },
   'byd-seal': {
     name: 'BYD Seal',
@@ -717,7 +701,6 @@ const SPECS: Record<string, Spec> = {
     wheel: 'aero',
     finish: 'gunmetal',
     noseRound: 0.7,
-    paints: [['Aurora White', '#F2F2EF'], ['Atlantis Gray', '#4B5A66'], ['Cosmos Black', '#131416'], ['Shark Gray', '#7A7F84']],
   },
   'byd-emax7': {
     name: 'BYD eMax 7',
@@ -729,7 +712,6 @@ const SPECS: Record<string, Spec> = {
     roofRails: true,
     finish: 'two-tone',
     noseRound: 0.5,
-    paints: [['Quartz Blue', '#2C4E6E'], ['Cosmos Black', '#131416'], ['Crystal White', '#F2F2EF'], ['Harbour Grey', '#6B7075']],
   },
   'citroen-ec3': {
     name: 'Citroën ë-C3',
@@ -743,7 +725,6 @@ const SPECS: Record<string, Spec> = {
     spokes: 8,
     finish: 'silver',
     noseRound: 0.25,
-    paints: [['Polar White', '#F2F2EF'], ['Perla Nera Black', '#131416'], ['Cosmo Blue', '#2F5B8F']],
   },
   'maruti-e-vitara': {
     name: 'Maruti e Vitara',
@@ -757,7 +738,6 @@ const SPECS: Record<string, Spec> = {
     cladding: true,
     finish: 'two-tone',
     noseRound: 0.25,
-    paints: [['Nexa Blue', '#1F3C78'], ['Opulent Red', '#8E1F2A'], ['Land Breeze Green', '#7E9C8A'], ['Grandeur Grey', '#5B5F63'], ['Arctic White', '#F2F2EF']],
   },
   'tesla-model-y': {
     name: 'Tesla Model Y',
@@ -773,7 +753,6 @@ const SPECS: Record<string, Spec> = {
     finish: 'gunmetal',
     frontOverhang: 0.5,
     noseRound: 0.75,
-    paints: [['Stealth Grey', '#4D5156'], ['Pearl White Multi-Coat', '#F1F1EC'], ['Diamond Black', '#121314'], ['Glacier Blue', '#6E8EA8'], ['Ultra Red', '#A8141E']],
   },
   'vinfast-vf7': {
     name: 'VinFast VF 7',
@@ -790,11 +769,10 @@ const SPECS: Record<string, Spec> = {
     wheel: 'turbine',
     finish: 'two-tone',
     noseRound: 0.5,
-    paints: [['Infinity Blanc', '#F2F2EF'], ['Crimson Red', '#9E1B25'], ['Jet Black', '#111213'], ['Zenith Grey', '#5A5E62'], ['Urban Mint', '#9FC2B4']],
   },
 };
 
-function make(s: Spec): CarDesign {
+function make(s: Spec, paints: ReadonlyArray<readonly [string, string]> = []): CarDesign {
   const [lengthMm, widthMm, heightMm, wheelbaseMm, clearanceMm, rimInch] = s.size;
   const [cowlX, roofFrontX, roofRearX, rearGlassX, hoodFrontH, hoodCowlH, beltH, roofH, tailH] = s.profile;
   const coupe = s.body === 'coupe' || s.body === 'sedan';
@@ -847,20 +825,20 @@ function make(s: Spec): CarDesign {
     wheel: { spokes: s.spokes ?? 5, style: s.wheel ?? 'spoke', finish: s.finish ?? 'silver' },
     front: s.frontItems ? s.frontItems(hoodFrontH) : frontFace(s.front, hoodFrontH),
     rear: s.rearItems ? s.rearItems(tailH) : rearFace(s.rear, tailH),
-    paints: s.paints.map(([name, hex]): CarPaint => ({ name, hex: hex.toLowerCase() })),
+    paints: paints.map(([name, hex]): CarPaint => ({ name, hex: hex.toLowerCase() })),
   };
 }
 
-export const DESIGNS: Record<string, CarDesign> = Object.fromEntries(Object.entries(SPECS).map(([k, s]) => [k, make(s)]));
+export const DESIGNS: Record<string, CarDesign> = Object.fromEntries(Object.entries(SPECS).map(([k, s]) => [k, make(s, PAINT_SPECS[k])]));
 
 /** For a custom car: a plain body of the right kind. */
 const GENERIC: Record<BodyStyle, CarDesign> = {
-  suv: { ...make({ ...SPECS['hyundai-creta-electric'], name: 'Electric SUV', front: 'thin', rear: 'bar' }), paints: [] },
-  coupe: { ...make({ ...SPECS['kia-ev6'], name: 'Electric coupe SUV', front: 'thin', rear: 'thin' }), paints: [] },
-  hatch: { ...make({ ...SPECS['tata-tiago-ev'], name: 'Electric hatchback', front: 'thin', rear: 'bar' }), paints: [] },
-  sedan: { ...make({ ...SPECS['byd-seal'], name: 'Electric sedan', front: 'thin', rear: 'thin' }), paints: [] },
-  mpv: { ...make({ ...SPECS['byd-emax7'], name: 'Electric MPV', front: 'thin', rear: 'bar' }), paints: [] },
-  micro: { ...make({ ...SPECS['mg-comet'], name: 'Electric city car' }), paints: [] },
+  suv: make({ ...SPECS['hyundai-creta-electric'], name: 'Electric SUV', front: 'thin', rear: 'bar' }),
+  coupe: make({ ...SPECS['kia-ev6'], name: 'Electric coupe SUV', front: 'thin', rear: 'thin' }),
+  hatch: make({ ...SPECS['tata-tiago-ev'], name: 'Electric hatchback', front: 'thin', rear: 'bar' }),
+  sedan: make({ ...SPECS['byd-seal'], name: 'Electric sedan', front: 'thin', rear: 'thin' }),
+  mpv: make({ ...SPECS['byd-emax7'], name: 'Electric MPV', front: 'thin', rear: 'bar' }),
+  micro: make({ ...SPECS['mg-comet'], name: 'Electric city car' }),
 };
 
 /** The design for an app vehicle id: its own when ChargeOne has one, else a generic body. */
@@ -870,17 +848,4 @@ export function designFor(modelId: string): { design: CarDesign; exact: boolean 
   return { design: GENERIC.suv, exact: false };
 }
 
-export const DEFAULT_PAINTS: CarPaint[] = [
-  { name: 'White', hex: '#f2f2ef' },
-  { name: 'Silver', hex: '#b9bcbe' },
-  { name: 'Grey', hex: '#5e6266' },
-  { name: 'Black', hex: '#131416' },
-  { name: 'Blue', hex: '#1f4e79' },
-  { name: 'Red', hex: '#a8141e' },
-];
-
-/** Factory colours for a model, or a plain set for a car ChargeOne has no design for. */
-export function paintsFor(modelId: string): CarPaint[] {
-  const { design, exact } = designFor(modelId);
-  return exact && design.paints.length ? design.paints : DEFAULT_PAINTS;
-}
+export { DEFAULT_PAINTS, paintsFor } from './carPaints.ts';

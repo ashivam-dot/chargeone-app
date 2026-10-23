@@ -56,7 +56,7 @@ const CANCEL = /^\s*(?:cancel|stop|never\s*mind|forget it|leave it|no|nope|nahi|
 const SUGGEST: Record<AgentLang, { trip: string[]; none: string[] }> = {
   en: {
     trip: ['Where can we eat on the way?', 'What if my next charger is down?', 'Can I skip a charging stop?', 'How much will charging cost?'],
-    none: ['Plan Pune to Goa with 80% battery', 'How far can my car go at 100 km/h?', 'Best way to charge on a road trip?', 'Fast chargers near me'],
+    none: ['Plan Delhi to Jaipur with 80% battery', 'How far can my car go at 100 km/h?', 'Best way to charge on a road trip?', 'Fast chargers near me'],
   },
   hi: {
     trip: ['रास्ते में खाना कहाँ मिलेगा?', 'अगर अगला चार्जर बंद हो तो?', 'क्या एक स्टॉप छोड़ सकते हैं?', 'चार्जिंग का खर्च कितना होगा?'],
@@ -281,7 +281,7 @@ export function CopilotScreen({ signedIn, account, canUse, trialAvailable, vehic
             <span class="orb__ring orb__ring--2" />
           </div>
           <h2 class="grad-text--plus">Plan your whole trip by voice</h2>
-          <p class="muted">Say “Pune se Goa jaana hai, battery 80 percent” or ask anything on the way: chargers, food, cost, your car. In Hindi or English.</p>
+          <p class="muted">Say “Delhi se Jaipur jaana hai, battery 80 percent” or ask anything on the way: chargers, food, cost, your car. In Hindi or English.</p>
         </div>
         <div class="copilot-sample" aria-label="Example conversation">
           <div class="bubble bubble--user">Lonavala ke baad agla charger kaisa hai?</div>
@@ -292,7 +292,7 @@ export function CopilotScreen({ signedIn, account, canUse, trialAvailable, vehic
           {trialAvailable ? <Sparkles size={18} aria-hidden="true" /> : <Lock size={18} aria-hidden="true" />}
           {trialAvailable ? `Try Plus free for ${TRIAL_DAYS} days` : 'Unlock with Plus'}
         </button>
-        {!signedIn && <p class="small muted center">You'll sign in with Google first.</p>}
+        {!signedIn && trialAvailable && <p class="small muted center">You'll sign in with Google first.</p>}
       </Page>
     );
   }

@@ -1,5 +1,6 @@
-import { BedDouble, BellRing, Bookmark, BookmarkCheck, Car, Gauge, Lightbulb, Moon, Navigation, Split, Utensils, X, Zap } from 'lucide-preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { BedDouble, BellRing, Bookmark, BookmarkCheck, Car, ChevronDown, Gauge, Lightbulb, Moon, Navigation, SlidersHorizontal, Split, Utensils, X, Zap } from 'lucide-preact';
+import type { ComponentChildren } from 'preact';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Station } from '../data/model.ts';
 import type { Place, PlacesData } from '../data/places.ts';
 import { ApiError, api, currentPosition, type Me, type RouteResponse } from '../lib/api.ts';
@@ -12,7 +13,7 @@ import type { Coord } from '../planner/geometry.ts';
 import { nearbyPlaces, planJourney, staysNearDestination, type DayPlan, type Journey } from '../planner/journey.ts';
 import { DEFAULT_OPTIONS, navigationUrl, planTrip, type DrivingStyle, type PlanOptions, type TripPlan } from '../planner/planner.ts';
 import { TAG_LABEL, compareRoutes, type RouteAnalysis, type RouteCandidate } from '../planner/routeCompare.ts';
-import { BASIC, FREE_TRIP_KM, PLANS, REPLAN_WINDOW_HOURS, cheapestWith, formatRupees, type Perk, type Plan, type PlanId } from '../shared/plans.ts';
+import { BASIC, FREE_TRIP_KM, PLANS, REPLAN_WINDOW_HOURS, TRIAL_DAYS, cheapestWith, formatRupees, type Perk, type Plan, type PlanId } from '../shared/plans.ts';
 import { LIVE_COLOUR, LIVE_LABEL, liveState, timeAgo, type StationStatus } from '../shared/status.ts';
 import type { MyVehicle } from '../shared/vehicles.ts';
 import { PlaceList } from './NearbyPlaces.tsx';
@@ -32,6 +33,9 @@ export interface TripView {
 
 interface Props {
   stations: Station[];
+  /** The charger list: a plan made before it loads would find no chargers and still use up a trip. */
+  dataState?: 'loading' | 'ready' | 'failed';
+  onRetryData?: () => void;
   statuses: Map<string, StationStatus>;
   vehicle: MyVehicle | null;
   me: Me | null;
@@ -48,12 +52,30 @@ interface Props {
   onPlanned?: (plan: PlannedTrip) => void;
   onNeedVehicle: () => void;
   onRequireSignIn: () => void;
+  /** Sign-in works on this server; until it does, guests aren't offered it. */
+  signInReady: boolean;
+  /** Offered when a guest reaches a Basic limit. */
+  onStartTrial?: () => void;
   onPaywall: (reason: Paywall) => void;
   onPlans: () => void;
   onShow: (view: TripView | null) => void;
   onSelectStation: (id: string) => void;
   onOpenPlace: (place: Place) => void;
   onUsageChanged: () => void;
+}
+
+/** A Basic limit a guest reached, with the server's exact reason. */
+interface GuestLimit {
+  code: 'too_long' | 'daily_limit';
+  message: string;
+}
+
+/** The server's reason, in words that say what still works. */
+function tripError(e: unknown): string {
+  if (!(e instanceof ApiError)) return 'Could not plan this trip.';
+  if (e.code === 'not_configured') return "Trip planning isn't switched on yet. The charger map and live status still work.";
+  if (e.code === 'device_required') return "This browser didn't keep ChargeOne's app id. Allow site storage, or leave private browsing, and try again.";
+  return e.message;
 }
 
 interface Result {
@@ -70,8 +92,10 @@ interface Result {
   /** Set when the result was opened from a saved trip rather than planned now. */
   savedAt: string | null;
   /** Every road route planned for this trip with its comparison; `active` is the one shown. */
-  routes: Array<{ candidate: RouteCandidate; analysis: RouteAnalysis; destStays: Result['destStays']; tip: string | null }>;
+  routes: Array<{ candidate: RouteCandidate; analysis: RouteAnalysis; destStays: Result['destStays']; tip: string | null; fullWorks: boolean }>;
   active: number;
+  /** The driver asked to plan at unverified chargers too (for this trip only). */
+  unverified: boolean;
 }
 
 export type Point = { name: string; lat: number; lng: number };
@@ -163,9 +187,19 @@ export function TripPlanner(props: Props) {
   const [showMore, setShowMore] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [limit, setLimit] = useState<GuestLimit | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [saved, setSaved] = useState<SavedTrip[]>(loadSavedTrips);
   const plan = PLANS[props.planId];
+  const dataReady = (props.dataState ?? 'ready') === 'ready';
+  /** The route request in flight, so the driver can cancel it on a stalled connection. */
+  const inFlight = useRef<AbortController | null>(null);
+  const [routing, setRouting] = useState(false);
+  const cancelPlanning = () => inFlight.current?.abort();
+  useEffect(() => () => inFlight.current?.abort(), []);
+
+  // A limit card is about the trip it refused; a new start or destination clears it.
+  useEffect(() => setLimit(null), [from, to]);
 
   const setOpt = <K extends keyof PlanOptions>(key: K, value: PlanOptions[K]) => {
     const next = { ...options, [key]: value };
@@ -194,22 +228,31 @@ export function TripPlanner(props: Props) {
     end: Point,
     startedAt: Date,
     savedAt: string | null = null,
+    unverified = false,
+    startSocPct = options.startSocPct,
   ) => {
     const now = new Date();
+    const planOptions: PlanOptions = { ...options, startSocPct, allowUnverified: unverified };
     const destStays = staysNearDestination({ stations, places }, end);
     const geometries = [{ ...response.route, via: null }, ...(response.alternatives ?? [])];
     const candidates: RouteCandidate[] = [];
     const tips: Array<string | null> = [];
+    const fullWorks: boolean[] = [];
     for (const g of geometries) {
-      const input = { route: { coords: g.coords, distanceKm: g.distanceKm, durationMin: g.durationMin }, stations, statuses, vehicle: car, options, now };
-      const journey = planJourney({ ...input, dailyHours: plan.multiDay ? dailyHours : 0, places });
+      const input = { route: { coords: g.coords, distanceKm: g.distanceKm, durationMin: g.durationMin }, stations, statuses, vehicle: car, options: planOptions, now };
+      const dayHours = plan.multiDay ? dailyHours : 0;
+      const journey = planJourney({ ...input, dailyHours: dayHours, places });
       candidates.push({ coords: g.coords, distanceKm: g.distanceKm, durationMin: g.durationMin, journey, via: g.via });
       tips.push(journey.days.length === 1 ? fullChargeTip(journey.days[0].plan, input) : null);
+      // A trip that can't be done as asked: would leaving full be enough, on the same chargers?
+      fullWorks.push(
+        !journey.feasible && startSocPct < 100 && planJourney({ ...input, options: { ...planOptions, startSocPct: 100 }, dailyHours: dayHours, places }).feasible,
+      );
     }
     const analyses = compareRoutes(candidates, stations, statuses, places, now);
-    const routes = candidates.map((candidate, i) => ({ candidate, analysis: analyses[i], destStays, tip: tips[i] }));
+    const routes = candidates.map((candidate, i) => ({ candidate, analysis: analyses[i], destStays, tip: tips[i], fullWorks: fullWorks[i] }));
     const journey = candidates[0].journey;
-    setResult({ response, journey, places, destStays, tip: tips[0], from: start, to: end, plannedAt: now, startedAt, savedAt, routes, active: 0 });
+    setResult({ response, journey, places, destStays, tip: tips[0], from: start, to: end, plannedAt: now, startedAt, savedAt, routes, active: 0, unverified });
     props.onShow(tripView(journey, destStays, response.route.coords, candidates.slice(1).map((c) => c.coords)));
     return journey;
   };
@@ -217,12 +260,9 @@ export function TripPlanner(props: Props) {
   const chooseRoute = (i: number) => {
     if (!result || i === result.active) return;
     const r = result.routes[i];
-    const swap = () => {
-      setResult({ ...result, active: i, journey: r.candidate.journey, tip: r.tip });
-      props.onShow(tripView(r.candidate.journey, r.destStays, r.candidate.coords, result.routes.filter((_, k) => k !== i).map((o) => o.candidate.coords)));
-    };
-    if (document.startViewTransition) document.startViewTransition(swap);
-    else swap();
+    // Applied directly: a View Transition would freeze the map's route redraw and swallow taps while it ran.
+    setResult({ ...result, active: i, journey: r.candidate.journey, tip: r.tip });
+    props.onShow(tripView(r.candidate.journey, r.destStays, r.candidate.coords, result.routes.filter((_, k) => k !== i).map((o) => o.candidate.coords)));
   };
 
   const openSaved = async (trip: SavedTrip) => {
@@ -247,21 +287,38 @@ export function TripPlanner(props: Props) {
       props.onNeedVehicle();
       return;
     }
+    if (!dataReady) {
+      // Never route (and count a trip) before the chargers are known: the plan would wrongly say there are none.
+      setError(props.dataState === 'failed' ? "The charger list didn't load, so this trip can't be planned yet." : 'Still loading chargers. Try again in a moment.');
+      return;
+    }
+    const ctl = new AbortController();
+    inFlight.current = ctl;
+    setRouting(true);
     setBusy(tripId ? 'Re-planning from here…' : plan.routeCompare ? 'Comparing routes…' : 'Planning your trip…');
     setError(null);
+    setLimit(null);
     try {
       const [response, places] = await Promise.all([
-        api.route({ lat: start.lat, lng: start.lng }, { lat: end.lat, lng: end.lng }, tripId, plan.routeCompare && !tripId),
+        api.route({ lat: start.lat, lng: start.lng }, { lat: end.lat, lng: end.lng }, tripId, plan.routeCompare && !tripId, ctl.signal),
         loadPlaces(),
       ]);
       const journey = present(vehicle, response, places, start, end, response.counted === 'replan' ? startedAt : new Date());
       props.onUsageChanged();
       props.onPlanned?.({ journey, from: start, to: end });
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) props.onRequireSignIn();
+      if (ctl.signal.aborted) return;
+      if (e instanceof ApiError && e.status === 402 && !me?.user && (e.code === 'too_long' || e.code === 'daily_limit')) {
+        // Guests stay here: the reason, and what they can do instead.
+        setLimit({ code: e.code, message: e.message });
+      } else if (e instanceof ApiError && e.status === 401) props.onRequireSignIn();
       else if (e instanceof ApiError && e.status === 402) props.onPaywall({ kind: 'trip', message: e.message });
-      else setError(e instanceof Error ? e.message : 'Could not plan this trip.');
+      else setError(tripError(e));
     } finally {
+      if (inFlight.current === ctl) {
+        inFlight.current = null;
+        setRouting(false);
+      }
       setBusy(null);
     }
   };
@@ -278,6 +335,19 @@ export function TripPlanner(props: Props) {
     }
   };
 
+  // Re-plan the same road with unverified chargers allowed: no new route request, so it costs nothing.
+  const useExtras = () => {
+    if (!result || !vehicle) return;
+    present(vehicle, result.response, result.places, result.from, result.to, result.startedAt, result.savedAt, true);
+  };
+
+  // Same road, leaving with a full battery: also a re-plan with no new route request.
+  const useFullCharge = () => {
+    if (!result || !vehicle) return;
+    setOpt('startSocPct', 100);
+    present(vehicle, result.response, result.places, result.from, result.to, result.startedAt, result.savedAt, result.unverified, 100);
+  };
+
   const clear = () => {
     setResult(null);
     props.onShow(null);
@@ -290,7 +360,7 @@ export function TripPlanner(props: Props) {
   const startDrive = () => {
     if (!result || !props.onStartDrive) return;
     const chosen = result.routes[result.active].candidate;
-    props.onStartDrive({ route: chosen.coords, durationMin: chosen.durationMin, journey: result.journey, from: result.from, to: result.to, options });
+    props.onStartDrive({ route: chosen.coords, durationMin: chosen.durationMin, journey: result.journey, from: result.from, to: result.to, options: { ...options, allowUnverified: result.unverified } });
   };
 
   // A stop that has had a problem report since the plan was made: offer a re-plan.
@@ -319,7 +389,13 @@ export function TripPlanner(props: Props) {
     const chosen = result.routes[result.active].candidate;
     const response: RouteResponse = {
       ...result.response,
-      route: { coords: chosen.coords, distanceKm: chosen.distanceKm, durationMin: chosen.durationMin, hasElevation: result.response.route.hasElevation },
+      route: {
+        coords: chosen.coords,
+        distanceKm: chosen.distanceKm,
+        durationMin: chosen.durationMin,
+        hasElevation: result.response.route.hasElevation,
+        source: result.response.route.source,
+      },
       alternatives: undefined,
     };
     const list = saveTrip(result.from, result.to, response, result.startedAt, plan.savedTrips);
@@ -398,8 +474,13 @@ export function TripPlanner(props: Props) {
             <PerkLock text={MULTI_DAY_LABEL} plan={cheapestWith('multiDay')} onUnlock={() => unlock('Multi-day trips', 'multiDay')} />
           )}
 
-          <button type="button" class="link" aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>
-            {showMore ? 'Fewer options' : 'More options (reserve, AC, passengers, driving style)'}
+          <button type="button" class="disclose" aria-expanded={showMore} onClick={() => setShowMore(!showMore)}>
+            <SlidersHorizontal size={18} aria-hidden="true" />
+            <span class="disclose__text">
+              <strong>{showMore ? 'Fewer options' : 'More options'}</strong>
+              <span>Reserve, AC, passengers, driving style</span>
+            </span>
+            <ChevronDown size={18} class="disclose__chev" aria-hidden="true" />
           </button>
           {showMore && (
             <div class="trip-options">
@@ -453,15 +534,50 @@ export function TripPlanner(props: Props) {
               {error}
             </p>
           )}
-          <button class="btn btn--primary btn--block" type="submit" disabled={!from || !to || busy !== null}>
+          {limit && (
+            <GuestLimitCard
+              limit={limit}
+              signInReady={props.signInReady}
+              onStartTrial={props.onStartTrial}
+              onSignIn={props.onRequireSignIn}
+              onPlans={props.onPlans}
+            />
+          )}
+          {!dataReady && (
+            <p class="notice" role="status" data-testid="trip-data-state">
+              {props.dataState === 'failed' ? (
+                <>
+                  The charger list didn't load, so trips can't be planned yet.{' '}
+                  {props.onRetryData && (
+                    <button type="button" class="link link--inline" onClick={props.onRetryData}>
+                      Try again
+                    </button>
+                  )}
+                </>
+              ) : (
+                'Loading chargers…'
+              )}
+            </p>
+          )}
+          <button class="btn btn--primary btn--block" type="submit" disabled={!from || !to || busy !== null || !dataReady}>
             {busy ?? 'Plan my trip'}
           </button>
+          {routing && (
+            <button type="button" class="btn btn--block btn--ghost" onClick={cancelPlanning} data-testid="trip-cancel">
+              Cancel
+            </button>
+          )}
           {free && !me?.user && (
-            <p class="small muted center">
-              Basic: {BASIC.shortTripsPerDay} trip plan a day up to {BASIC.maxTripKm} km, no sign-in.{' '}
-              <button type="button" class="link link--inline" onClick={props.onRequireSignIn}>
-                Sign in free for {PLANS.free.shortTripsPerDay} a day
-              </button>
+            <p class="small muted center" data-testid="basic-hint">
+              Basic: {BASIC.shortTripsPerDay} trip plan a day up to {BASIC.maxTripKm} km, no sign-in.
+              {typeof me?.basicToday === 'number' && ` ${Math.max(0, BASIC.shortTripsPerDay - me.basicToday)} left today.`}{' '}
+              {props.signInReady ? (
+                <button type="button" class="link link--inline" onClick={props.onRequireSignIn}>
+                  Sign in free for {PLANS.free.shortTripsPerDay} a day
+                </button>
+              ) : (
+                <>Free accounts with {PLANS.free.shortTripsPerDay} a day are coming soon.</>
+              )}
             </p>
           )}
           {free && me?.user && (
@@ -481,7 +597,7 @@ export function TripPlanner(props: Props) {
               <ul>
                 {saved.map((t) => (
                   <li key={t.id}>
-                    <button type="button" class="saved__open" disabled={busy !== null} onClick={() => void openSaved(t)}>
+                    <button type="button" class="saved__open" disabled={busy !== null || !dataReady} onClick={() => void openSaved(t)}>
                       <strong>
                         {t.from.name} → {t.to.name}
                       </strong>
@@ -514,14 +630,71 @@ export function TripPlanner(props: Props) {
           onSave={save}
           onUnlock={unlock}
           onReplan={() => void replanFromHere()}
+          onCancel={routing ? cancelPlanning : undefined}
+          limitCard={
+            limit && (
+              <GuestLimitCard
+                limit={limit}
+                signInReady={props.signInReady}
+                onStartTrial={props.onStartTrial}
+                onSignIn={props.onRequireSignIn}
+                onPlans={props.onPlans}
+              />
+            )
+          }
           onClear={clear}
           onChooseRoute={chooseRoute}
           onStartDrive={props.onStartDrive ? startDrive : undefined}
           onSelectStation={props.onSelectStation}
           onOpenPlace={props.onOpenPlace}
+          onUseExtras={useExtras}
+          onFullCharge={useFullCharge}
         />
       )}
     </Sheet>
+  );
+}
+
+interface LimitProps {
+  limit: GuestLimit;
+  signInReady: boolean;
+  onStartTrial?: () => void;
+  onSignIn: () => void;
+  onPlans: () => void;
+}
+
+/** A guest reached a Basic limit: say exactly which, and offer only what this server can do. */
+function GuestLimitCard({ limit, signInReady, onStartTrial, onSignIn, onPlans }: LimitProps) {
+  return (
+    <div class="trip-limit" role="alert" data-testid="trip-limit">
+      <p class="trip-limit__why">{limit.message}</p>
+      <p class="small muted">
+        {limit.code === 'too_long'
+          ? `You can still plan any trip up to ${BASIC.maxTripKm} km, and the charger map works for every distance.`
+          : 'The charger map and live status still work. Plan again after midnight.'}
+      </p>
+      {signInReady ? (
+        <div class="trip-limit__actions">
+          {onStartTrial && (
+            <button type="button" class="btn btn--primary btn--block" onClick={onStartTrial} data-testid="trip-limit-trial">
+              Try Plus free for {TRIAL_DAYS} days
+            </button>
+          )}
+          {limit.code === 'daily_limit' && (
+            <button type="button" class="btn btn--block" onClick={onSignIn}>
+              Sign in free for {PLANS.free.shortTripsPerDay} trips a day
+            </button>
+          )}
+          <button type="button" class="btn btn--block btn--ghost" onClick={onPlans}>
+            See plans
+          </button>
+        </div>
+      ) : (
+        <p class="small muted" data-testid="trip-limit-soon">
+          Free accounts and longer trips need sign-in, which is coming soon.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -541,11 +714,17 @@ interface ResultProps {
   onSave: () => void;
   onUnlock: (label: string, perk: Perk) => void;
   onReplan: () => void;
+  /** Set while a re-plan is waiting on the network. */
+  onCancel?: () => void;
+  /** A guest's re-plan that Basic doesn't cover: shown by the re-plan button, as the form is hidden. */
+  limitCard: ComponentChildren;
   onClear: () => void;
   onChooseRoute: (index: number) => void;
   onStartDrive?: () => void;
   onSelectStation: (id: string) => void;
   onOpenPlace: (place: Place) => void;
+  onUseExtras?: () => void;
+  onFullCharge?: () => void;
 }
 
 function RouteCompareCards({ result, onChoose }: { result: Result; onChoose: (i: number) => void }) {
@@ -630,21 +809,85 @@ function verdictText(j: Journey): string {
 }
 
 function JourneyResult(props: ResultProps) {
-  const { result, journey, alerts, busy, error, me, plan, statuses, saveState, onSave, onUnlock, onReplan, onClear, onChooseRoute, onStartDrive, onSelectStation, onOpenPlace } = props;
+  const { result, journey, alerts, busy, error, me, plan, statuses, saveState, onSave, onUnlock, onReplan, onCancel, limitCard, onClear, onChooseRoute, onStartDrive, onSelectStation, onOpenPlace, onUseExtras, onFullCharge } = props;
+  const extras = journey.days.flatMap((d) => d.plan.extras.map((s) => ({ s, km: d.startKm + s.alongKm })));
+  const extrasWork = journey.days.some((d) => d.plan.extras.length > 0) && journey.days.every((d) => d.plan.feasible || d.plan.extrasFeasible);
   const ends = dayEnds(journey, result.from, result.to);
   const multi = journey.days.length > 1;
   const area = (stationId: string) => result.places?.area[stationId] ?? null;
   const now = new Date();
   const replanFree = plan.freeReplans && now.getTime() - result.startedAt.getTime() < REPLAN_WINDOW_HOURS * 3600_000;
   const replanCost = plan.freeReplans ? 'uses a long trip' : "uses one of today's trips";
+  // Basic has no re-plans: each one is a new trip, so say so once today's are used.
+  const basicUsed = !me?.user && typeof me?.basicToday === 'number' && me.basicToday >= BASIC.shortTripsPerDay;
+  const gapDay = journey.days.find((d) => d.plan.gapAtKm !== null);
+  const gapKm = gapDay ? Math.round(gapDay.startKm + gapDay.plan.gapAtKm!) : null;
+  const safeRoute = result.routes.findIndex((r, i) => i !== result.active && r.candidate.journey.feasible);
+  const fullWorks = result.routes[result.active]?.fullWorks ?? false;
+  const canFix = safeRoute >= 0 || fullWorks || (extrasWork && Boolean(onUseExtras));
   let stopNo = 0;
 
   return (
     <div class="trip-result">
       <div class={`verdict ${journey.feasible ? 'verdict--ok' : 'verdict--bad'}`} role="status">
         <strong>{verdictText(journey)}</strong>
-        <span>Arrive with about {Math.max(0, journey.arrivalSocPct)}% battery</span>
+        <span>
+          {journey.feasible || journey.tooLong
+            ? `Arrive with about ${Math.max(0, journey.arrivalSocPct)}% battery`
+            : gapKm !== null
+              ? `No ${result.unverified ? 'known' : 'confirmed'} charger in reach after km ${gapKm}`
+              : 'You would arrive below your safety reserve'}
+        </span>
       </div>
+
+      {!journey.feasible && !journey.tooLong && (
+        // Never a dead end: what would make this trip work, best first, each a re-plan of the same road.
+        <section class="fixes" aria-label="Ways to make this trip" data-testid="trip-fixes">
+          <h3>{canFix ? 'Ways to make this trip' : 'What you can do'}</h3>
+          <ul>
+            {safeRoute >= 0 && (
+              <li>
+                <button class="fix" onClick={() => onChooseRoute(safeRoute)} data-testid="fix-route">
+                  <strong>Take the {result.routes[safeRoute].analysis.label.toLowerCase()} instead</strong>
+                  <span>It has confirmed chargers all the way with your battery.</span>
+                </button>
+              </li>
+            )}
+            {fullWorks && onFullCharge && (
+              <li>
+                <button class="fix" onClick={onFullCharge} data-testid="fix-full">
+                  <strong>Leave with a full battery</strong>
+                  <span>At 100% the chargers on this plan are enough. Charge at home or near the start first.</span>
+                </button>
+              </li>
+            )}
+            {extrasWork && onUseExtras && (
+              <li>
+                <button class="fix" onClick={onUseExtras} data-testid="use-extras">
+                  <strong>Also use chargers nobody has confirmed recently</strong>
+                  <span>
+                    {extras.length === 1 ? 'One charger' : `${extras.length} chargers`} on this road would fill the gap. They're listed in our data but have no recent check-in, so call
+                    ahead or check reports before you rely on them.
+                  </span>
+                </button>
+              </li>
+            )}
+            <li class="fix fix--text">
+              <strong>Or change the trip</strong>
+              <span>
+                {gapKm !== null
+                  ? `Plan to a town before km ${gapKm} and charge there overnight, or pick a nearer destination.`
+                  : 'Start with more charge, or pick a nearer destination.'}{' '}
+                Know a charger on this road that we don't?{' '}
+                <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener noreferrer">
+                  Add it to OpenStreetMap
+                </a>{' '}
+                and a later plan can use it.
+              </span>
+            </li>
+          </ul>
+        </section>
+      )}
 
       <div class="stats">
         <div>
@@ -711,6 +954,28 @@ function JourneyResult(props: ResultProps) {
           {w}
         </p>
       ))}
+      {result.unverified && (
+        <p class="notice" data-testid="unverified-plan">
+          This plan includes chargers nobody has confirmed recently. Check each one before you set off, and keep the backups in mind.
+        </p>
+      )}
+      {extras.length > 0 && (
+        <section class="extras" aria-label="Extra options" data-testid="extra-options">
+          <h3>Extra options, not verified</h3>
+          <p class="small muted">
+            Chargers on this road that could fill the gap, but that nobody has confirmed recently. We don't plan stops at them unless you ask.
+          </p>
+          <ul>
+            {extras.map(({ s, km }) => (
+              <li key={s.station.id}>
+                <button class="backup" onClick={() => onSelectStation(s.station.id)}>
+                  {s.station.name} · km {Math.round(km)} · {s.mode.toUpperCase()} {s.powerKw} kW
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {journey.days.map((d, di) => {
         const { start, end } = ends[di];
@@ -771,6 +1036,7 @@ function JourneyResult(props: ResultProps) {
                             {s.backups.map((b) => (
                               <button key={b.station.id} class="backup" onClick={() => onSelectStation(b.station.id)}>
                                 {b.station.name} · km {Math.round(d.startKm + b.alongKm)} · arrive {b.arriveSocPct}% · {b.mode.toUpperCase()} {b.powerKw} kW
+                                {b.trusted ? '' : ' · unverified'}
                               </button>
                             ))}
                           </div>
@@ -843,15 +1109,21 @@ function JourneyResult(props: ResultProps) {
             <PerkLock text="Save this trip to open without signal" plan={cheapestWith('savedTrips')} onUnlock={() => onUnlock('Saved trips', 'savedTrips')} />
           )
         )}
-        <button class="btn btn--block" disabled={busy !== null} onClick={onReplan}>
-          {busy ?? `Re-plan from where I am (${replanFree ? 'free' : replanCost})`}
+        {limitCard}
+        <button class="btn btn--block" disabled={busy !== null} onClick={onReplan} data-testid="trip-replan">
+          {busy ?? `Re-plan from where I am (${basicUsed ? "today's Basic trip is used" : replanFree ? 'free' : replanCost})`}
         </button>
+        {onCancel && (
+          <button type="button" class="btn btn--block btn--ghost" onClick={onCancel} data-testid="trip-cancel">
+            Cancel
+          </button>
+        )}
         <button class="btn btn--block btn--ghost" onClick={onClear}>
           Plan another trip
         </button>
       </div>
       <p class="small muted">
-        Estimates use your car's typical consumption, the terrain and your settings. Costs assume about ₹22/kWh for DC and ₹14/kWh for AC. Hotel
+        Estimates use your car's typical consumption, {result.response.route.hasElevation ? 'the terrain and ' : ''}your settings. Costs assume about ₹22/kWh for DC and ₹14/kWh for AC. Hotel
         prices and availability are on Booking.com.
         {result.savedAt
           ? ` Opened from your saved trips (saved ${formatDate(result.savedAt)}); it didn't use a trip.`
@@ -859,6 +1131,19 @@ function JourneyResult(props: ResultProps) {
             ? ` Long trips used: ${me.usage.longInWindow} of ${me.limits.longTripQuota}.`
             : ''}
       </p>
+      {result.response.route.source === 'valhalla' && (
+        // FOSSGIS's terms for its public router: OpenStreetMap credit and a way to report map errors.
+        <p class="small muted" data-testid="route-attribution">
+          Route ©{' '}
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">
+            OpenStreetMap contributors
+          </a>{' '}
+          (ODbL) · Valhalla by FOSSGIS ·{' '}
+          <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noopener">
+            Report a map error
+          </a>
+        </p>
+      )}
     </div>
   );
 }
@@ -896,11 +1181,25 @@ function OvernightCard({ day, index, area, onSelectStation, onOpenPlace }: Overn
           km {Math.round(night.alongKm)}
           {area ? ` · ${area}` : ''}
         </span>
-        <div class="timeline__charge">
-          Arrive {Math.max(0, day.plan.arrivalSocPct)}% → <strong>{night.morningSocPct === 100 ? '100%' : `about ${night.morningSocPct}%`} by morning</strong> ·{' '}
-          {night.morningSocPct === 100 ? `about ${night.hoursToFull} h` : `${night.hoursToFull} h to full`} on {night.mode.toUpperCase()} {night.powerKw} kW
-        </div>
-        {night.morningSocPct < 100 && (
+        {(!night.trusted || night.speedUnknown) && (
+          <span class="trust__badge trust__badge--unverified" data-testid="overnight-unverified">
+            {[!night.trusted && 'Unverified', night.speedUnknown && 'Speed unknown'].filter(Boolean).join(' · ')}
+          </span>
+        )}
+        {night.speedUnknown ? (
+          <div class="timeline__charge">
+            Arrive {Math.max(0, day.plan.arrivalSocPct)}%. No source gives this charger's speed, so we can't say how full the battery will be by
+            morning. Ask the site, or plan a stop early on day {index + 2}.
+          </div>
+        ) : (
+          <div class="timeline__charge">
+            Arrive {Math.max(0, day.plan.arrivalSocPct)}% → <strong>{night.morningSocPct === 100 ? '100%' : `about ${night.morningSocPct}%`} by morning</strong> ·{' '}
+            {night.morningSocPct === 100 ? `about ${night.hoursToFull} h` : `${night.hoursToFull} h to full`} on {night.mode.toUpperCase()} {night.powerKw} kW
+          </div>
+        )}
+        {!night.trusted && <p class="small muted">Nobody has confirmed this charger recently. Call the site before you rely on it for the night.</p>}
+        {night.station.access === 'customers' && <p class="small muted">Customers only: book a room there, or ask before you plug in.</p>}
+        {!night.speedUnknown && night.morningSocPct < 100 && (
           <p class="small muted">A slow charger: a night here won't fill the battery, so day {index + 2} starts lower and may need an extra stop.</p>
         )}
         {night.stays.length > 0 ? (

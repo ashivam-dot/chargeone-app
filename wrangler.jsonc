@@ -22,7 +22,14 @@
   "ai": { "binding": "AI", "remote": true },
   "vars": {
     "ENVIRONMENT": "production",
-    "GOOGLE_CLIENT_ID": "",
+    // Public by design (OAuth web client ID and Firebase web config; not secrets). Firebase project
+    // chargeone-512418 on the owner's personal Google account: Email/Password and Phone providers on,
+    // authorised domains localhost and chargeone.akshshivam5.workers.dev.
+    "GOOGLE_CLIENT_ID": "189004935714-6quqivutlq7dl3j5v2uh88iu24771hmu.apps.googleusercontent.com",
+    "FIREBASE_API_KEY": "AIzaSyC_tHokToLD2hA9I5nvDypfJEIk_s6l7h4",
+    "FIREBASE_PROJECT_ID": "chargeone-512418",
+    "FIREBASE_AUTH_DOMAIN": "chargeone-512418.firebaseapp.com",
+    "FIREBASE_APP_ID": "1:189004935714:web:353b18f1b14b423941907b",
     "RAZORPAY_KEY_ID": "",
     "RAZORPAY_PLAN_MONTHLY": "",
     "RAZORPAY_PLAN_YEARLY": "",
@@ -30,7 +37,7 @@
     "AGENT_FALLBACK_MODEL": "@cf/zai-org/glm-4.7-flash"
   },
   // Secrets (set with `npx wrangler secret put <NAME>`, never committed):
-  // SESSION_SECRET, ORS_API_KEY, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET
+  // SESSION_SECRET, ADMIN_TOKEN (admin console, 24+ chars), ORS_API_KEY, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET
   "env": {
     // CI: `wrangler dev --env ci` without a Cloudflare login, so no AI binding (the copilot answers 503).
     // Bindings and vars aren't inherited by environments, so they are repeated here.
@@ -45,7 +52,10 @@
       ],
       "vars": {
         "ENVIRONMENT": "development",
+        // CI runs offline from Google: no Google or Firebase sign-in there (the app hides those options).
         "GOOGLE_CLIENT_ID": "",
+        "FIREBASE_API_KEY": "",
+        "FIREBASE_PROJECT_ID": "",
         "RAZORPAY_KEY_ID": "",
         "RAZORPAY_PLAN_MONTHLY": "",
         "RAZORPAY_PLAN_YEARLY": "",
