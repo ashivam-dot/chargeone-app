@@ -19,14 +19,15 @@
     "import:places": "node scripts/import-places.ts",
     "icons": "node scripts/make-icons.ts",
     "smoke:api": "node scripts/api-smoke.ts",
-    "deploy": "npm run build -- --require-site-url && wrangler d1 migrations apply chargeone --remote && wrangler deploy",
+    "deploy": "npm run build -- --require-site-url && wrangler d1 migrations apply chargeone --remote && wrangler deploy && npm run alias:sync",
     "budget": "node scripts/bundle-budget.ts",
     "e2e": "playwright test",
     "e2e:slow": "playwright test --project=pixel-7 --grep @slow",
     "cap:build": "CAPACITOR=1 vite build && cap sync",
     "cap:android": "npm run cap:build && cap open android",
     "cap:ios": "npm run cap:build && cap open ios",
-    "native:icons": "node scripts/native-icons.ts"
+    "native:icons": "node scripts/native-icons.ts",
+    "alias:sync": "node scripts/station-alias-sql.ts --out .wrangler/station-alias-sync.sql && wrangler d1 execute chargeone --remote --file .wrangler/station-alias-sync.sql"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "8.3.0",

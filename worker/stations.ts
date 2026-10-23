@@ -1,12 +1,15 @@
 // Charger lookups for the API, read from the same static files the app ships.
 //
-// First choice is the sharded layout the data pipeline writes: aliases.json maps any id (legacy osm-/ocm-
-// ids and retired c1_ ids) to the current stable c1_ id and that id to its geohash cell, and
-// cells/<cell>.json lists the cell's chargers in a few fields. A lookup reads one or a few small cell
-// files instead of all of stations.json. Deployments without those files fall back to stations.json.
+// First choice is the sharded layout the data pipeline writes (src/data/lookup.ts): cells.json is a tiny
+// list of cells and the alias bucket count; aliases/<bucket>.json maps any id (legacy osm-/ocm- ids and
+// retired c1_ ids) to the current stable c1_ id and that id to its geohash cell; cells/<cell>.json lists
+// the cell's chargers in a few fields. A cold start parses a few KB, a lookup one or two buckets and one
+// cell, all within the Free plan's 10 ms of CPU. Deployments without those files fall back to
+// stations.json. Only a 404 means "not on this deployment"; any other failure is retried next request.
 import type { CellFile, CellRow } from '../src/data/compact.ts';
+import { resolveThroughBuckets, type AliasBucket, type LookupFile } from '../src/data/lookup.ts';
 import { DC_THRESHOLD_KW, DC_TYPES, type ConnectorType, type Dataset } from '../src/data/model.ts';
-import { boundsAround, cellsCovering } from '../src/shared/geohash.ts';
+import { boundsAround, cellsCovering, geohashBounds } from '../src/shared/geohash.ts';
 import type { Env } from './env.ts';
 
 export interface StationPoint {
@@ -27,22 +30,14 @@ export interface StationPoint {
 /** Ids the API accepts: stable c1_ ids and the legacy OpenStreetMap / Open Charge Map ids. */
 export const STATION_ID = /^(c1_[a-z2-7]{12}|osm-[nwr]\d{1,15}|ocm-\d{1,10})$/;
 
-interface AliasFile {
-  version: string;
-  aliases: Record<string, string>;
-  legacy: Record<string, string>;
-  cells: Record<string, string>;
-}
-
-interface Sharded {
-  cells: string[];
-  aliases: AliasFile;
-}
+/** Most cells one "near" query reads; a wide radius over a dense area reads the nearest ones only. */
+export const MAX_NEAR_CELLS = 16;
 
 const TTL_MS = 10 * 60 * 1000;
 let legacyCache: { map: Map<string, StationPoint>; loadedAt: number } | null = null;
-let shardedCache: { value: Sharded | null; loadedAt: number } | null = null;
+let shardedCache: { value: LookupFile | null; loadedAt: number } | null = null;
 const cellCache = new Map<string, { points: StationPoint[]; loadedAt: number }>();
+const bucketCache = new Map<string, { value: AliasBucket | null; loadedAt: number }>();
 
 const fresh = (c: { loadedAt: number } | null | undefined) => c !== null && c !== undefined && Date.now() - c.loadedAt < TTL_MS;
 
@@ -59,18 +54,27 @@ export function clearStationCaches(): void {
   legacyCache = null;
   shardedCache = null;
   cellCache.clear();
+  bucketCache.clear();
 }
 
-async function sharded(env: Env): Promise<Sharded | null> {
+/** cells.json, or null when this deployment has none (a 404, cached). Other failures throw, uncached. */
+async function sharded(env: Env): Promise<LookupFile | null> {
   if (fresh(shardedCache)) return shardedCache!.value;
-  const [manifest, aliases] = await Promise.all([
-    asset<{ shards?: Array<{ cell: string }> }>(env, '/data/manifest.json').catch(() => null),
-    asset<AliasFile>(env, '/data/aliases.json').catch(() => null),
-  ]);
-  const value = manifest?.shards?.length && aliases?.cells && aliases.aliases ? { cells: manifest.shards.map((s) => s.cell), aliases } : null;
+  const file = await asset<LookupFile>(env, '/data/cells.json');
+  const value = file?.cells?.length && file.aliasBuckets > 0 ? file : null;
   shardedCache = { value, loadedAt: Date.now() };
   return value;
 }
+
+async function bucket(env: Env, name: string): Promise<AliasBucket | null> {
+  const cached = bucketCache.get(name);
+  if (fresh(cached)) return cached!.value;
+  const value = await asset<AliasBucket>(env, `/data/aliases/${encodeURIComponent(name)}.json`);
+  bucketCache.set(name, { value, loadedAt: Date.now() });
+  return value;
+}
+
+const lookupId = (env: Env, s: LookupFile, id: string) => resolveThroughBuckets(id, s.aliasBuckets, (name) => bucket(env, name));
 
 const fromCellRow = ([c1Id, id, lat, lng, name, operator, maxKw, connectors, dc]: CellRow): StationPoint => ({
   id,
@@ -94,7 +98,10 @@ async function cellPoints(env: Env, cell: string): Promise<StationPoint[]> {
   return points;
 }
 
-/** Every station from stations.json, by its id. The fallback, and what older deployments use. */
+/**
+ * Every station from stations.json, by its id, its c1 id and its aliases. The fallback, and what older
+ * deployments use.
+ */
 export async function stationIndex(env: Env): Promise<Map<string, StationPoint>> {
   if (fresh(legacyCache)) return legacyCache!.map;
   const data = await asset<Dataset>(env, '/data/stations.json');
@@ -102,9 +109,9 @@ export async function stationIndex(env: Env): Promise<Map<string, StationPoint>>
   const map = new Map<string, StationPoint>();
   for (const s of data.stations) {
     const connectors = [...new Set(s.connectors.map((c) => c.type))];
-    map.set(s.id, {
+    const point: StationPoint = {
       id: s.id,
-      c1Id: s.id,
+      c1Id: s.c1Id ?? s.id,
       lat: s.lat,
       lng: s.lng,
       name: s.name,
@@ -112,7 +119,11 @@ export async function stationIndex(env: Env): Promise<Map<string, StationPoint>>
       maxKw: s.maxKw,
       connectors,
       dc: s.speed === 'dc' || connectors.some((c) => DC_TYPES.has(c)) || (s.maxKw ?? 0) > DC_THRESHOLD_KW,
-    });
+    };
+    // Own ids first, so an alias never shadows a station's own id.
+    for (const a of s.aliases ?? []) if (!map.has(a)) map.set(a, point);
+    map.set(point.c1Id, point);
+    map.set(s.id, point);
   }
   legacyCache = { map, loadedAt: Date.now() };
   return map;
@@ -120,25 +131,22 @@ export async function stationIndex(env: Env): Promise<Map<string, StationPoint>>
 
 /**
  * The current stable id for any id a client may send: a c1_ id, a retired c1_ id, or a legacy
- * osm-/ocm- id. Null when no charger has it. On the stations.json fallback, ids map to themselves.
+ * osm-/ocm- id. Null when no charger has it. On the stations.json fallback, the station's c1 id when
+ * the file has one.
  */
 export async function resolveStationId(env: Env, id: string): Promise<string | null> {
   const s = await sharded(env);
-  if (s) {
-    const current = s.aliases.aliases[id] ?? id;
-    return s.aliases.cells[current] ? current : null;
-  }
-  return (await stationIndex(env)).has(id) ? id : null;
+  if (s) return (await lookupId(env, s, id))?.c1Id ?? null;
+  return (await stationIndex(env)).get(id)?.c1Id ?? null;
 }
 
 /** One charger by any of its ids. */
 export async function stationById(env: Env, id: string): Promise<StationPoint | null> {
   const s = await sharded(env);
   if (!s) return (await stationIndex(env)).get(id) ?? null;
-  const current = s.aliases.aliases[id] ?? id;
-  const cell = s.aliases.cells[current];
-  if (!cell) return null;
-  return (await cellPoints(env, cell)).find((p) => p.c1Id === current) ?? null;
+  const found = await lookupId(env, s, id);
+  if (!found) return null;
+  return (await cellPoints(env, found.cell)).find((p) => p.c1Id === found.c1Id) ?? null;
 }
 
 /** Several chargers by id (for lists of reports); ids nobody has are left out. */
@@ -155,8 +163,8 @@ export async function stationsByIds(env: Env, ids: Iterable<string>): Promise<Ma
 export async function stationsNear(env: Env, at: { lat: number; lng: number }, radiusKm: number, dcOnly: boolean): Promise<Array<StationPoint & { km: number }>> {
   const s = await sharded(env);
   const pool = s
-    ? (await Promise.all(cellsCovering(s.cells, boundsAround(at, radiusKm)).map((c) => cellPoints(env, c)))).flat()
-    : (await stationIndex(env)).values();
+    ? (await Promise.all(nearestCells(s.cells, at, radiusKm).map((c) => cellPoints(env, c)))).flat()
+    : new Set((await stationIndex(env)).values());
   const out: Array<StationPoint & { km: number }> = [];
   for (const p of pool) {
     if (dcOnly && !p.dc) continue;
@@ -164,6 +172,21 @@ export async function stationsNear(env: Env, at: { lat: number; lng: number }, r
     if (km <= radiusKm) out.push({ ...p, km });
   }
   return out.sort((a, b) => a.km - b.km);
+}
+
+/** The cells a circle touches, nearest centre first, at most MAX_NEAR_CELLS. */
+export function nearestCells(cells: string[], at: { lat: number; lng: number }, radiusKm: number): string[] {
+  const touched = cellsCovering(cells, boundsAround(at, radiusKm));
+  if (touched.length <= MAX_NEAR_CELLS) return touched;
+  const centre = (c: string) => {
+    const b = geohashBounds(c);
+    return { lat: (b.south + b.north) / 2, lng: (b.west + b.east) / 2 };
+  };
+  return touched
+    .map((c) => ({ c, d: distanceMetres(at, centre(c)) }))
+    .sort((x, y) => x.d - y.d || x.c.localeCompare(y.c))
+    .slice(0, MAX_NEAR_CELLS)
+    .map((x) => x.c);
 }
 
 export function distanceMetres(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {

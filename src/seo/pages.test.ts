@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Dataset, Station } from '../data/model.ts';
 import type { PlacesData } from '../data/places.ts';
-import { buildPages, esc, jsonLd, robots, siteOrigin, sitemap, stationPath } from './pages.ts';
+import { buildPages, esc, jsonLd, MAX_STATION_PAGES, pagedStations, robots, siteOrigin, sitemap, stationPath } from './pages.ts';
 
 const station = (id: string, name: string, extra: Partial<Station> = {}): Station => ({
   id,
@@ -106,5 +106,28 @@ describe('seo pages', () => {
     expect(xml).toContain('<lastmod>2026-10-20</lastmod>');
     expect(robots('https://x.in')).toContain('Sitemap: https://x.in/sitemap.xml');
     expect(robots('https://x.in')).toContain('Disallow: /api/');
+  });
+
+  it('caps charger pages at MAX_STATION_PAGES past 15k stations: DC first, then most confident', () => {
+    const many = Array.from({ length: 26_000 }, (_, i) =>
+      station(`osm-n${i + 1}`, `Hub ${i}`, { speed: i % 2 ? 'dc' : 'ac', confidence: (i % 100) / 100 }),
+    );
+    const paged = pagedStations(many);
+    expect(paged.size).toBe(MAX_STATION_PAGES);
+    // All 13,000 DC chargers make it, then the most confident AC ones.
+    expect(many.filter((s) => s.speed === 'dc').every((s) => paged.has(s.id))).toBe(true);
+    const ac = many.filter((s) => s.speed === 'ac' && paged.has(s.id));
+    expect(ac).toHaveLength(2_000);
+    expect(Math.min(...ac.map((s) => s.confidence!))).toBeGreaterThanOrEqual(Math.max(...many.filter((s) => s.speed === 'ac' && !paged.has(s.id)).map((s) => s.confidence!)));
+    expect(pagedStations(many, 10).size).toBe(10);
+    expect(pagedStations(many, -5).size).toBe(0);
+  });
+
+  it('builds exactly the capped number of charger pages and links the rest into the app', () => {
+    const { dataset, places } = fixture();
+    const pages = buildPages({ site: 'https://example.in', dataset, places, maxStationPages: 1 });
+    expect(pages.filter((p) => p.path.startsWith('/charger/'))).toHaveLength(1);
+    const city = pages.find((p) => p.path === '/ev-charging/new-delhi/')!;
+    expect(city.html).toMatch(/\?s=osm-n/);
   });
 });

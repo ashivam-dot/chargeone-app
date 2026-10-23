@@ -2,6 +2,7 @@ import { Route } from 'lucide-preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { DEFAULT_FILTERS, filterStations, hiddenBySettings, operatorsByCount, type MapMode } from './data/filters.ts';
 import { loadDataset, loadStationDetail, type DataManifest } from './data/loader.ts';
+import { keepIfSame, statusesByStation, unknownStatusIds } from './data/statusIds.ts';
 import type { Dataset, Station } from './data/model.ts';
 import type { Place, PlacesData } from './data/places.ts';
 import { api, type Config, type Me } from './lib/api.ts';
@@ -26,7 +27,7 @@ import { Garage } from './ui/Garage.tsx';
 import { Onboarding } from './ui/onboarding/Onboarding.tsx';
 import { PlaceInput, type PickedPlace } from './ui/PlaceInput.tsx';
 import { PlaceSheet } from './ui/PlaceSheet.tsx';
-import { Plans, type Paywall } from './ui/Plans.tsx';
+import type { Paywall } from './ui/Plans.tsx';
 import { lazy } from './ui/shell/lazy.tsx';
 import { TabBar, type Tab } from './ui/shell/TabBar.tsx';
 import { SignIn, signInReady } from './ui/SignIn.tsx';
@@ -38,6 +39,9 @@ const CarScreen = lazy(() => import('./ui/car/CarScreen.tsx').then((m) => m.CarS
 const CopilotScreen = lazy(() => import('./ui/copilot/CopilotScreen.tsx').then((m) => m.CopilotScreen));
 const DriveMode = lazy(() => import('./ui/drive/DriveMode.tsx').then((m) => m.DriveMode));
 const About = lazy(() => import('./ui/About.tsx').then((m) => m.About));
+const Plans = lazy(() => import('./ui/Plans.tsx').then((m) => m.Plans));
+/** Alias buckets, fetched only for an id the index doesn't list (src/data/aliasLookup.ts). */
+const resolveAlias = (id: string) => import('./data/aliasLookup.ts').then((m) => m.resolveAlias(id));
 
 type Overlay = 'plans' | 'signin' | 'about' | 'garage' | null;
 
@@ -91,6 +95,8 @@ export function App() {
   const [mapView, setMapView] = useState<MapViewport | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rawStatuses, setRawStatuses] = useState<StationStatus[]>([]);
+  /** Report ids the index doesn't list (old source ids, retired c1 ids) -> the station's c1 id. */
+  const [aliasOf, setAliasOf] = useState<Map<string, string | null>>(() => new Map());
   const [config, setConfig] = useState<Config | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [filters, setFilters] = useState<MapFilters>(() => ({
@@ -169,11 +175,15 @@ export function App() {
         setDataset(d);
         setManifest(m);
         const id = new URLSearchParams(location.search).get('s');
-        const s = id ? d.stations.find((x) => x.id === id || x.c1Id === id || x.aliases?.includes(id)) : undefined;
-        if (s) {
+        const open = (s: (typeof d.stations)[number] | undefined) => {
+          if (!s) return;
           setSelectedId(s.id);
           setFlyTarget({ kind: 'point', lat: s.lat, lng: s.lng, zoom: 14 });
-        }
+        };
+        const s = id ? d.stations.find((x) => x.id === id || x.c1Id === id || x.aliases?.includes(id)) : undefined;
+        if (s) open(s);
+        // The index lists each station's own ids only; a link may use a merged record's or a retired one.
+        else if (id) void resolveAlias(id).then((r) => r && open(d.stations.find((x) => x.c1Id === r.c1Id || x.id === r.legacyId)));
       })
       .catch(() => setLoadError("Couldn't load the charger map. Check your connection and reload."));
     const placeId = new URLSearchParams(location.search).get('p');
@@ -220,7 +230,8 @@ export function App() {
   const refreshStatuses = useCallback(() => {
     api
       .statuses()
-      .then((r) => setRawStatuses(r.statuses))
+      // Most polls return what the last one did: keep the same array so nothing downstream redraws.
+      .then((r) => setRawStatuses((prev) => keepIfSame(prev, r.statuses)))
       .catch(() => undefined);
   }, []);
 
@@ -264,20 +275,20 @@ export function App() {
   const stations = dataset?.stations ?? [];
   const byId = useMemo(() => new Map(stations.map((s) => [s.id, s])), [stations]);
   // Reports are kept under stable c1 ids (older ones under osm-/ocm- ids); the app keys stations by id.
-  const statuses = useMemo(() => {
-    const idOf = new Map<string, string>();
-    for (const s of stations) {
-      idOf.set(s.id, s.id);
-      if (s.c1Id) idOf.set(s.c1Id, s.id);
-      for (const a of s.aliases ?? []) idOf.set(a, s.id);
-    }
-    const out = new Map<string, StationStatus>();
-    for (const st of rawStatuses) {
-      const id = idOf.get(st.stationId);
-      if (id && !out.has(id)) out.set(id, { ...st, stationId: id });
-    }
-    return out;
-  }, [stations, rawStatuses]);
+  const statuses = useMemo(() => statusesByStation(stations, rawStatuses, aliasOf), [stations, rawStatuses, aliasOf]);
+  // Reports under an id the index doesn't list: look each up once in the alias buckets.
+  useEffect(() => {
+    if (!stations.length) return;
+    const unknown = unknownStatusIds(stations, rawStatuses, aliasOf);
+    if (!unknown.length) return;
+    let live = true;
+    void Promise.all(unknown.map(async (id) => [id, (await resolveAlias(id))?.c1Id ?? null] as const)).then((pairs) => {
+      if (live) setAliasOf((prev) => new Map([...prev, ...pairs]));
+    });
+    return () => {
+      live = false;
+    };
+  }, [stations, rawStatuses, aliasOf]);
   const operators = useMemo(() => operatorsByCount(stations), [stations]);
   const dcCount = useMemo(() => stations.filter((s) => s.speed === 'dc').length, [stations]);
   const shown = useMemo(() => {

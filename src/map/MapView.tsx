@@ -527,9 +527,17 @@ export function MapView(props: Props) {
     map.addControl(attributionControl.current, 'bottom-left');
   }, [credits]);
 
+  // A status poll changes a few chargers' colours at most, usually none: re-send the stations to the map
+  // (and re-tile them) only when the stations or a charger's live state actually changed.
+  const drawn = useRef<{ stations: Station[]; live: string } | null>(null);
   useEffect(() => {
     const source = mapRef.current?.getSource(SOURCE) as GeoJSONSource | undefined;
-    void source?.setData(stationsGeoJson(stations, statuses));
+    if (!source) return;
+    const now = new Date();
+    const live = stations.map((s) => liveState(statuses.get(s.id), now)[0]).join('');
+    if (drawn.current && drawn.current.stations === stations && drawn.current.live === live) return;
+    drawn.current = { stations, live };
+    void source.setData(stationsGeoJson(stations, statuses));
   }, [stations, statuses]);
 
   useEffect(() => {
