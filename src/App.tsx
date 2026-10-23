@@ -8,6 +8,7 @@ import type { Place, PlacesData } from './data/places.ts';
 import { api, type Config, type Me } from './lib/api.ts';
 import { setHdVoice } from './voice/hd.ts';
 import { loadPlaces } from './lib/places.ts';
+import { setReloadBlocker } from './lib/reloadGuard.ts';
 import { THEME_COLOUR, loadTheme, saveTheme } from './lib/theme.ts';
 import { clearSavedTrips } from './lib/savedTrips.ts';
 import { isObject, loadJson, removeJson, saveJson } from './lib/storage.ts';
@@ -24,7 +25,6 @@ import { useCarLink } from './ui/car/carLink.ts';
 import type { VoiceTrip } from './ui/copilot/CopilotScreen.tsx';
 import type { CarPosition } from './ui/drive/DriveMode.tsx';
 import { FilterBar, HiddenPill, type MapFilters } from './ui/FilterBar.tsx';
-import { Onboarding } from './ui/onboarding/Onboarding.tsx';
 import { MapLegend } from './ui/MapLegend.tsx';
 import { PlaceInput, type PickedPlace } from './ui/PlaceInput.tsx';
 import { PlaceSheet } from './ui/PlaceSheet.tsx';
@@ -43,6 +43,8 @@ const DriveMode = lazy(() => import('./ui/drive/DriveMode.tsx').then((m) => m.Dr
 // Feedback and the garage open on a tap, so they load then: it keeps the start-up bundle in budget.
 const Feedback = lazy(() => import('./ui/Feedback.tsx').then((m) => m.Feedback));
 const Garage = lazy(() => import('./ui/Garage.tsx').then((m) => m.Garage));
+// Only on the first visit, so it isn't in the start-up download.
+const Onboarding = lazy(() => import('./ui/onboarding/Onboarding.tsx').then((m) => m.Onboarding));
 const About = lazy(() => import('./ui/About.tsx').then((m) => m.About));
 const YouScreen = lazy(() => import('./ui/YouScreen.tsx').then((m) => m.YouScreen));
 const Plans = lazy(() => import('./ui/Plans.tsx').then((m) => m.Plans));
@@ -179,6 +181,9 @@ export function App() {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOUR[dark ? 'dark' : 'light']);
   }, [dark]);
+
+  // A new deploy waits for a Reload tap while a trip is being planned or driven.
+  useEffect(() => setReloadBlocker(() => tripOpen || drive !== null), [tripOpen, drive]);
 
   useEffect(() => {
     if (!toast) return;

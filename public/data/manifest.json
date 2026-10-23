@@ -1,6 +1,6 @@
 {
   "version": "e08b038f0643",
-  "generatedAt": "2026-10-23T14:10:00.763Z",
+  "generatedAt": "2026-10-23T17:47:38.090Z",
   "schema": 1,
   "counts": {
     "stations": 2560,
@@ -192,16 +192,16 @@
       "sha256": "a00e29354010007e7622e93a20ab1b5d3f1e243f46c628b7705e781371103da4"
     },
     "chargeone-stations-odbl.zip": {
-      "bytes": 558004,
-      "sha256": "62e9dc8d396856b7445e7c89057f5c74826042f98b313a616c490e1620acf4d3"
+      "bytes": 558005,
+      "sha256": "f8f84d559ae91ecc5b7ccd462480c7ef37c9b9adda3fe9b97ced6e40fc033c84"
     },
     "coverage.json": {
       "bytes": 12548,
-      "sha256": "50de37916f546a6542fdd6074f144caeecd429fba0d82ad458197584d2347a51"
+      "sha256": "c63e1b0e76d1a2803243a26bad93777d311d30d56d899a997f46036889fd2743"
     },
     "index.json": {
       "bytes": 316740,
-      "sha256": "93999c2029db8c257ae047d373fcea0738544b7348f8746e095755bda9a6bdb5"
+      "sha256": "3ddfaf98073836d6e498b3571c57f785c496b9a2921f0fea5a0e0755f1bd6c35"
     },
     "LICENSE-Apache-2.0.txt": {
       "bytes": 11358,
@@ -221,7 +221,7 @@
     },
     "review-queue.json": {
       "bytes": 93026,
-      "sha256": "4c69b27f1df020537ab3ebddde4a2827e026f7f8ce65a0377e4a3231a4d8765a"
+      "sha256": "07f97e6c9a9ed2cc2370be66a4a20860022a701b2f274548e0e8108e995e14b5"
     },
     "shards/t9.json": {
       "bytes": 275948,
@@ -309,7 +309,7 @@
     },
     "stations.json": {
       "bytes": 2048869,
-      "sha256": "a6a5ab6813a154287969106e085cc6c0b7d9c3a541750abdce730dc1598cb9ab"
+      "sha256": "08f9c05c554ddc31ac972f00bccd0d6a16e8d15222ce466f07e5801c02f2b6f0"
     }
   },
   "shards": [
