@@ -303,6 +303,55 @@ export function resolve(records: SourceRecord[]): Resolution {
   return { clusters, review: [...review.values()].sort((x, y) => y.score - x.score || x.distanceM - y.distanceM), blocked };
 }
 
+/** A location-only listing this close to a station a stronger source describes is that station (see listedDuplicates). */
+export const LISTED_DEDUPE_METRES = 100;
+
+/** Source strength for de-duplication: OSM and OCM describe chargers, the lists only place them. */
+const LIST_RANK: Record<SourceRecord['source'], number> = { osm: 0, ocm: 0, tgredco: 1 };
+
+/**
+ * Clusters made only of location-only listings (a government list, a places dataset) that sit within
+ * LISTED_DEDUPE_METRES of a record from a stronger source: the same charger, geocoded a little apart, and
+ * usually without the operator that would let resolution merge it. They are dropped, not merged: the
+ * listing adds nothing the stronger source lacks, and a null operator is never a wildcard for merging.
+ * The hard rules still hold: a listing of another known operator, or of another vehicle class, stays.
+ */
+export function listedDuplicates(records: SourceRecord[], clusters: number[][]): Set<number> {
+  const prepared = records.map(prepare);
+  const rankOf = clusters.map((c) => Math.min(...c.map((i) => LIST_RANK[records[i].source])));
+  const clusterOf = new Map<number, number>();
+  clusters.forEach((c, k) => c.forEach((i) => clusterOf.set(i, k)));
+  const cells = new Map<string, number[]>();
+  records.forEach((r, i) => {
+    const cell = geohash(r.lat, r.lng, BLOCK_PRECISION);
+    (cells.get(cell) ?? cells.set(cell, []).get(cell)!).push(i);
+  });
+  const drop = new Set<number>();
+  clusters.forEach((c, k) => {
+    if (rankOf[k] === 0) return;
+    const near = c.some((i) =>
+      geohashBlock(records[i].lat, records[i].lng, BLOCK_PRECISION).some((cell) =>
+        (cells.get(cell) ?? []).some((j) => {
+          const other = clusterOf.get(j)!;
+          if (other === k || rankOf[other] >= rankOf[k]) return false;
+          // Every record of the listing must be compatible with every record of the stronger station.
+          return (
+            distanceMetres(records[i], records[j]) <= LISTED_DEDUPE_METRES &&
+            c.every((x) =>
+              clusters[other].every((y) => {
+                const d = distanceMetres(records[x], records[y]);
+                return !operatorClash(prepared[x], prepared[y], d) && !vehicleConflict(prepared[x].vclass, prepared[y].vclass);
+              }),
+            )
+          );
+        }),
+      ),
+    );
+    if (near) drop.add(k);
+  });
+  return drop;
+}
+
 /** Groups stations closer than THRESHOLDS.siteMetres into Sites (different operators at one car park). */
 export function groupSites(points: Array<{ lat: number; lng: number }>): number[][] {
   const uf = new Clusters(points.length);

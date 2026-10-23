@@ -16,6 +16,12 @@ export type Speed = 'dc' | 'ac' | 'unknown';
 
 export type Vehicle = 'car' | '2w' | '3w' | 'bus';
 
+/** The data sources (pipeline/types.ts SourceKey). `tgredco` is a location-only government list. */
+export type DataSourceKey = 'osm' | 'ocm' | 'tgredco';
+
+/** Display names of the sources (pipeline/outputs.ts SOURCE_NAME). */
+export type SourceName = 'OpenStreetMap' | 'Open Charge Map' | 'Telangana Open Data (TGREDCO)';
+
 export interface Connector {
   type: ConnectorType;
   count: number | null;
@@ -23,7 +29,7 @@ export interface Connector {
 }
 
 export interface SourceRef {
-  name: 'OpenStreetMap' | 'Open Charge Map';
+  name: SourceName;
   id: string;
   url: string;
   editUrl?: string;
@@ -85,7 +91,7 @@ export type DetailField = 'name' | 'operator' | 'connectors' | 'maxKw' | 'points
 
 export interface FieldClaim {
   value: unknown;
-  source: 'osm' | 'ocm';
+  source: DataSourceKey;
   sourceId: string;
   observedAt: string | null;
   licence: string;
@@ -102,7 +108,7 @@ export interface FieldDetail {
 
 export interface SourceRecordRef {
   sourceId: string;
-  source: 'osm' | 'ocm';
+  source: DataSourceKey;
   observedAt: string | null;
   /** True when the date is a survey or verification; false when it's only an edit or bulk-import date. */
   verified: boolean;

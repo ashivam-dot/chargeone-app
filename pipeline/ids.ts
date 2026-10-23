@@ -129,11 +129,15 @@ export function assignIds(clusters: string[][], registry: Registry, today: strin
       registry.stations[k].mergedInto = id;
       delete registry.stations[k].gone;
     }
-    if (!members.includes(entry.legacy)) {
+    // A station only the location lists know (`tg-…`, …) has no OSM/OCM id to link with: its c1 id is its
+    // app id, and stays so once published, even when an OSM or OCM record joins later.
+    const keepC1 = entry.legacy === id && previousLegacy.has(id);
+    if (!members.includes(entry.legacy) && !keepC1) {
       entry.legacy =
         members.find((m) => previousLegacy.has(m)) ??
         members.find((m) => m.startsWith('osm-')) ??
-        members[0];
+        members.find((m) => m.startsWith('ocm-')) ??
+        id;
     }
     for (const m of members) registry.sources[m] = id;
   }

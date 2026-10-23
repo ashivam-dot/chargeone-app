@@ -6,7 +6,7 @@ import { PLAN_MIN_CONFIDENCE } from '../src/data/trust.ts';
 import { THRESHOLDS } from './config.ts';
 import { denied, strings } from './lib/denylist.ts';
 import { distanceMetres } from './lib/geo.ts';
-import type { CanonicalStation, FieldValue, HealthReport, SourceKey } from './types.ts';
+import { LISTED_SOURCES, type CanonicalStation, type FieldValue, type HealthReport, type SourceKey } from './types.ts';
 
 /**
  * Licences a published value may carry: free, no card, commercial use allowed
@@ -18,6 +18,7 @@ export const ALLOWED_LICENCES: ReadonlySet<string> = new Set(['ODbL-1.0', 'CC-BY
 export const SOURCE_LICENCES: Readonly<Record<string, ReadonlySet<string>>> = {
   osm: new Set(['ODbL-1.0']),
   ocm: new Set(['CC-BY-4.0']),
+  tgredco: new Set(['GODL-India']),
 };
 
 const STATION_FIELDS = ['name', 'operator', 'connectors', 'maxKw', 'points', 'hours', 'price', 'access', 'address', 'website'] as const;
@@ -80,7 +81,7 @@ export interface Baseline {
   stations: Station[];
 }
 
-const SOURCE_KEY: Record<string, SourceKey> = { OpenStreetMap: 'osm', 'Open Charge Map': 'ocm' };
+const SOURCE_KEY: Record<string, SourceKey> = { OpenStreetMap: 'osm', 'Open Charge Map': 'ocm', 'Telangana Open Data (TGREDCO)': 'tgredco' };
 
 /** Baseline from the published files. `manifest` wins for source counts; positions and DC come from stations.json. */
 export function baselineFrom(dataset: Dataset | null, manifest: { sources: Array<{ key: SourceKey; records: number }> } | null): Baseline | null {
@@ -181,6 +182,11 @@ export function runGates(g: GateInput): GateResult {
     const provenance = provenanceFailures(g.canonical ?? [], g.adapters ?? []);
     failures.push(...provenance);
     checks.push(`provenance: ${g.canonical?.length ?? 0} stations, ${provenance.length ? 'FAILED' : 'every record and claim licensed, no denylisted text'}`);
+    // Location-only lists never put a stop in a plan on their own.
+    const listedOnly = (g.canonical ?? []).filter((s) => s.members.length > 0 && s.members.every((m) => LISTED_SOURCES.has(m.source)));
+    const plannable = listedOnly.filter((s) => s.confidence >= PLAN_MIN_CONFIDENCE);
+    if (plannable.length) failures.push(`${plannable.length} location-only stations reach the planner line ${PLAN_MIN_CONFIDENCE}, first: ${plannable.slice(0, 3).map((s) => s.id).join(', ')}`);
+    else checks.push(`location-only: ${listedOnly.length} stations, all under the planner line ${PLAN_MIN_CONFIDENCE}`);
   }
 
   if (g.aliasCollisions?.length) failures.push(`${g.aliasCollisions.length} aliases are live station ids, first: ${g.aliasCollisions.slice(0, 3).join(', ')}`);

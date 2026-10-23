@@ -16,6 +16,7 @@ import { geofabrikAdapter } from './adapters/geofabrik.ts';
 import { ocmApiAdapter, ocmApiKey } from './adapters/ocm-api.ts';
 import { ocmExportAdapter } from './adapters/ocm-export.ts';
 import { osmAdapter } from './adapters/osm.ts';
+import { tgredcoAdapter } from './adapters/tgredco.ts';
 import { CACHE_DIR, OUT_DIR, readJson, REGISTRY_FILE, writeJson } from './config.ts';
 import { baselineFrom, runGates } from './gates.ts';
 import { emptyRegistry, serializeRegistry, type Registry } from './ids.ts';
@@ -33,7 +34,7 @@ function parseArgs(argv: string[]) {
   const refresh = new Set<SourceKey>();
   let dryRun = false;
   for (const a of argv) {
-    if (a === '--refresh') (['osm', 'ocm'] as const).forEach((k) => refresh.add(k));
+    if (a === '--refresh') (['osm', 'ocm', 'tgredco'] as const).forEach((k) => refresh.add(k));
     else if (a.startsWith('--refresh=')) for (const k of a.slice(10).split(',')) refresh.add(k.trim() as SourceKey);
     else if (a === '--dry-run') dryRun = true;
     else throw new Error(`Unknown option ${a}`);
@@ -47,6 +48,7 @@ function chooseAdapters(): Array<{ adapter: Adapter<unknown>; origin: string }> 
   return [
     { adapter: osm as Adapter<unknown>, origin: osm === geofabrikAdapter ? 'geofabrik' : 'overpass' },
     { adapter: ocm as Adapter<unknown>, origin: ocm === ocmApiAdapter ? 'api' : 'github-export' },
+    { adapter: tgredcoAdapter as Adapter<unknown>, origin: 'data.telangana.gov.in' },
   ];
 }
 
@@ -123,7 +125,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   const m = built.manifest.counts;
   console.log(
     `Stations ${m.stations} (DC ${m.dc}, AC ${m.ac}, unknown ${m.unknownSpeed}) · with kW ${m.withKw} · with connectors ${m.withConnectors} · ` +
-      `multi-source ${m.multiSource} · merged ${m.merged} · review ${m.review} · quarantined ${m.quarantined} · sites ${m.sites}`,
+      `multi-source ${m.multiSource} · merged ${m.merged} · listed duplicates dropped ${layer.listedDuplicates} · review ${m.review} · quarantined ${m.quarantined} · sites ${m.sites}`,
   );
   if (!gates.ok) {
     for (const f of gates.failures) console.error(`  GATE FAILED: ${f}`);

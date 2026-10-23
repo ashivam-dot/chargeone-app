@@ -2,7 +2,7 @@
 import { assignIds, type Registry } from './ids.ts';
 import { stateAt, type StateShape } from './lib/geo.ts';
 import { mergeCluster } from './merge.ts';
-import { groupSites, resolve } from './resolve.ts';
+import { groupSites, listedDuplicates, resolve } from './resolve.ts';
 import type { CanonicalStation, ReviewItem, Site, SourceRecord } from './types.ts';
 
 export interface BuildContext {
@@ -21,11 +21,18 @@ export interface StationLayer {
   merged: number;
   /** Pairs within the candidate radius kept apart by a hard rule. */
   blocked: number;
+  /** Location-only listings dropped as a charger OSM or OCM already describe (resolve.ts listedDuplicates). */
+  listedDuplicates: number;
 }
 
 export function buildStations(records: SourceRecord[], ctx: BuildContext): StationLayer {
   const today = ctx.now.toISOString().slice(0, 10);
-  const { clusters, review, blocked } = resolve(records);
+  const resolved = resolve(records);
+  const { review, blocked } = resolved;
+  // Location-only listings of a charger OSM or OCM already describe are dropped before ids are issued.
+  const duplicate = listedDuplicates(records, resolved.clusters);
+  const clusters = resolved.clusters.filter((_, k) => !duplicate.has(k));
+  const dropped = new Set(resolved.clusters.filter((_, k) => duplicate.has(k)).flat());
   const ids = assignIds(
     clusters.map((c) => c.map((i) => records[i].sourceId)),
     ctx.registry,
@@ -54,7 +61,7 @@ export function buildStations(records: SourceRecord[], ctx: BuildContext): Stati
     const s = stations[stationOf.get(i)!];
     return { id: s.id, legacyId: s.legacyId, name: s.name.value, operator: s.operator.value, sources: s.members.map((m) => m.sourceId) };
   };
-  const reviewItems: ReviewItem[] = review.map((p) => ({
+  const reviewItems: ReviewItem[] = review.filter((p) => !dropped.has(p.i) && !dropped.has(p.j)).map((p) => ({
     kind: p.kind,
     score: Math.round(p.score * 1000) / 1000,
     distanceM: Math.round(p.distanceM),
@@ -68,7 +75,8 @@ export function buildStations(records: SourceRecord[], ctx: BuildContext): Stati
     stations,
     sites: sites.sort((a, b) => a.id.localeCompare(b.id)),
     review: reviewItems,
-    merged: records.length - clusters.length,
+    merged: records.length - dropped.size - clusters.length,
+    listedDuplicates: dropped.size,
     blocked: blocked.length,
   };
 }

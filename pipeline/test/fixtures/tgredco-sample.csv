@@ -1,0 +1,21 @@
+﻿S.No.,Name of the EV Charging Station (Private / Public Charging Infra),State,District,Address,Latitude,Longitude,Name of the Owning Organisation/ Person
+1,IOCL Sample Filling Station,Telangana,Hyderabad,"Plot 1, Sample Road,
+Hyderabad, Telangana-500001",17.4000000,78.4000000,TATA Power Company Limited
+2,"Hotel Example (C1), Hyderabad",Telangana,Hyderabad,"Example Colony, Hyderabad","17.4500000,",78. 4500000,Joule Point pvt Ltd
+3,"Hotel Example (C2), Hyderabad",Telangana,Hyderabad,"Example Colony, Hyderabad",17.4502000,78.4502000,Joule Point pvt Ltd
+4,Sample Bhavan (TGREDCO),Telangana,Hyderabad,"Sample Bhavan, Khairatabad",17°24.600'N,"78°27.600""E",TGREDCO/REIL
+5,Test Mall DMS,Telangana,Hyderabad,"Test Mall Road",17°20'43.5,78°30'10.2,Fortum Charge and Drive India Pvt Ltd
+6,Swapped Petrol Pump,Telangana,Warangal,"Swapped Road",79.5000000,18.0000000,BPCL
+7,Broken Coordinates FS,Telangana,Nizamabad,"Broken Road",17.2417.0N,78.2000.1 E,HPCL
+8,No Coordinates FS,Telangana,Nalgonda,"Nowhere",NA,NA,BPCL
+9,Wrong State FS,Telangana,Nizamabad,"Far Road",18.5300000,75.7800000,IOCL
+10,Ather Space Sample,Telangana,Hyderabad,"Scooter Street",17.4100000,78.4100000,Ather Energy Pvt Ltd
+11,Swap Point Sample,Telangana,Hyderabad,"Swap Street",17.4200000,78.4200000,SUN Mobility
+12,TSRTC Sample Bus Depot,Telangana,Hyderabad,"Depot Road",17.4300000,78.4300000,TSRTC Sample Depot
+13,Sample Metro Station,Telangana,Hyderabad,"Metro Road",17.4400000,78.4400000,Hyderabad Metro Rail Ltd
+14,Sample Home,Telangana,Hyderabad,"House 1, Lane 2",17.3600000,78.3600000,Test Person (Domestic)
+15,"Test Person Name, Shamshabad",Telangana,Ranga Reddy,"Road No 9, Sample Colony, Shamshabad",17.2600000,78.3800000,Joule Point pvt Ltd
+16,"C1, 120 KW, Sample Airport, Hyderabad",Telangana,Ranga Reddy,"Sample Airport",17.2400000,78.4300000,Joule Point pvt Ltd
+17,Begumpet,Telangana,Hyderabad,"Begumpet, Hyderabad",17.4400000,78.4700000,Fortum Charge and Drive India Pvt Ltd
+18,"Anutex Sample Mall, Dr. AS Rao Nagar",Telangana,Hyderabad,"Dr. AS Rao Nagar Rd",17.4813000,78.5554000,Joule Point pvt Ltd
+19,ETO Sample Point,Telangana,Hyderabad,"Three Wheeler Road",17.3000000,78.5000000,ETO Motors Private Limited

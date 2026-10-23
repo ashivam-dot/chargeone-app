@@ -124,6 +124,17 @@ export function About({ dataset, manifest, onClose, onAddCharger }: Props) {
           . Records Open Charge Map marks as copied from Google Maps are left out.
         </li>
         <li>
+          Contains data from Telangana Renewable Energy Development Corporation (TGREDCO),{' '}
+          <a href="https://data.telangana.gov.in/dataset/ev-charging-stations-details-location-ownership" target="_blank" rel="noopener noreferrer">
+            EV charging stations - details of location &amp; ownership
+          </a>{' '}
+          (April 2024), Telangana Open Data Portal, under the{' '}
+          <a href="https://data.gov.in/government-open-data-license-india" target="_blank" rel="noopener noreferrer">
+            Government Open Data License – India
+          </a>
+          . Not endorsed by the provider. These listings give a place only and show as unverified; owner names are left out.
+        </li>
+        <li>
           Government charger counts: Ministry of Heavy Industries (Rajya Sabha answers, via BHEL), used under the{' '}
           <a href="https://data.gov.in/government-open-data-license-india" target="_blank" rel="noopener noreferrer">
             Government Open Data License – India (GODL)

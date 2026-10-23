@@ -1,5 +1,5 @@
 import { DC_THRESHOLD_KW, DC_TYPES, type ConnectorType } from '../../src/data/model.ts';
-import type { CanonicalConnector, CanonicalEvse, PowerType } from '../types.ts';
+import type { CanonicalConnector, CanonicalEvse, PowerType, SourceKey } from '../types.ts';
 
 const AC_TYPES: ReadonlySet<ConnectorType> = new Set(['Type 2', 'Type 1', 'GB/T AC', 'Bharat AC', '3-pin socket']);
 
@@ -54,7 +54,7 @@ const signature = (list: CanonicalConnector[]) => JSON.stringify(list.map((c) =>
  * points (one feature, one object), so they add up. OCM often lists one site twice; two OCM listings with the
  * very same equipment are taken as a duplicate listing and counted once, different equipment adds up.
  */
-export function sourceConnectors(source: 'osm' | 'ocm', lists: CanonicalConnector[][]): CanonicalConnector[] {
+export function sourceConnectors(source: SourceKey, lists: CanonicalConnector[][]): CanonicalConnector[] {
   const nonEmpty = lists.filter((l) => l.length > 0);
   if (source === 'osm') return sumConnectors(nonEmpty);
   const distinct = new Map(nonEmpty.map((l) => [signature(l), l]));

@@ -9,10 +9,10 @@ import { geohash } from './lib/geo.ts';
 import { GOV_COUNTS, STATES } from './lib/states.ts';
 import { zip } from './lib/zip.ts';
 import { positionRecord } from './merge.ts';
-import { BOUNDARIES_ATTRIBUTION, GOVERNMENT_COUNTS_ATTRIBUTION, LICENCES } from './licences.ts';
+import { BOUNDARIES_ATTRIBUTION, GOVERNMENT_COUNTS_ATTRIBUTION, LICENCES, TGREDCO_DATASET_URL } from './licences.ts';
 import type { Adapter, AdapterResult, CanonicalStation, FieldValue, ReviewItem, Site, SourceKey } from './types.ts';
 
-const SOURCE_NAME: Record<SourceKey, SourceRef['name']> = { osm: 'OpenStreetMap', ocm: 'Open Charge Map' };
+const SOURCE_NAME: Record<SourceKey, SourceRef['name']> = { osm: 'OpenStreetMap', ocm: 'Open Charge Map', tgredco: 'Telangana Open Data (TGREDCO)' };
 
 function sourceRef(r: CanonicalStation['members'][number]): SourceRef {
   const id = r.sourceId.replace(/^osm-([nwr])/, (_, t: string) => `${{ n: 'node', w: 'way', r: 'relation' }[t]}/`).replace(/^ocm-/, '');
@@ -280,6 +280,13 @@ It also contains data from Open Charge Map contributors (Data Provider 1 only), 
 CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ and https://openchargemap.org/site/about/terms
 Values from Open Charge Map keep that licence and attribution; every field lists its source and licence.
 
+Location-only listings (source "tgredco") come from Telangana Renewable Energy Development Corporation
+(TGREDCO), "EV charging stations - details of location & ownership" (data as of April 2024), Telangana
+Open Data Portal, under the Government Open Data License - India:
+${TGREDCO_DATASET_URL} and https://data.gov.in/government-open-data-license-india
+They keep that licence and attribution, are not endorsed by the provider, and must not be uploaded to
+OpenStreetMap. Owner names and names of people in that list are not included.
+
 Records Open Charge Map marks as copied from Google Maps (Google Place IDs) are excluded.
 If you publish a produced work from this database, credit "© OpenStreetMap contributors, Open Charge Map contributors, ChargeOne".
 If you publicly use an adapted version of this database, you must offer it under the ODbL as well.
@@ -454,7 +461,10 @@ export function buildOutputs(input: BuildInput): Built {
     legacyStations,
     odbl,
     thresholds: THRESHOLDS,
-    attribution: [LICENCES['ODbL-1.0'].attribution, LICENCES['CC-BY-4.0'].attribution, GOVERNMENT_COUNTS_ATTRIBUTION],
+    attribution: [
+      ...new Set([LICENCES['ODbL-1.0'].attribution, LICENCES['CC-BY-4.0'].attribution, ...input.sources.map((r) => r.adapter.licence.attribution)]),
+      GOVERNMENT_COUNTS_ATTRIBUTION,
+    ],
   };
   for (const [name, bytes] of [...files].sort(([a], [b]) => a.localeCompare(b))) manifest.files[name] = { bytes: bytes.length, sha256: sha(bytes) };
   files.set('manifest.json', Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`));

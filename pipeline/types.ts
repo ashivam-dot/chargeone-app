@@ -3,9 +3,12 @@
 // came from and how old it is. Unknown stays unknown: no attribute defaults to false or 0.
 import type { ConnectorType } from '../src/data/model.ts';
 
-export type SourceKey = 'osm' | 'ocm';
+export type SourceKey = 'osm' | 'ocm' | 'tgredco';
 
-export type LicenceId = 'ODbL-1.0' | 'CC-BY-4.0';
+/** Sources that only list where a charger is (a government list, a places dataset): weak evidence, never verified. */
+export const LISTED_SOURCES: ReadonlySet<SourceKey> = new Set<SourceKey>(['tgredco']);
+
+export type LicenceId = 'ODbL-1.0' | 'CC-BY-4.0' | 'GODL-India';
 
 export interface Licence {
   id: LicenceId;
@@ -124,7 +127,18 @@ export interface Rejection {
     | 'removed'
     | 'not-live'
     | 'google-derived'
-    | 'other-licence';
+    | 'other-licence'
+    /** Listed sources: points only two- or three-wheelers can use. */
+    | 'not-car'
+    | 'battery-swap'
+    | 'bus'
+    | 'metro'
+    /** A charger at someone's home, or one listed under a person's name. */
+    | 'private-individual'
+    /** Outside the state a state-government list covers (a typo in the coordinates). */
+    | 'outside-state'
+    /** The same charger listed again within LISTED_MERGE_METRES (one row per charge point). */
+    | 'duplicate-listing';
   /** Quarantined records are kept out for legal reasons and must never ship, even as ids. */
   quarantine: boolean;
 }

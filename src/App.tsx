@@ -61,7 +61,11 @@ const NO_ALTS: [number, number][][] = [];
 const TOAST_MS = 3800;
 /** Ask how the app is going once, after this many planned trips. */
 const FEEDBACK_AFTER_PLANS = 2;
-const CHARGER_CREDITS = ['Chargers © OpenStreetMap contributors (ODbL)', 'Contains data from Open Charge Map contributors (CC BY 4.0)'];
+const CHARGER_CREDITS = [
+  'Chargers © OpenStreetMap contributors (ODbL)',
+  'Contains data from Open Charge Map contributors (CC BY 4.0)',
+  'Contains data from TGREDCO, Telangana Open Data Portal (GODL-India)',
+];
 const readViewport = () => ({ height: window.innerHeight, desktop: window.innerWidth >= 820 });
 const isVehicle = (v: unknown): v is MyVehicle => isObject(v) && typeof v.modelId === 'string' && typeof v.batteryKwh === 'number';
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
