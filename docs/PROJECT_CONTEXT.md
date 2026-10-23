@@ -271,5 +271,6 @@ OBD-II BLE beta (many Indian EVs don't expose battery % on OBD). Station data is
 
 `/Users/ashivam/Desktop/Side-Income/ev-charging-super-app-plan-2026-10-20/ChargeOne-context.zip`
 holds this file, the plans, and the full chat transcripts (JSONL). Also uploaded to the release
-`context-2026-10-21` on the repo. To search without unzipping everything:
+`context-2026-10-21` on the private repo `ashivam-dot/chargeone-private` (never on this public repo).
+To search without unzipping everything:
 `unzip -p ChargeOne-context.zip transcripts/main.jsonl | rg -n "<keyword>" | cut -c1-300`.
