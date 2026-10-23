@@ -158,7 +158,7 @@ export function YouScreen(p: Props) {
                     } ${dateFmt(e.activeUntil)}`
                   : plan
                     ? plan.tagline
-                    : `${BASIC.shortTripsPerDay} trip plan a day, up to ${BASIC.maxTripKm} km`}
+                    : `${BASIC.shortTripsPerDay} trip plan a day, ${BASIC.maxTripKm === null ? 'any distance' : `up to ${BASIC.maxTripKm} km`}`}
             </span>
           </div>
           {onTrial && me?.trial?.endsAt && <TrialRing endsAt={me.trial.endsAt} />}

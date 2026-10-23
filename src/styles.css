@@ -1912,3 +1912,97 @@ button.poi__name:hover {
 .extras li {
   margin-bottom: 6px;
 }
+
+/* Trip itinerary: clock times, breaks, meals and gaps between the charging stops. */
+.trip-when {
+  display: grid;
+  gap: 8px;
+}
+.trip-when input[type='time'] {
+  font: inherit;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-solid);
+  color: var(--text);
+}
+.trip-clock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 10px 0 0;
+  font-size: 0.95rem;
+}
+.timeline__time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  color: var(--text);
+  margin-right: 6px;
+}
+.timeline__time--block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--accent-strong);
+}
+.timeline__item {
+  padding: 4px 0 !important;
+}
+.timeline__line {
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 0;
+  min-height: 32px;
+  align-items: center;
+}
+.timeline__dot--small {
+  width: 22px;
+  height: 22px;
+  margin: 0 0 0 3px;
+  display: grid;
+  place-items: center;
+  border-width: 2px;
+  color: var(--accent-strong);
+}
+.timeline__dot--food {
+  border-color: var(--food);
+  color: var(--food);
+}
+.timeline__dot--gap {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+.timeline__dot--end {
+  display: grid;
+  place-items: center;
+  color: var(--accent-strong);
+}
+.timeline__item--gap > div {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 28%, transparent);
+}
+.pill--meal {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--food);
+  background: color-mix(in srgb, var(--food) 10%, transparent);
+}
+.coverage {
+  margin-top: 12px;
+}

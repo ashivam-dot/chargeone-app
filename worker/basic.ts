@@ -1,4 +1,4 @@
-import { BASIC, FREE_TRIP_KM, type UsageCounts } from '../src/shared/plans.ts';
+import { BASIC, type UsageCounts } from '../src/shared/plans.ts';
 import type { Env } from './env.ts';
 import {
   HttpError,
@@ -25,7 +25,8 @@ const ROUTES_PER_IP_PER_HOUR = 20;
  * guest could spend the network's whole public-router share on them.
  */
 export const BASIC_ROUTINGS_PER_IP = BASIC_TRIPS_PER_IP + 5;
-const MAX_KM = BASIC.maxTripKm ?? FREE_TRIP_KM;
+/** Longest Basic trip; null = any distance. */
+const MAX_KM: number | null = BASIC.maxTripKm;
 
 const deviceSlot = (device: string) => `basic-dev:${device}`;
 const ipSlot = (ip: string) => `basic-ip:${ip}`;
@@ -38,7 +39,7 @@ export async function basicTripsToday(env: Env, device: string, now = new Date()
 
 const usage = (n: number): UsageCounts => ({ shortToday: n, longInWindow: 0 });
 
-const COVERS = `Basic covers ${BASIC.shortTripsPerDay} trip up to ${MAX_KM} km a day`;
+const COVERS = `Basic covers ${BASIC.shortTripsPerDay} trip${MAX_KM === null ? '' : ` up to ${MAX_KM} km`} a day`;
 
 /** km is the road distance, or the straight line (which the road can only exceed) before routing. */
 function tooLong(km: number, straightLine: boolean): HttpError {
@@ -77,7 +78,7 @@ export async function planBasicRoute(req: Request, env: Env) {
 
   const straightKm = distanceMetres(from, to) / 1000;
   if (straightKm < 0.5) throw new HttpError(400, 'too_short', 'Start and destination are the same place.');
-  if (straightKm > MAX_KM) throw tooLong(straightKm, true);
+  if (MAX_KM !== null && straightKm > MAX_KM) throw tooLong(straightKm, true);
 
   const day = indianDayStart();
   // The same trip again today (a retry after the answer was lost on a weak signal, or the planner
@@ -120,7 +121,7 @@ async function routeOnce(req: Request, env: Env, ip: string, day: number, from: 
     if (!(err instanceof HttpError) || err.status === 429 || err.status >= 500) await releaseSlot(env.DB, routingSlot(ip), day);
     throw err;
   }
-  if (route.distanceKm > MAX_KM) throw tooLong(route.distanceKm, false);
+  if (MAX_KM !== null && route.distanceKm > MAX_KM) throw tooLong(route.distanceKm, false);
   return route;
 }
 

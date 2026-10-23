@@ -46,14 +46,15 @@ export const PLANS: Record<PlanId, Plan> = {
     pricePaise: 0,
     billing: 'none',
     periodDays: 0,
-    maxTripKm: FREE_TRIP_KM,
+    // Any distance and multi-day trips on every plan: a safe long trip isn't a paid extra.
+    maxTripKm: null,
     longTripQuota: 0,
     longTripWindow: 'day',
     shortTripsPerDay: 3,
-    tagline: 'For driving around town',
+    tagline: 'For a few trips a day',
     freeReplans: false,
     backups: false,
-    multiDay: false,
+    multiDay: true,
     routeCompare: false,
     liveDrive: false,
     carConnect: false,
@@ -237,7 +238,8 @@ export function decideTrip(
     };
   }
   if (isReplan && plan.freeReplans) return { allowed: true, counts: 'replan' };
-  if (distanceKm <= FREE_TRIP_KM) {
+  // Plans without a long-trip allowance plan any distance from their daily trips.
+  if (distanceKm <= FREE_TRIP_KM || plan.longTripQuota === 0) {
     if (usage.shortToday >= plan.shortTripsPerDay) {
       return {
         allowed: false,

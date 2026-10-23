@@ -57,6 +57,8 @@ const plan = (stops: Stop[], over: Partial<TripPlan> = {}): TripPlan => ({
   stops,
   warnings: [],
   gapAtKm: null,
+  gaps: [],
+  coverage: { confirmed: 10, unconfirmed: 0 },
   extras: [],
   extrasFeasible: false,
   ...over,
@@ -70,6 +72,11 @@ const day = (startKm: number, endKm: number, p: TripPlan, overnightName: string 
   overnight: overnightName
     ? { station: station(overnightName), alongKm: endKm, mode: 'ac', powerKw: 7.4, hoursToFull: 6, morningSocPct: 95, trusted: true, speedUnknown: false, stays: [], food: [] }
     : null,
+  night: null,
+  departAt: 0,
+  arriveAt: 0,
+  driveMinutes: 0,
+  items: [],
 });
 
 const journey = (days: DayPlan[]): Journey => ({
@@ -83,6 +90,11 @@ const journey = (days: DayPlan[]): Journey => ({
   stopCount: days.reduce((a, d) => a + d.plan.stops.length, 0),
   tooLong: false,
   warnings: [],
+  departAt: 0,
+  arriveAt: 0,
+  gaps: [],
+  coverage: { confirmed: 10, unconfirmed: 0 },
+  hasCorridor: false,
 });
 
 const nexon = myVehicleFromModel(VEHICLES.find((v) => v.id === 'tata-nexon-ev-45')!);

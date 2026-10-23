@@ -652,8 +652,10 @@ describe('quota enforcement is on the server', () => {
 
     // Same destination, but starting 300 km away (Chennai): not a re-plan of the same journey.
     km = 340;
+    // Any distance is fine on the free plan now, but it is a new trip, not a free re-plan.
     const far = await api('POST', '/api/route', { from: { lat: 13.0827, lng: 80.2707 }, to, tripId: first.body.tripId });
-    expect(far.status).toBe(402);
+    expect(far.status).toBe(200);
+    expect(far.body.counted).toBe('short');
 
     // A genuine re-plan from closer by is allowed; on the free plan it counts as a new short trip.
     km = 12;

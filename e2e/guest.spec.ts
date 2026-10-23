@@ -140,7 +140,7 @@ test.describe('guest on a server that is not fully set up', () => {
 
     const card = page.getByTestId('trip-limit');
     await expect(card).toContainText('Basic covers 1 trip up to 100 km a day; this trip is at least 148 km.');
-    await expect(card).toContainText('up to 100 km');
+    await expect(card).toContainText('The charger map works for every distance.');
     await expect(page.getByTestId('trip-limit-soon')).toBeVisible();
     await expect(page.getByTestId('trip-limit-trial')).toHaveCount(0);
     await expect(page.getByRole('dialog').filter({ hasText: /Sign in|Unlock this trip/ })).toHaveCount(0);
@@ -157,7 +157,7 @@ test.describe('guest on a server that is not fully set up', () => {
 
     const sheet = page.getByTestId('signin-unavailable');
     await expect(sheet).toContainText('Sign-in is being set up');
-    await expect(sheet).toContainText('Trip length: Up to 100 km');
+    await expect(sheet).toContainText('Trip length: Any distance');
     await expect(sheet).toContainText('Trip plans: 1 a day');
     await page.getByTestId('signin-guest').click();
     await expect(sheet).toBeHidden();

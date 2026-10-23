@@ -10,14 +10,12 @@ describe('decideTrip', () => {
     expect(decideTrip('free', 50, { shortToday: 3, longInWindow: 0 }, false)).toMatchObject({ allowed: false, reason: 'daily_limit' });
   });
 
-  it('blocks free trips over 100 km, even as a re-plan', () => {
-    expect(decideTrip('free', 100.5, noUsage, false)).toMatchObject({ allowed: false, reason: 'too_long_for_plan' });
-    expect(decideTrip('free', 250, noUsage, true)).toMatchObject({ allowed: false, reason: 'too_long_for_plan' });
-  });
-
-  it('words a straight-line estimate as a minimum', () => {
-    expect(decideTrip('free', 366.4, noUsage, false, true)).toMatchObject({ message: expect.stringContaining('more than 366 km by road') });
-    expect(decideTrip('free', 507, noUsage, false)).toMatchObject({ message: expect.stringContaining('This trip is 507 km.') });
+  it('lets free users plan any distance, counted against their daily trips', () => {
+    expect(PLANS.free.maxTripKm).toBeNull();
+    expect(PLANS.free.multiDay).toBe(true);
+    expect(decideTrip('free', 100.5, noUsage, false)).toEqual({ allowed: true, counts: 'short' });
+    expect(decideTrip('free', 1250, noUsage, true)).toEqual({ allowed: true, counts: 'short' });
+    expect(decideTrip('free', 600, { shortToday: 3, longInWindow: 0 }, false)).toMatchObject({ allowed: false, reason: 'daily_limit' });
   });
 
   it('counts long trips against the paid quota', () => {

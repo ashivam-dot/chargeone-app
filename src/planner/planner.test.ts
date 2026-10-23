@@ -45,7 +45,14 @@ function dcStation(id: string, atKm: number, over: Partial<Station> = {}): Stati
 const nexon = myVehicleFromModel(VEHICLES.find((v) => v.id === 'tata-nexon-ev-45')!);
 
 function plan(km: number, stations: Station[], statuses = new Map<string, StationStatus>(), vehicle = nexon) {
-  return planTrip({ route: route(km), stations, statuses, vehicle, options: DEFAULT_OPTIONS, now });
+  return planTrip({
+    route: route(km),
+    stations,
+    statuses,
+    vehicle,
+    options: DEFAULT_OPTIONS,
+    now,
+  });
 }
 
 describe('RouteIndex', () => {
@@ -58,7 +65,10 @@ describe('RouteIndex', () => {
   });
 
   it('finds points beside long straight segments', () => {
-    const index = new RouteIndex([[LNG, START_LAT], [LNG, START_LAT + 1]]);
+    const index = new RouteIndex([
+      [LNG, START_LAT],
+      [LNG, START_LAT + 1],
+    ]);
     expect(index.project(LNG + 0.01, START_LAT + 0.5, 3)?.alongKm).toBeCloseTo(55.6, 0);
   });
 });
@@ -72,21 +82,99 @@ describe('planTrip', () => {
     expect(p.arrivalSocPct).toBeLessThan(50);
   });
 
-  it('picks the farthest good charger in reach and only charges what is needed', () => {
+  it('picks the quickest stops: one charge to just enough beats two short ones', () => {
     const p = plan(400, [dcStation('a', 120), dcStation('b', 190), dcStation('c', 300)]);
     expect(p.feasible).toBe(true);
-    expect(p.stops.map((s) => s.station.id)).toEqual(['b', 'c']);
-    expect(p.stops[0].departSocPct).toBe(80);
-    expect(p.stops[1].departSocPct).toBeLessThan(80);
+    expect(p.stops.map((s) => s.station.id)).toEqual(['b']);
     expect(p.stops[0].arriveSocPct).toBeGreaterThanOrEqual(DEFAULT_OPTIONS.stopReservePct);
     expect(p.arrivalSocPct).toBeGreaterThanOrEqual(DEFAULT_OPTIONS.arriveReservePct);
     expect(p.stops[0].backups.map((b) => b.station.id)).toContain('a');
   });
 
+  it('plans two stops on a longer road, charging to the usual target first and just enough last', () => {
+    const p = plan(600, [dcStation('a', 120), dcStation('b', 190), dcStation('c', 300), dcStation('d', 400)]);
+    expect(p.feasible).toBe(true);
+    expect(p.stops).toHaveLength(2);
+    expect(p.stops[p.stops.length - 1].departSocPct).toBeLessThanOrEqual(100);
+    expect(p.arrivalSocPct).toBeGreaterThanOrEqual(DEFAULT_OPTIONS.arriveReservePct);
+  });
+
+  it('does not stop at a charger just after the start to top up a nearly full battery', () => {
+    const p = planTrip({
+      route: route(500),
+      stations: [dcStation('early', 3), dcStation('mid', 200), dcStation('late', 300)],
+      statuses: new Map(),
+      vehicle: nexon,
+      options: { ...DEFAULT_OPTIONS, startSocPct: 80 },
+      now,
+    });
+    expect(p.feasible).toBe(true);
+    expect(p.stops.map((s) => s.station.id)).not.toContain('early');
+  });
+
+  it('prefers a fast charger to a slow one a few km on', () => {
+    const slow = dcStation('slow', 210, {
+      connectors: [{ type: 'CCS2', count: 1, kw: 25 }],
+      maxKw: 25,
+    });
+    const fast = dcStation('fast', 195, {
+      connectors: [{ type: 'CCS2', count: 1, kw: 120 }],
+      maxKw: 120,
+    });
+    const p = plan(420, [slow, fast]);
+    expect(p.stops.map((s) => s.station.id)).toEqual(['fast']);
+  });
+
+  it('keeps planning after a gap and names it, with the unconfirmed chargers inside it', () => {
+    const p = plan(900, [dcStation('a', 200), dcStation('maybe', 400, { confidence: 0.3 }), dcStation('b', 600), dcStation('c', 750)]);
+    expect(p.feasible).toBe(false);
+    expect(p.gaps).toHaveLength(1);
+    const g = p.gaps[0];
+    expect(g.fromName).toBe('Charger a');
+    expect(g.toName).toBe('Charger b');
+    expect(g.toKm - g.fromKm).toBeCloseTo(400, -1);
+    expect(g.unconfirmed.map((u) => u.station.id)).toEqual(['maybe']);
+    expect(p.gapAtKm).toBe(Math.round(g.fromKm));
+    // Stops on both sides of the gap: the plan doesn't stop at the first data gap.
+    const ids = p.stops.map((s) => s.station.id);
+    expect(ids).toContain('a');
+    expect(ids).toContain('b');
+    expect(p.stops.find((s) => s.station.id === 'b')!.afterGap).toBe(true);
+    expect(p.warnings[0]).toMatch(/no confirmed car charger for \d+ km between Charger a \(km \d+\) and Charger b/);
+  });
+
   it('prefers a charger reported working over one with a recent problem', () => {
     const statuses = new Map<string, StationStatus>([
-      ['bad', { stationId: 'bad', lastWorkedAt: null, lastWorkedKw: null, lastWorkedVehicle: null, inUseSince: null, queueAt: null, problemAt: '2026-10-20T08:00:00Z', problemKind: 'broken', problemReports: 2, reports7d: 2 }],
-      ['good', { stationId: 'good', lastWorkedAt: '2026-10-20T07:00:00Z', lastWorkedKw: 55, lastWorkedVehicle: 'Nexon EV', inUseSince: null, queueAt: null, problemAt: null, problemKind: null, problemReports: 0, reports7d: 1 }],
+      [
+        'bad',
+        {
+          stationId: 'bad',
+          lastWorkedAt: null,
+          lastWorkedKw: null,
+          lastWorkedVehicle: null,
+          inUseSince: null,
+          queueAt: null,
+          problemAt: '2026-10-20T08:00:00Z',
+          problemKind: 'broken',
+          problemReports: 2,
+          reports7d: 2,
+        },
+      ],
+      [
+        'good',
+        {
+          stationId: 'good',
+          lastWorkedAt: '2026-10-20T07:00:00Z',
+          lastWorkedKw: 55,
+          lastWorkedVehicle: 'Nexon EV',
+          inUseSince: null,
+          queueAt: null,
+          problemAt: null,
+          problemKind: null,
+          problemReports: 0,
+          reports7d: 1,
+        },
+      ],
     ]);
     const p = plan(300, [dcStation('good', 170), dcStation('bad', 185)], statuses);
     expect(p.stops[0].station.id).toBe('good');
@@ -108,7 +196,11 @@ describe('planTrip', () => {
 
   it('uses AC chargers for cars without DC charging', () => {
     const comet = myVehicleFromModel(VEHICLES.find((v) => v.id === 'mg-comet')!);
-    const ac = dcStation('ac', 80, { connectors: [{ type: 'Type 2', count: 1, kw: 7.4 }], speed: 'ac', maxKw: 7.4 });
+    const ac = dcStation('ac', 80, {
+      connectors: [{ type: 'Type 2', count: 1, kw: 7.4 }],
+      speed: 'ac',
+      maxKw: 7.4,
+    });
     const p = plan(170, [dcStation('dc', 70), ac], new Map(), comet);
     expect(p.stops.map((s) => s.station.id)).toEqual(['ac']);
     expect(p.stops[0].mode).toBe('ac');
@@ -148,7 +240,14 @@ describe('trusted stops only', () => {
 
   it('plans unverified chargers only when the driver allows them, and says so', () => {
     const stations = [dcStation('b', 190, { confidence: 0.3 }), dcStation('c', 300)];
-    const p = planTrip({ route: route(400), stations, statuses: new Map(), vehicle: nexon, options: { ...DEFAULT_OPTIONS, allowUnverified: true }, now });
+    const p = planTrip({
+      route: route(400),
+      stations,
+      statuses: new Map(),
+      vehicle: nexon,
+      options: { ...DEFAULT_OPTIONS, allowUnverified: true },
+      now,
+    });
     expect(p.feasible).toBe(true);
     const b = p.stops.find((s) => s.station.id === 'b')!;
     expect(b.trusted).toBe(false);
@@ -160,7 +259,7 @@ describe('trusted stops only', () => {
   it('counts a recent "charged fine" report towards trust', () => {
     const p = plan(400, [dcStation('b', 190, { confidence: 0.3 }), dcStation('c', 300)], new Map([['b', worked('b')]]));
     expect(p.feasible).toBe(true);
-    expect(p.stops.map((s) => s.station.id)).toEqual(['b', 'c']);
+    expect(p.stops.map((s) => s.station.id)).toContain('b');
   });
 
   it('never plans a stop at a DC charger whose plug is not confirmed', () => {
@@ -170,7 +269,11 @@ describe('trusted stops only', () => {
   });
 
   it('plans only DC stops for a DC car even when trusted AC is on the way', () => {
-    const ac = dcStation('ac', 190, { connectors: [{ type: 'Type 2', count: 1, kw: 7.4 }], speed: 'ac', maxKw: 7.4 });
+    const ac = dcStation('ac', 190, {
+      connectors: [{ type: 'Type 2', count: 1, kw: 7.4 }],
+      speed: 'ac',
+      maxKw: 7.4,
+    });
     const p = plan(400, [ac, dcStation('c', 300)]);
     expect(p.stops.map((s) => s.station.id)).not.toContain('ac');
     expect(p.stops.every((s) => s.mode === 'dc')).toBe(true);
@@ -207,7 +310,8 @@ describe('chargeMinutes', () => {
 it('builds a Google Maps link with stops as waypoints', () => {
   const p = plan(400, [dcStation('b', 190), dcStation('c', 300)]);
   const url = new URL(navigationUrl({ lat: 20, lng: 77 }, { lat: 23.6, lng: 77 }, p.stops));
-  expect(url.searchParams.get('waypoints')?.split('|')).toHaveLength(2);
+  expect(p.stops.length).toBeGreaterThan(0);
+  expect(url.searchParams.get('waypoints')?.split('|')).toHaveLength(p.stops.length);
   expect(url.searchParams.get('destination')).toBe('23.6,77');
 });
 
@@ -245,7 +349,14 @@ describe('stops the planner must not count on', () => {
     const strict = plan(400, stations, statuses);
     expect(strict.stops.map((s) => s.station.id)).not.toContain('bad');
     expect(strict.extras.map((s) => s.station.id)).not.toContain('bad');
-    const p = planTrip({ route: route(400), stations, statuses, vehicle: nexon, options: loose, now });
+    const p = planTrip({
+      route: route(400),
+      stations,
+      statuses,
+      vehicle: nexon,
+      options: loose,
+      now,
+    });
     expect(p.stops.map((s) => s.station.id)).not.toContain('bad');
     expect(p.feasible).toBe(false);
   });
@@ -255,7 +366,14 @@ describe('stops the planner must not count on', () => {
     const strict = plan(400, stations);
     expect(strict.stops.map((s) => s.station.id)).not.toContain('hotel');
     expect(strict.extras.map((s) => s.station.id)).toContain('hotel');
-    const p = planTrip({ route: route(400), stations, statuses: new Map(), vehicle: nexon, options: loose, now });
+    const p = planTrip({
+      route: route(400),
+      stations,
+      statuses: new Map(),
+      vehicle: nexon,
+      options: loose,
+      now,
+    });
     const hotel = p.stops.find((s) => s.station.id === 'hotel')!;
     expect(hotel.trusted).toBe(false);
     expect(hotel.notes.join(' ')).toMatch(/Customers only/);
@@ -266,7 +384,7 @@ describe('stops the planner must not count on', () => {
     const near = plan(450, [dcStation('a', 190)]);
     const far = plan(450, [dcStation('a', 190, { lng: LNG + 0.028 })]);
     expect(near.stops[0].departSocPct).toBe(far.stops[0].departSocPct);
-    const backPct = ((far.stops[0].detourKm - near.stops[0].detourKm) * baseWhPerKm(nexon)) / 1000 / nexon.batteryKwh * 100;
+    const backPct = (((far.stops[0].detourKm - near.stops[0].detourKm) * baseWhPerKm(nexon)) / 1000 / nexon.batteryKwh) * 100;
     expect(backPct).toBeGreaterThan(1);
     expect(near.arrivalSocPct - far.arrivalSocPct).toBeCloseTo(backPct, 0);
   });

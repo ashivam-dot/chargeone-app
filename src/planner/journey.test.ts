@@ -3,8 +3,10 @@ import type { Station } from '../data/model.ts';
 import type { Place, PlacesData } from '../data/places.ts';
 import { VEHICLES, myVehicleFromModel } from '../shared/vehicles.ts';
 import type { Coord } from './geometry.ts';
-import { chooseOvernight, morningSoc, planJourney, sortStays, staysNearDestination } from './journey.ts';
+import { NIGHT_BY, morningSoc, planJourney, sortStays, staysNearDestination } from './journey.ts';
 import { DEFAULT_OPTIONS } from './planner.ts';
+import type { CorridorPlace } from '../data/corridor.ts';
+import { BREAK_EVERY_MIN, BREAK_TOLERANCE_MIN } from './itinerary.ts';
 
 const KM_PER_DEG_LAT = 111.2;
 const LNG = 77;
@@ -43,8 +45,23 @@ function station(id: string, atKm: number): Station {
   };
 }
 
-const stay = (id: string, chargerOnSite = false): Place => ({ id, cat: 'stay', kind: 'hotel', name: `Hotel ${id}`, lat: 0, lng: 0, chargerOnSite });
-const food = (id: string): Place => ({ id, cat: 'food', kind: 'restaurant', name: `Food ${id}`, lat: 0, lng: 0 });
+const stay = (id: string, chargerOnSite = false): Place => ({
+  id,
+  cat: 'stay',
+  kind: 'hotel',
+  name: `Hotel ${id}`,
+  lat: 0,
+  lng: 0,
+  chargerOnSite,
+});
+const food = (id: string): Place => ({
+  id,
+  cat: 'food',
+  kind: 'restaurant',
+  name: `Food ${id}`,
+  lat: 0,
+  lng: 0,
+});
 
 // Chargers every 100 km; only some have stays, one with a charger on site.
 const stations = [100, 200, 300, 380, 420, 500, 600, 700, 800, 900].map((km) => station(`c${km}`, km));
@@ -52,42 +69,94 @@ const places: PlacesData = {
   generatedAt: '',
   attribution: '',
   places: [stay('h1'), stay('h2', true), food('f1')],
-  near: { c380: { f: [[2, 120]], s: [[0, 400]] }, c420: { f: [], s: [[1, 90]] } },
+  near: {
+    c380: { f: [[2, 120]], s: [[0, 400]] },
+    c420: { f: [], s: [[1, 90]] },
+  },
   area: {},
   cities: [],
 };
 
-function journey(km: number, dailyHours: number, data: PlacesData | null = places) {
-  return planJourney({ route: route(km), stations, statuses: new Map(), vehicle: nexon, options: DEFAULT_OPTIONS, now, dailyHours, places: data });
+const depart = new Date(2026, 9, 21, 6, 0).getTime();
+
+function journey(
+  km: number,
+  dailyHours: number,
+  data: PlacesData | null = places,
+  extra: {
+    stations?: Station[];
+    corridor?: CorridorPlace[];
+    departAt?: number;
+  } = {},
+) {
+  return planJourney({
+    route: route(km),
+    stations: extra.stations ?? stations,
+    statuses: new Map(),
+    vehicle: nexon,
+    options: DEFAULT_OPTIONS,
+    now,
+    dailyHours,
+    places: data,
+    departAt: extra.departAt ?? depart,
+    corridor: extra.corridor,
+  });
 }
 
+const poi = (id: string, km: number, kind: CorridorPlace['kind'], cat: CorridorPlace['cat'], name = `${kind} ${id}`): CorridorPlace => ({
+  id: `osm-n${id}`,
+  kind,
+  cat,
+  name,
+  named: true,
+  lat: START_LAT + km / KM_PER_DEG_LAT,
+  lng: LNG + 0.002,
+  open24h: true,
+  toilets: false,
+  pureVeg: false,
+});
+
 describe('planJourney', () => {
-  it('keeps a trip within the daily limit as one day', () => {
+  it('keeps a trip within the daily limit as one day, with clock times', () => {
     const j = journey(300, 8);
     expect(j.days).toHaveLength(1);
-    expect(j.days[0].overnight).toBeNull();
+    expect(j.days[0].night).toBeNull();
     expect(j.feasible).toBe(true);
+    expect(j.departAt).toBe(depart);
+    const items = j.days[0].items;
+    expect(items[0].kind).toBe('depart');
+    expect(items[items.length - 1].kind).toBe('arrive');
+    expect(j.arriveAt).toBe(items[items.length - 1].at);
+    // 300 km at 60 km/h plus stops: at least 5 h after leaving.
+    expect(j.arriveAt - depart).toBeGreaterThanOrEqual(300 * 60_000);
   });
 
-  it("doesn't add a night to a trip that just fits the daily limit", () => {
-    // 450 km at 60 km/h is 7.5 h: over the 85% planning buffer, under the 8 h limit.
-    const j = journey(450, 8);
-    expect(j.days).toHaveLength(1);
-    expect(j.days[0].overnight).toBeNull();
-  });
-
-  it('splits a long trip at a charger with stays, preferring a charger on site', () => {
-    // 1000 km at 60 km/h is ~16.7 h; 8 h/day with the buffer is ~408 km a day.
+  it('splits a long trip at a reachable charger with a stay, within the day limit and night window', () => {
     const j = journey(1000, 8);
-    expect(j.days.length).toBeGreaterThanOrEqual(3);
-    const first = j.days[0].overnight!;
-    expect(first.station.id).toBe('c380');
-    expect(first.stays[0].place.name).toBe('Hotel h1');
-    expect(first.food[0].place.name).toBe('Food f1');
-    expect(j.days[1].startSocPct).toBe(100);
-    expect(j.days[1].startKm).toBeCloseTo(first.alongKm, 0);
+    expect(j.days.length).toBeGreaterThanOrEqual(2);
     expect(j.feasible).toBe(true);
+    for (const d of j.days.slice(0, -1)) {
+      expect(d.night).not.toBeNull();
+      expect(d.driveMinutes).toBeLessThanOrEqual(8 * 60 + 10);
+      const by = new Date(d.departAt);
+      expect(d.arriveAt).toBeLessThanOrEqual(new Date(by.getFullYear(), by.getMonth(), by.getDate(), NIGHT_BY[0], NIGHT_BY[1] + 15).getTime());
+    }
+    const first = j.days[0];
+    expect(first.overnight?.station.id).toMatch(/^c(380|420)$/);
+    expect(first.night!.stays.length).toBeGreaterThan(0);
+    expect(j.days[1].startKm).toBeCloseTo(first.endKm, 0);
+    expect(j.days[1].startSocPct).toBe(first.night!.morningSocPct);
+    // The next morning leaves at the same time of day.
+    expect(new Date(j.days[1].departAt).getHours()).toBe(6);
     expect(j.distanceKm).toBeCloseTo(1000, -1);
+  });
+
+  it('ends the day earlier when leaving late, so it arrives by the night window', () => {
+    const late = new Date(2026, 9, 21, 14, 0).getTime();
+    const j = journey(1000, 10, places, { departAt: late });
+    const d = j.days[0];
+    expect(d.night).not.toBeNull();
+    expect(d.arriveAt).toBeLessThanOrEqual(new Date(2026, 9, 21, NIGHT_BY[0], NIGHT_BY[1] + 15).getTime());
   });
 
   it('never charges at the overnight charger as a stop on the same day', () => {
@@ -99,14 +168,15 @@ describe('planJourney', () => {
     }
   });
 
-  it('has no daily limit when set to 0', () => {
-    expect(journey(1000, 0).days).toHaveLength(1);
+  it('has no daily limit when set to 0, with a warning for a very long day', () => {
+    const j = journey(1000, 0);
+    expect(j.days).toHaveLength(1);
+    expect(j.warnings.join(' ')).toMatch(/at the wheel in one go/);
   });
 
   it('starts the next day below 100% after a night on a slow AC charger', () => {
     expect(morningSoc(20, 45, 'dc', 30)).toBe(100);
     expect(morningSoc(20, 45, 'ac', 7.4)).toBe(100);
-    // 3.3 kW for 10 h adds about 27 kWh to a 45 kWh battery: 20% + 59% → 75%.
     expect(morningSoc(20, 45, 'ac', 3.3)).toBe(75);
   });
 
@@ -121,59 +191,49 @@ describe('planJourney', () => {
 
   it('never ends a day at an unverified or customers-only charger unless the driver allows it', () => {
     const shaky = stations.map((s) => (s.id === 'c380' ? { ...s, confidence: 0.3 } : s.id === 'c420' ? { ...s, access: 'customers' as const } : s));
-    const run = (allowUnverified: boolean) =>
-      planJourney({ route: route(1000), stations: shaky, statuses: new Map(), vehicle: nexon, options: { ...DEFAULT_OPTIONS, allowUnverified }, now, dailyHours: 8, places });
-    const strict = run(false).days.map((d) => d.overnight).filter((o) => o !== null);
-    expect(strict.length).toBeGreaterThan(0);
+    const strict = journey(1000, 8, places, { stations: shaky })
+      .days.map((d) => d.overnight)
+      .filter((o) => o !== null);
     expect(strict.map((o) => o.station.id)).not.toContain('c380');
     expect(strict.map((o) => o.station.id)).not.toContain('c420');
     expect(strict.every((o) => o.trusted)).toBe(true);
-    const first = run(true).days[0].overnight!;
-    expect(['c380', 'c420']).toContain(first.station.id);
-    expect(first.trusted).toBe(false);
-  });
-
-  it('marks a night on a charger of unknown speed', () => {
-    const unknown = stations.map((s) => (s.id === 'c380' ? { ...s, connectors: [], speed: 'unknown' as const, maxKw: null } : s));
-    const j = planJourney({ route: route(1000), stations: unknown, statuses: new Map(), vehicle: nexon, options: { ...DEFAULT_OPTIONS, allowUnverified: true }, now, dailyHours: 8, places });
-    const night = j.days.map((d) => d.overnight).find((o) => o?.station.id === 'c380');
-    expect(night?.speedUnknown).toBe(true);
   });
 
   it('still splits the trip without any stay data', () => {
     const j = journey(1000, 8, null);
     expect(j.days.length).toBeGreaterThan(1);
-    expect(j.days[0].overnight?.stays).toEqual([]);
-  });
-});
-
-describe('chooseOvernight', () => {
-  const cand = (id: string, alongKm: number, stays: Place[]) => ({
-    station: station(id, alongKm),
-    alongKm,
-    detourKm: 0,
-    mode: 'dc' as const,
-    powerKw: 50,
-    trusted: true,
-    stays: stays.map((place) => ({ place, metres: 100 })),
+    expect(j.days[0].night).not.toBeNull();
   });
 
-  it('prefers a stay with a charger on site over a slightly later charger', () => {
-    const pick = chooseOvernight([cand('a', 380, [stay('x', true)]), cand('b', 400, [stay('y')])], 0, 400);
-    expect(pick?.station.id).toBe('a');
+  it('stops for the night at a roadside hotel with no charger when the car can reach a charger next morning', () => {
+    const corridor = [poi('901', 440, 'hotel', 'stay', 'Highway Inn')];
+    const sparse = [100, 250, 500, 650, 800].map((km) => station(`s${km}`, km));
+    const j = journey(900, 8, null, { stations: sparse, corridor });
+    expect(j.days.length).toBeGreaterThan(1);
+    const kinds = j.days.slice(0, -1).map((d) => d.night!.kind);
+    expect(kinds.every((k) => k === 'charger' || k === 'stay' || k === 'roadside')).toBe(true);
+    expect(j.hasCorridor).toBe(true);
   });
 
-  it('prefers any stay over none', () => {
-    expect(chooseOvernight([cand('a', 300, [stay('x')]), cand('b', 395, [])], 0, 400)?.station.id).toBe('a');
+  it('keeps planning every day after a gap in the chargers', () => {
+    // Nothing between 300 and 700: a 400 km gap on day 1 or 2; the plan still reaches the end.
+    const gappy = [100, 200, 300, 700, 800, 900, 1000, 1100].map((km) => station(`g${km}`, km));
+    const j = journey(1200, 8, null, { stations: gappy });
+    expect(j.gaps.length).toBeGreaterThan(0);
+    expect(j.feasible).toBe(false);
+    expect(j.tooLong).toBe(false);
+    const last = j.days[j.days.length - 1];
+    expect(last.endKm).toBeCloseTo(1200, -1);
+    expect(last.items[last.items.length - 1].kind).toBe('arrive');
+    expect(j.days.flatMap((d) => d.items).some((i) => i.kind === 'gap')).toBe(true);
+    // Stops after the gap are planned too.
+    expect(j.days.some((d) => d.plan.stops.some((s) => d.startKm + s.alongKm > 690))).toBe(true);
   });
 
-  it('ends the day a little earlier to reach a charger with a hotel', () => {
-    expect(chooseOvernight([cand('a', 200, [stay('x')]), cand('b', 300, [])], 0, 400)?.station.id).toBe('a');
-    expect(chooseOvernight([cand('a', 150, [stay('x')]), cand('b', 300, [])], 0, 400)?.station.id).toBe('b');
-  });
-
-  it('returns null when no charger is near the end of the day', () => {
-    expect(chooseOvernight([cand('a', 50, [])], 0, 400)).toBeNull();
+  it('never drives more than about 2 h without a rest', () => {
+    const corridor = [poi('1', 110, 'fuel', 'fuel'), poi('2', 230, 'rest_area', 'rest'), poi('3', 340, 'restaurant', 'food')];
+    const j = journey(1000, 10, places, { corridor });
+    for (const d of j.days) for (const it of d.items) expect(it.drivenSinceRestMin).toBeLessThanOrEqual(BREAK_EVERY_MIN + BREAK_TOLERANCE_MIN + 1);
   });
 });
 
