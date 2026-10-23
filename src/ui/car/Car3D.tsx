@@ -11,7 +11,6 @@ import {
   MeshBasicMaterial,
   PerspectiveCamera,
   PlaneGeometry,
-  PMREMGenerator,
   RingGeometry,
   Scene,
   SRGBColorSpace,
@@ -19,7 +18,7 @@ import {
   type Material,
   type Object3D,
 } from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { studioEnvironment } from './carStudio.ts';
 import { buildCar, type CarModel } from './carMesh.ts';
 import { designFor } from './carDesigns.ts';
 
@@ -100,10 +99,8 @@ export function Car3D(props: Car3DProps) {
     renderer.outputColorSpace = SRGBColorSpace;
 
     const scene = new Scene();
-    const pmrem = new PMREMGenerator(renderer);
-    const room = new RoomEnvironment();
-    scene.environment = pmrem.fromScene(room, 0.04).texture;
-    room.dispose?.();
+    const studio = studioEnvironment(renderer);
+    scene.environment = studio.texture;
 
     scene.add(new HemisphereLight('#eef3ff', '#16181d', 1.0));
     const key = new DirectionalLight('#ffffff', 2.2);
@@ -185,7 +182,7 @@ export function Car3D(props: Car3DProps) {
         model.paint.color.set(l.paint);
         shownPaint = l.paint;
       }
-      for (const h of model.headlights) h.emissiveIntensity += ((l.connected ? 2.4 : 0.35) - h.emissiveIntensity) * Math.min(1, dt * 6);
+      for (const h of model.headlights) h.emissiveIntensity += ((l.connected ? 2.4 : model.lampGlow) - h.emissiveIntensity) * Math.min(1, dt * 6);
       for (const t of model.taillights) t.emissiveIntensity = l.driving ? 1.4 : l.connected ? 0.8 : 0.3;
 
       // Arrival: the car rolls in from the left and settles on its springs.
@@ -281,8 +278,7 @@ export function Car3D(props: Car3DProps) {
       document.removeEventListener('visibilitychange', onVisibility);
       model.dispose();
       disposeTree(scene);
-      scene.environment?.dispose();
-      pmrem.dispose();
+      studio.dispose();
       renderer.dispose();
     };
   }, [props.modelId]);

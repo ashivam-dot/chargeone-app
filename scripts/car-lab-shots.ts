@@ -15,6 +15,9 @@ mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'chromium', args: ['--ignore-gpu-blocklist', '--mute-audio'] });
 const page = await browser.newPage({ viewport: { width: 900, height: 520 } });
 page.on('pageerror', (e) => console.log('page error:', e.message));
+page.on('console', (m) => {
+  if (m.type() === 'warning' || m.type() === 'error') console.log('console:', m.text());
+});
 for (const id of ids.length ? ids : ['tata-nexon-ev']) {
   for (const view of views) {
     await page.goto(`${base}/lab/car.html?id=${id}&view=${view}`);

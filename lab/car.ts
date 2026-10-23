@@ -1,7 +1,7 @@
 // Dev-only page for tuning car designs against reference photos (not part of the app build).
 // npx vite, then http://localhost:5173/lab/car.html?id=tata-nexon-ev&view=side|front34|rear34|front|rear|top
-import { ACESFilmicToneMapping, Color, DirectionalLight, HemisphereLight, PerspectiveCamera, PMREMGenerator, Scene, SRGBColorSpace, WebGLRenderer } from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { ACESFilmicToneMapping, Color, DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, SRGBColorSpace, WebGLRenderer } from 'three';
+import { studioEnvironment } from '../src/ui/car/carStudio.ts';
 import { buildCar } from '../src/ui/car/carMesh.ts';
 import { designFor } from '../src/ui/car/carDesigns.ts';
 
@@ -15,8 +15,9 @@ renderer.toneMapping = ACESFilmicToneMapping;
 renderer.outputColorSpace = SRGBColorSpace;
 const scene = new Scene();
 scene.background = new Color(q.get('bg') ?? '#c4c7cc');
-const pmrem = new PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+scene.environment = studioEnvironment(renderer).texture;
+renderer.toneMappingExposure = 1.15;
 scene.add(new HemisphereLight('#ffffff', '#202024', 1.0));
 const key = new DirectionalLight('#ffffff', 2);
 key.position.set(4, 7, 5);
@@ -31,6 +32,7 @@ const views: Record<string, [number, number, number]> = {
   front34: [L * 1.5, 1.6, L * 1.5],
   rear34: [-L * 1.5, 1.6, L * 1.5],
   front: [L * 2.6, 0.9, 0],
+  close: [L * 0.95, 1.1, L * 0.7],
   rear: [-L * 2.6, 0.9, 0],
   top: [0, 26, 0.01],
 };
