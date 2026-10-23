@@ -115,6 +115,8 @@ function Login({ onSignedIn }: { onSignedIn: () => void }) {
     <main class="ad-center ad-login">
       <form onSubmit={submit} class="ad-card" data-testid="admin-login">
         <h1>ChargeOne admin</h1>
+        {/* Lets password managers match the saved "admin" login to this token-only form. */}
+        <input hidden type="text" name="username" autoComplete="username" value="admin" readOnly />
         <label class="ad-field">
           <span>Admin token</span>
           <input
