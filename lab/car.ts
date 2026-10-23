@@ -34,6 +34,7 @@ const views: Record<string, [number, number, number]> = {
   rear34: [-L * 1.32, 1.5, L * 1.32],
   front: [L * 1.45, 0.95, 0],
   close: [L * 0.95, 1.1, L * 0.7],
+  closeRear: [-L * 0.95, 1.1, L * 0.7],
   rear: [-L * 1.45, 0.95, 0],
   top: [0, 26, 0.01],
 };

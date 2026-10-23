@@ -183,7 +183,7 @@ export function Car3D(props: Car3DProps) {
         shownPaint = l.paint;
       }
       for (const h of model.headlights) h.emissiveIntensity += ((l.connected ? 2.4 : model.lampGlow) - h.emissiveIntensity) * Math.min(1, dt * 6);
-      for (const t of model.taillights) t.emissiveIntensity = l.driving ? 1.4 : l.connected ? 0.8 : 0.3;
+      for (const t of model.taillights) t.emissiveIntensity = l.driving ? 1.6 : l.connected ? 1.1 : 0.9;
 
       // Arrival: the car rolls in from the left and settles on its springs.
       const p = reduce ? 1 : Math.min(1, (now - t0) / ARRIVE_MS);

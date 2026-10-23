@@ -38,6 +38,8 @@ export interface FaceLine {
   w: number;
   /** Also draw it on the other side of the centre line. */
   mirror?: boolean;
+  /** Extra millimetres it stands off the surface. */
+  lift?: number;
 }
 /** A rectangle in face coordinates. A panel from -s to s is one piece across the centre. */
 export interface FacePanel {

@@ -78,15 +78,19 @@ function nexonFront(n: number): FaceItem[] {
     { kind: 'gloss', poly: [[-0.93, n - 0.004], [0.93, n - 0.004], [1.02, n - 0.03], [0.92, n - 0.032], [-0.92, n - 0.032], [-1.02, n - 0.03]] },
     { kind: 'drl', pts: [[0, n - 0.018], [0.88, n - 0.018], [0.97, n - 0.028], [1.05, n - 0.075]], w: 7, mirror: true },
     // Raised closed panel, its shut lines narrowing down to the air dam.
-    { kind: 'body', poly: [[-0.6, n - 0.045], [0.6, n - 0.045], [0.5, 0.345], [-0.5, 0.345]], lift: 4 },
-    { kind: 'trim', pts: [[0.6, n - 0.045], [0.5, 0.345]], w: 4, mirror: true },
+    { kind: 'body', poly: [[-0.54, n - 0.045], [0.54, n - 0.045], [0.46, 0.345], [-0.46, 0.345]], lift: 4 },
+    { kind: 'trim', pts: [[0.54, n - 0.045], [0.46, 0.345]], w: 4, mirror: true },
     // Headlamp pod: the X's upper arm runs up to the DRL corner; the lamp housing sits in its lower half.
-    { kind: 'gloss', poly: [[0.64, n - 0.05], [0.9, n - 0.04], [1.04, n - 0.08], [1.05, n - 0.25], [0.9, n - 0.275], [0.74, n - 0.19]], mirror: true, lift: 1 },
-    { kind: 'housing', poly: [[0.76, n - 0.1], [0.97, n - 0.09], [1.02, n - 0.12], [1.02, n - 0.24], [0.9, n - 0.255], [0.8, n - 0.19]], mirror: true, lift: 2 },
-    ...projector(0.88, n - 0.135, 0.038, hw, h),
-    ...projector(0.95, n - 0.205, 0.034, hw, h),
-    // LED light guide down the inner edge of the pod, and a short one up the upper arm.
-    { kind: 'drl', pts: [[0.67, n - 0.06], [0.76, n - 0.11], [0.82, n - 0.2], [0.9, n - 0.262]], w: 5, mirror: true },
+    { kind: 'gloss', poly: [[0.56, n - 0.05], [0.86, n - 0.04], [0.97, n - 0.07], [0.97, n - 0.25], [0.84, n - 0.275], [0.67, n - 0.19]], mirror: true, lift: 1 },
+    { kind: 'satin', pts: [[0.56, n - 0.05], [0.67, n - 0.19], [0.84, n - 0.275], [0.97, n - 0.25]], w: 4, mirror: true, lift: 2 },
+    // Smoked lamp cluster: a lit eyebrow over two stacked projectors and a vertical turn lamp.
+    { kind: 'housing', poly: [[0.7, n - 0.085], [0.93, n - 0.08], [0.94, n - 0.24], [0.84, n - 0.255], [0.74, n - 0.18]], mirror: true, lift: 2 },
+    { kind: 'drl', pts: [[0.72, n - 0.09], [0.92, n - 0.087]], w: 6, mirror: true },
+    ...projector(0.81, n - 0.135, 0.046, hw, h),
+    ...projector(0.85, n - 0.205, 0.04, hw, h),
+    { kind: 'turn', pts: [[0.925, n - 0.12], [0.925, n - 0.23]], w: 7, mirror: true },
+    // LED light guide down the inner edge of the pod.
+    { kind: 'drl', pts: [[0.6, n - 0.065], [0.69, n - 0.12], [0.75, n - 0.2], [0.83, n - 0.26]], w: 5, mirror: true },
     // Lower air dam, wider at the bottom: the X's lower arms.
     { kind: 'gloss', poly: [[-0.5, 0.345], [0.5, 0.345], [0.74, 0.3], [1.02, 0.205], [-1.02, 0.205], [-0.74, 0.3]] },
     { kind: 'satin', pattern: 'slats-h', rect: [-0.5, 0.5, 0.25, 0.33], pitch: 26, fill: 0.3, lift: 1 },
@@ -102,17 +106,19 @@ function nexonRear(t: number): FaceItem[] {
   const top = t - 0.03;
   return [
     { kind: 'gloss', rect: [-0.94, 0.94, top - 0.004, t - 0.004] },
-    { kind: 'tail', pts: [[0, top - 0.013], [0.66, top - 0.013]], w: 7, mirror: true },
+    { kind: 'tail', pts: [[0, top - 0.013], [0.66, top - 0.013]], w: 11, mirror: true },
     { kind: 'housing', poly: [[0.6, top - 0.002], [1.14, top + 0.006], [1.14, top - 0.07], [0.98, top - 0.085], [0.78, top - 0.04]], mirror: true, lift: 1 },
     { kind: 'lens', poly: [[0.64, top - 0.006], [1.12, top + 0.002], [1.12, top - 0.064], [0.98, top - 0.078], [0.8, top - 0.038]], mirror: true, lift: 2 },
-    { kind: 'tail', pts: [[0.64, top - 0.013], [1.12, top - 0.006]], w: 8, mirror: true },
-    { kind: 'tail', pts: [[0.8, top - 0.036], [0.98, top - 0.072], [1.12, top - 0.058]], w: 6, mirror: true },
-    { kind: 'tail', pts: [[1.0, top - 0.02], [1.08, top - 0.04]], w: 5, mirror: true },
+    // The X end: the bar's upper blade runs out to the corner, a lower blade angles down and back up.
+    { kind: 'tail', pts: [[0.64, top - 0.013], [1.12, top - 0.006]], w: 12, mirror: true },
+    { kind: 'tail', pts: [[0.8, top - 0.036], [0.98, top - 0.072], [1.12, top - 0.058]], w: 9, mirror: true },
+    { kind: 'tail', pts: [[0.96, top - 0.022], [1.1, top - 0.044]], w: 6, mirror: true },
     // Black band along the bottom of the tailgate.
-    { kind: 'gloss', rect: [-0.8, 0.8, 0.375, 0.392] },
+    { kind: 'gloss', rect: [-0.8, 0.8, 0.375, 0.39] },
     // Lower bumper: black centre with a plate recess, body-colour corners carrying black reflector pods.
-    { kind: 'gloss', poly: [[-0.62, 0.36], [0.62, 0.36], [0.74, 0.26], [0.7, 0.198], [-0.7, 0.198], [-0.74, 0.26]] },
-    { kind: 'housing', rect: [-0.3, 0.3, 0.27, 0.34], lift: 1 },
+    { kind: 'gloss', poly: [[-0.6, 0.345], [0.6, 0.345], [0.72, 0.26], [0.7, 0.198], [-0.7, 0.198], [-0.72, 0.26]] },
+    { kind: 'housing', rect: [-0.3, 0.3, 0.265, 0.33], lift: 1 },
+    { kind: 'satin', pts: [[-0.56, 0.35], [0.56, 0.35]], w: 3 },
     { kind: 'gloss', poly: [[0.84, 0.37], [1.06, 0.39], [1.06, 0.22], [0.94, 0.22]], mirror: true },
     { kind: 'tail', rect: [0.96, 1.01, 0.25, 0.35], mirror: true, lift: 1 },
     { kind: 'satin', poly: [[-0.66, 0.19], [0.66, 0.19], [0.6, 0.214], [-0.6, 0.214]], lift: 2 },
@@ -128,17 +134,21 @@ function punchFront(n: number): FaceItem[] {
   const h = 1.622;
   return [
     { kind: 'gloss', poly: [[-0.96, n - 0.004], [0.96, n - 0.004], [1.03, n - 0.03], [0.96, n - 0.046], [-0.96, n - 0.046], [-1.03, n - 0.03]] },
-    { kind: 'drl', pts: [[0.72, n - 0.024], [0.96, n - 0.02], [1.03, n - 0.04], [1.05, n - 0.08]], w: 10, mirror: true },
+    // Corner DRLs (also the indicators) at the strip ends, wrapping round the corner along the bonnet shut line.
+    { kind: 'drl', pts: [[0.66, n - 0.026], [0.96, n - 0.02], [1.04, n - 0.035], [1.13, n - 0.05]], w: 11, mirror: true },
+    { kind: 'drl', pts: [[1.0, n - 0.04], [1.03, n - 0.1]], w: 7, mirror: true },
     // Raised centre panel.
     { kind: 'body', poly: [[-0.34, n - 0.05], [0.34, n - 0.05], [0.31, n - 0.2], [-0.31, n - 0.2]], lift: 5 },
     { kind: 'trim', pts: [[-0.34, n - 0.05], [-0.31, n - 0.2], [0.31, n - 0.2], [0.34, n - 0.05]], w: 4 },
-    // Headlamp pods.
-    { kind: 'gloss', poly: [[0.74, n - 0.105], [1.0, n - 0.095], [1.04, n - 0.15], [1.01, n - 0.32], [0.78, n - 0.31]], mirror: true, lift: 1 },
-    ...projector(0.89, n - 0.15, 0.036, hw, h),
-    ...projector(0.9, n - 0.245, 0.036, hw, h),
-    { kind: 'drl', pts: [[0.8, n - 0.12], [0.775, n - 0.2], [0.81, n - 0.295]], w: 5, mirror: true },
+    // Angular headlamp pods low in the bumper corners, with a satin frame.
+    { kind: 'gloss', poly: [[0.6, n - 0.11], [0.9, n - 0.1], [0.97, n - 0.15], [0.95, n - 0.33], [0.8, n - 0.335], [0.64, n - 0.24]], mirror: true, lift: 1 },
+    { kind: 'satin', pts: [[0.6, n - 0.11], [0.64, n - 0.24], [0.8, n - 0.335], [0.95, n - 0.33]], w: 4, mirror: true, lift: 1 },
+    { kind: 'housing', poly: [[0.71, n - 0.125], [0.9, n - 0.12], [0.92, n - 0.3], [0.8, n - 0.305], [0.71, n - 0.24]], mirror: true, lift: 2 },
+    ...projector(0.8, n - 0.165, 0.042, hw, h),
+    ...projector(0.82, n - 0.255, 0.042, hw, h),
+    { kind: 'drl', pts: [[0.68, n - 0.125], [0.665, n - 0.21], [0.73, n - 0.3]], w: 5, mirror: true },
     // Black blade between the pods, splitting the upper face from the bumper.
-    { kind: 'gloss', poly: [[-0.76, n - 0.255], [0.76, n - 0.255], [0.76, n - 0.285], [-0.76, n - 0.285]] },
+    { kind: 'gloss', poly: [[-0.66, n - 0.255], [0.66, n - 0.255], [0.66, n - 0.285], [-0.66, n - 0.285]] },
     // Lower bumper with vertical teeth.
     { kind: 'trim', poly: [[-0.74, 0.3], [0.74, 0.3], [0.94, 0.24], [0.99, 0.2], [-0.99, 0.2], [-0.94, 0.24]] },
     { kind: 'clad', pattern: 'slats-v', rect: [-0.6, 0.6, 0.235, 0.29], pitch: 34, fill: 0.32, lift: 1 },
@@ -157,8 +167,9 @@ function punchRear(t: number): FaceItem[] {
     { kind: 'tail', pts: [[0, top - 0.03], [0.78, top - 0.03]], w: 5, mirror: true },
     { kind: 'tail', pts: [[0.78, top - 0.03], [0.9, top - 0.014], [1.08, top - 0.014]], w: 10, mirror: true },
     { kind: 'tail', pts: [[0.78, top - 0.03], [0.9, top - 0.064], [1.08, top - 0.072]], w: 10, mirror: true },
-    // Recessed plate panel on the tailgate.
-    { kind: 'housing', rect: [-0.34, 0.34, 0.39, 0.47] },
+    // Gloss garnish across the tailgate over the plate area, and the tailgate's lower shut line.
+    { kind: 'gloss', rect: [-0.38, 0.38, 0.505, 0.53] },
+    { kind: 'trim', pts: [[-0.9, 0.345], [0.9, 0.345]], w: 4 },
     { kind: 'clad', poly: [[-1.0, 0.33], [1.0, 0.33], [1.02, 0.192], [-1.02, 0.192]] },
     { kind: 'tail', rect: [0.82, 0.95, 0.255, 0.272], mirror: true, lift: 1 },
     { kind: 'satin', poly: [[-0.52, 0.19], [0.52, 0.19], [0.46, 0.228], [-0.46, 0.228]], lift: 2 },
@@ -168,23 +179,26 @@ function punchRear(t: number): FaceItem[] {
  * inward at the bottom (the boomerang L); triangular headlamp clusters tucked inside each L; a smooth,
  * blanked gloss-black panel in the middle that narrows downward; a gloss-black lower bumper with two slots. */
 function xev9sFront(n: number): FaceItem[] {
-  const hw = 0.95;
-  const h = 1.747;
   return [
     { kind: 'gloss', rect: [-0.92, 0.92, n - 0.05, n - 0.004] },
     { kind: 'drl', pts: [[0, n - 0.024], [0.9, n - 0.024], [0.975, n - 0.045], [0.995, n - 0.09], [0.99, n - 0.27], [0.93, n - 0.315]], w: 20, mirror: true },
-    // Headlamps: a dark triangle inside the L, deepest at the outer edge, with three projectors on a slant.
-    { kind: 'housing', poly: [[0.56, n - 0.062], [0.95, n - 0.062], [0.95, n - 0.25], [0.85, n - 0.205]], mirror: true, lift: 1 },
-    ...projector(0.68, n - 0.088, 0.03, hw, h),
-    ...projector(0.78, n - 0.11, 0.03, hw, h),
-    ...projector(0.88, n - 0.135, 0.03, hw, h),
-    // Blanked panel, framed by body colour, with a thin satin edge.
-    { kind: 'body', poly: [[-0.42, n - 0.07], [0.42, n - 0.07], [0.34, n - 0.2], [-0.34, n - 0.2]], lift: 3 },
-    { kind: 'gloss', pts: [[-0.42, n - 0.07], [-0.34, n - 0.2], [0.34, n - 0.2], [0.42, n - 0.07]], w: 6 },
+    // Headlamps: a smoked wedge inside the L, deepest at the outer edge, holding two square projector modules
+    // with chrome bezels and a lit inner LED line under them.
+    { kind: 'housing', poly: [[0.6, n - 0.062], [0.95, n - 0.062], [0.95, n - 0.24], [0.86, n - 0.2]], mirror: true, lift: 1 },
+    { kind: 'chrome', poly: [[0.72, n - 0.075], [0.8, n - 0.075], [0.8, n - 0.125], [0.72, n - 0.125]], mirror: true, lift: 2 },
+    { kind: 'housing', poly: [[0.73, n - 0.08], [0.79, n - 0.08], [0.79, n - 0.12], [0.73, n - 0.12]], mirror: true, lift: 3 },
+    { kind: 'chrome', poly: [[0.83, n - 0.085], [0.92, n - 0.085], [0.92, n - 0.14], [0.83, n - 0.14]], mirror: true, lift: 2 },
+    { kind: 'housing', poly: [[0.84, n - 0.09], [0.91, n - 0.09], [0.91, n - 0.135], [0.84, n - 0.135]], mirror: true, lift: 3 },
+    { kind: 'drl', pts: [[0.66, n - 0.075], [0.86, n - 0.17], [0.93, n - 0.205]], w: 5, mirror: true },
+    // Blanked panel: smooth body colour between the lamps, underlined in satin.
     { kind: 'satin', pts: [[-0.3, n - 0.215], [0.3, n - 0.215]], w: 4 },
-    // Lower bumper: gloss black, rising up the corners inside the DRL legs.
+    // Lower bumper: gloss black, rising up the corners inside the DRL legs, with a satin top edge.
     { kind: 'gloss', poly: [[-0.55, 0.3], [0.55, 0.3], [0.78, 0.31], [0.9, n - 0.29], [0.94, n - 0.33], [1.05, 0.25], [1.05, 0.185], [-1.05, 0.185], [-1.05, 0.25], [-0.94, n - 0.33], [-0.9, n - 0.29], [-0.78, 0.31]] },
-    { kind: 'intake', poly: [[0.08, 0.212], [0.5, 0.212], [0.56, 0.265], [0.1, 0.265]], mirror: true, lift: 1 },
+    { kind: 'satin', pts: [[-0.55, 0.302], [0.55, 0.302], [0.78, 0.312], [0.9, n - 0.288]], w: 3, mirror: true, lift: 1 },
+    // Two intake slots with fine vertical vanes, and a sensor box in the middle.
+    { kind: 'intake', poly: [[0.1, 0.212], [0.52, 0.212], [0.6, 0.272], [0.12, 0.272]], mirror: true, lift: 1 },
+    { kind: 'trim', pattern: 'slats-v', rect: [0.14, 0.52, 0.218, 0.266], pitch: 22, fill: 0.35, mirror: true, lift: 2 },
+    { kind: 'housing', rect: [-0.06, 0.06, 0.225, 0.262], lift: 1 },
     { kind: 'satin', poly: [[-0.4, 0.19], [0.4, 0.19], [0.44, 0.202], [-0.44, 0.202]], lift: 2 },
   ];
 }
@@ -198,6 +212,8 @@ function xev9sRear(t: number): FaceItem[] {
     { kind: 'tail', pts: [[0.63, top - 0.006], [1.11, top - 0.006]], w: 10, mirror: true },
     { kind: 'tail', pts: [[0.64, top - 0.035], [0.74, top - 0.115], [0.84, top - 0.098], [1.1, top - 0.045]], w: 7, mirror: true },
     { kind: 'gloss', rect: [-0.57, 0.57, top - 0.065, top - 0.008] },
+    // Fine hexagon-like relief on the joining panel, done as small diamonds.
+    { kind: 'housing', pattern: 'diamonds', rect: [-0.54, 0.54, top - 0.058, top - 0.014], pitch: 22, fill: 0.7, lift: 1 },
     { kind: 'satin', pts: [[-0.55, top - 0.07], [0.55, top - 0.07]], w: 4 },
     { kind: 'gloss', poly: [[-1.02, 0.3], [1.02, 0.3], [1.02, 0.19], [-1.02, 0.19]] },
     { kind: 'satin', poly: [[-0.45, 0.188], [0.45, 0.188], [0.4, 0.215], [-0.4, 0.215]], lift: 2 },
@@ -384,9 +400,9 @@ const SPECS: Record<string, Spec> = {
     name: 'Tata Nexon EV',
     body: 'suv',
     size: [3995, 1802, 1625, 2498, 190, 16],
-    profile: [0.31, 0.46, 0.87, 0.955, 0.57, 0.635, 0.62, 0.98, 0.68],
+    profile: [0.31, 0.46, 0.87, 0.955, 0.57, 0.65, 0.645, 0.98, 0.705],
     dloX: 0.875,
-    faceRake: 0.13,
+    faceRake: 0.1,
     front: 'bar-split',
     rear: 'x-bar',
     floatingRoof: true,
@@ -397,22 +413,23 @@ const SPECS: Record<string, Spec> = {
     finish: 'two-tone',
     tyre: [215, 60],
     frontOverhang: 0.538,
-    noseRound: 0.35,
+    noseRound: 0.22,
     frontItems: nexonFront,
     rearItems: nexonRear,
     curves: {
-      // Rounded bonnet lip that the DRL bar sits on.
-      hood: [[0, 0.535], [0.008, 0.56], [0.022, 0.576], [0.06, 0.59], [0.3, 0.635]],
+      // Long, flat bonnet with a short, firm lip that the DRL bar sits on.
+      hood: [[0, 0.548], [0.007, 0.572], [0.02, 0.586], [0.06, 0.596], [0.31, 0.65]],
       // The window line climbs all the way back and kicks up hard into the thick rear quarter, while the
       // roof falls away from the B-pillar: the coupe-SUV stance, with side glass tapering to a point.
-      belt: [[0.31, 0.62], [0.5, 0.634], [0.7, 0.66], [0.8, 0.705], [0.885, 0.775], [0.955, 0.685]],
-      roof: [[0.48, 0.985], [0.58, 0.982], [0.7, 0.965], [0.8, 0.935], [0.87, 0.895]],
+      belt: [[0.31, 0.645], [0.5, 0.656], [0.7, 0.68], [0.8, 0.72], [0.87, 0.77], [0.9, 0.778], [0.955, 0.71]],
+      roof: [[0.48, 0.982], [0.6, 0.975], [0.72, 0.955], [0.8, 0.93], [0.87, 0.89]],
     },
-    plan: { noseDepth: 0.46, noseSquare: 2.4, tailDepth: 0.34, tailSquare: 2.5 },
-    hoodCrown: 0.045,
-    shoulder: { drop: [0.19, 0.1], tumble: 0.09, sharp: true, crease: { y: [0.34, 0.42], depth: 0.008 } },
+    // A wide, flat face with tight corners, so both headlamp pods show from a three-quarter view.
+    plan: { noseDepth: 0.25, noseSquare: 3.6, tailDepth: 0.26, tailSquare: 3 },
+    hoodCrown: 0.026,
+    shoulder: { drop: [0.2, 0.11], tumble: 0.085, sharp: true, crease: { y: [0.44, 0.5], depth: 0.008 } },
     // Silver accent along the rising window line, as on the dual-tone cars.
-    glass: { rearPillar: 'black', trim: 'chrome', rearSlant: 0.12 },
+    glass: { rearPillar: 'body', trim: 'chrome', rearSlant: 0.12 },
     arch: { shape: 'round', gap: 0.013 },
     clad: { archWidth: 0.09, sillH: 0.125, proud: 0.014 },
     lampGlow: 1.2,
@@ -424,8 +441,8 @@ const SPECS: Record<string, Spec> = {
     size: [3880, 1742, 1622, 2445, 195, 16],
     // Roof falls a little toward a raked rear glass over a short tail; the side glass ends ahead of a
     // thick C-pillar that carries the rear door handle.
-    profile: [0.29, 0.44, 0.875, 0.96, 0.58, 0.65, 0.62, 0.96, 0.655],
-    dloX: 0.86,
+    profile: [0.29, 0.44, 0.88, 0.965, 0.6, 0.665, 0.66, 0.955, 0.69],
+    dloX: 0.865,
     front: 'corners',
     rear: 'bar',
     floatingRoof: true,
@@ -441,15 +458,16 @@ const SPECS: Record<string, Spec> = {
     frontItems: punchFront,
     rearItems: punchRear,
     // Short, high clamshell bonnet with a firm rounded lip.
+    // A tall, stubby body: high bonnet and window line, so the glass is a short band under the rails.
     curves: {
-      hood: [[0, 0.555], [0.008, 0.578], [0.022, 0.594], [0.06, 0.607], [0.29, 0.65]],
-      roof: [[0.44, 0.96], [0.62, 0.958], [0.78, 0.948], [0.875, 0.932]],
-      belt: [[0.29, 0.645], [0.5, 0.628], [0.75, 0.632], [0.845, 0.66], [0.96, 0.655]],
+      hood: [[0, 0.575], [0.008, 0.598], [0.022, 0.612], [0.06, 0.624], [0.29, 0.665]],
+      roof: [[0.44, 0.955], [0.62, 0.953], [0.78, 0.945], [0.88, 0.93]],
+      belt: [[0.29, 0.665], [0.5, 0.66], [0.75, 0.664], [0.85, 0.69], [0.965, 0.69]],
     },
-    plan: { noseDepth: 0.26, noseSquare: 3.4, tailDepth: 0.22, tailSquare: 3.4 },
+    plan: { noseDepth: 0.22, noseSquare: 3.8, tailDepth: 0.2, tailSquare: 3.6 },
     hoodCrown: 0.03,
     shoulder: { drop: [0.12, 0.1], tumble: 0.055, sharp: true },
-    glass: { rearPillar: 'black', trim: 'black', rearSlant: 0.07 },
+    glass: { rearPillar: 'body', trim: 'black', rearSlant: 0.07 },
     arch: { shape: 'squared', gap: 0.014 },
     clad: { colour: '#4a4d52', archWidth: 0.09, sillH: 0.14, proud: 0.018 },
     handles: 'pillar-rear',
@@ -598,7 +616,8 @@ const SPECS: Record<string, Spec> = {
     size: [4737, 1900, 1747, 2762, 205, 18],
     // Tall, upright three-row body: the bonnet and beltline sit a little above the photo estimates, which
     // read as a low estate car in the renders.
-    profile: [0.31, 0.45, 0.9, 0.96, 0.6, 0.64, 0.62, 0.975, 0.645],
+    // The published height includes the roof rails, so the roof skin sits a rail height below it.
+    profile: [0.31, 0.45, 0.9, 0.962, 0.6, 0.665, 0.66, 0.965, 0.705],
     front: 'bar-down',
     rear: 'wrap',
     cladding: true,
@@ -615,13 +634,16 @@ const SPECS: Record<string, Spec> = {
     // Upright XUV700 body: the window line kicks up at the C-pillar into a body-colour D-pillar.
     curves: {
       // Big rounded bonnet lip over the full-width light bar.
-      hood: [[0, 0.565], [0.008, 0.594], [0.022, 0.611], [0.06, 0.62], [0.3, 0.645]],
-      belt: [[0.31, 0.62], [0.7, 0.632], [0.8, 0.642], [0.85, 0.69], [0.96, 0.645]],
+      hood: [[0, 0.57], [0.008, 0.597], [0.022, 0.614], [0.06, 0.626], [0.31, 0.665]],
+      // High window line that rises gently, then kicks up sharply into the body-colour D-pillar.
+      belt: [[0.31, 0.66], [0.6, 0.67], [0.78, 0.685], [0.815, 0.695], [0.86, 0.765], [0.962, 0.705]],
+      // The roof falls slightly toward the tailgate over the third row.
+      roof: [[0.45, 0.965], [0.65, 0.964], [0.82, 0.955], [0.9, 0.942]],
     },
-    plan: { noseDepth: 0.36, noseSquare: 2.9, tailDepth: 0.3, tailSquare: 2.8 },
+    plan: { noseDepth: 0.3, noseSquare: 3.4, tailDepth: 0.26, tailSquare: 3.2 },
     arch: { shape: 'round', gap: 0.014 },
-    hoodCrown: 0.055,
-    shoulder: { drop: [0.17, 0.12], tumble: 0.08, sharp: true, crease: { y: [0.37, 0.4], depth: 0.006 } },
+    hoodCrown: 0.05,
+    shoulder: { drop: [0.17, 0.13], tumble: 0.1, sharp: true, crease: { y: [0.47, 0.5], depth: 0.01 } },
     glass: { rearPillar: 'body', trim: 'chrome', rearSlant: 0.05 },
     clad: { colour: '#0b0c0e', archWidth: 0.075, sillH: 0.13, proud: 0.014 },
     lampGlow: 1.3,

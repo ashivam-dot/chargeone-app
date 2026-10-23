@@ -137,10 +137,10 @@ function materials(d: CarDesign, paint: string): Mats {
     satin: new MeshStandardMaterial({ color: '#aeb3ba', metalness: 0.75, roughness: 0.38, ...decal }),
     housing: new MeshPhysicalMaterial({ color: '#0b0d11', metalness: 0.3, roughness: 0.06, clearcoat: 1, ...decal }),
     // A softer coat than the paint: on a small, sharply curved lens a mirror coat shows the faceting as blotches.
-    lens: new MeshPhysicalMaterial({ color: '#4a070c', metalness: 0.1, roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.25, ...lamp }),
+    lens: new MeshPhysicalMaterial({ color: '#6a0a12', emissive: new Color('#5c0610'), emissiveIntensity: 0.5, metalness: 0.1, roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.25, ...lamp }),
     drl: new MeshStandardMaterial({ color: '#ffffff', emissive: new Color('#e4eeff'), emissiveIntensity: d.lampGlow, roughness: 0.25, ...lamp }),
     turn: new MeshStandardMaterial({ color: '#ffb84a', emissive: new Color('#ff9a1f'), emissiveIntensity: 0.25, roughness: 0.3, ...lamp }),
-    tail: new MeshStandardMaterial({ color: '#b3121b', emissive: new Color('#ff1e2c'), emissiveIntensity: 0.7, roughness: 0.3, ...lamp }),
+    tail: new MeshStandardMaterial({ color: '#b3121b', emissive: new Color('#ff1e2c'), emissiveIntensity: 1.1, roughness: 0.3, ...lamp }),
     tyre: new MeshStandardMaterial({ color: '#19191b', roughness: 0.86 }),
     rim: new MeshPhysicalMaterial({ color: rimColour, metalness: f === 'black' ? 0.2 : 0.95, roughness: f === 'two-tone' ? 0.16 : 0.3, clearcoat: f === 'black' ? 1 : 0.4 }),
     rimDark: new MeshStandardMaterial({ color: '#141518', metalness: 0.45, roughness: 0.5 }),
@@ -701,9 +701,23 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
   const tSet = new Set<number>([T_NOSE, 0.05, 0.07, 0.09, 0.12, p.cowlX, p.rearGlassX, 0.88, 0.91, 0.93, 0.95, 0.965, 0.975, 0.985, 0.992, 0.997, 1]);
   for (let k = 0; k <= 18; k++) tSet.add((d.plan.noseDepth / L) * (k / 18) ** 2.2);
   for (let k = 0; k <= 14; k++) tSet.add(1 - (d.plan.tailDepth / L) * (k / 14) ** 2.2);
-  for (let t = 0.12; t < 0.88; t += 0.011) tSet.add(t);
+  for (let t = 0.12; t < 0.96; t += 0.011) tSet.add(t);
   for (const ax of axles) for (let x = ax - archR - 0.04; x <= ax + archR + 0.04; x += 0.018) tSet.add(clamp01(tOf(x)));
-  const tList = [...tSet].map((t) => Math.round(clamp01(t) * 1e5) / 1e5).filter((t, i, a) => a.indexOf(t) === i).sort((a, b) => a - b);
+  // Drop stations that land almost on top of another one (the even spacing and the arch spacing interleave):
+  // a sliver of quads between two near-identical rings showed as fine vertical ripples in the reflections.
+  const keep = new Set([T_NOSE, p.cowlX, p.rearGlassX, 1].map((t) => Math.round(t * 1e5) / 1e5));
+  const tList = [...tSet]
+    .map((t) => Math.round(clamp01(t) * 1e5) / 1e5)
+    .sort((a, b) => a - b)
+    .reduce<number[]>((out, t) => {
+      const last = out[out.length - 1];
+      // Only thin between the nose and the last few centimetres of the tail; the nose and tail-corner
+      // roundings need their dense stations.
+      const thin = t >= 0.12 && t <= 1 - 0.04 / L;
+      if (last === undefined || !thin || (t - last) * L >= 0.012) out.push(t);
+      else if (keep.has(t) && !keep.has(last)) out[out.length - 1] = t;
+      return out;
+    }, []);
 
   const group = new Group();
   const lowerRings = tList.map(ring);
@@ -1001,7 +1015,7 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     arm.position.set(xOf(mt) - 0.005, mBelt + 0.045, zSign * (zBase + 0.05));
     group.add(arm);
     const housing = new Mesh(new SphereGeometry(0.5, 24, 16), d.roof === 'black' ? m.black : m.paint);
-    housing.scale.set(0.09, 0.115, 0.22);
+    housing.scale.set(0.1, 0.13, 0.24);
     const mz = zSign * (zBase + 0.15);
     housing.position.set(xOf(mt) - 0.02, mBelt + 0.085, mz);
     housing.rotation.y = zSign * 0.12;
@@ -1249,8 +1263,8 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
       const len = Math.hypot(ds, dy) || 1;
       const os = (-dy / len) * half;
       const oy = (ds / len) * half;
-      const a = facePoint(front, (s + os / (W / 2)) * mirrorSign, y + oy / H, offFor(line.kind));
-      const b = facePoint(front, (s - os / (W / 2)) * mirrorSign, y - oy / H, offFor(line.kind));
+      const a = facePoint(front, (s + os / (W / 2)) * mirrorSign, y + oy / H, offFor(line.kind, line.lift));
+      const b = facePoint(front, (s - os / (W / 2)) * mirrorSign, y - oy / H, offFor(line.kind, line.lift));
       if (!a || !b) return offBody(d.name, line);
       pts.push([a, b]);
     }
