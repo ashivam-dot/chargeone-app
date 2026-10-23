@@ -39,7 +39,6 @@
   display: flex;
   flex-direction: column;
   padding: calc(28px + var(--safe-top)) 22px calc(22px + var(--safe-bottom));
-  view-transition-name: onboard-step;
 }
 .onboard__step > * {
   animation: fade-up 0.7s var(--ease-out) both;
@@ -237,24 +236,6 @@
   line-height: 1.4;
 }
 
-::view-transition-old(onboard-step) {
-  animation: 0.3s var(--ease-out) both step-out;
-}
-::view-transition-new(onboard-step) {
-  animation: 0.5s var(--ease-out) both step-in;
-}
-@keyframes step-out {
-  to {
-    opacity: 0;
-    transform: translateX(-30px);
-  }
-}
-@keyframes step-in {
-  from {
-    opacity: 0;
-    transform: translateX(40px);
-  }
-}
 @keyframes ring {
   from {
     transform: scale(0.6);

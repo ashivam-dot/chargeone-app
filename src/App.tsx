@@ -138,6 +138,9 @@ export function App() {
     const q = new URLSearchParams(location.search);
     return !loadJson('welcomed', false, isBool) && !q.has('s') && !q.has('p');
   });
+  // The map waits until the full-screen welcome is closed: it can't be seen behind it, and on a slow phone its
+  // first seconds of style, tile and shader set-up made the welcome's buttons lag. Once shown it stays mounted.
+  const mapShown = useRef(!onboard);
   const [viewport, setViewport] = useState(readViewport);
   /** A trial the driver asked for before signing in or adding a car; started once both are done. */
   const trialWanted = useRef(false);
@@ -367,12 +370,10 @@ export function App() {
 
   const go = (next: Tab) => {
     if (next === tab) return;
-    const swap = () => {
-      setTab(next);
-      if (next === 'trip' && !tripOpen) openTrip({ to: null, from: null, soc: null, autoRun: false }, false);
-    };
-    if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) document.startViewTransition(swap);
-    else swap();
+    // No View Transition here: while one runs the whole page ignores taps (<html> takes them), and on a slow
+    // phone it ran for seconds, so the tab bar swallowed taps. Each page animates itself in (`page-in`).
+    setTab(next);
+    if (next === 'trip' && !tripOpen) openTrip({ to: null, from: null, soc: null, autoRun: false }, false);
   };
 
   const openTrip = (seed: TripSeed, switchTab = true) => {
@@ -522,31 +523,36 @@ export function App() {
     saveJson('paint', hex);
   };
   const canConnect = plan.carConnect;
+  // If the charger data can't load, the welcome never opens, so the map (with its error notice) shows at once.
+  if (!onboard || loadError) mapShown.current = true;
+  const mapWanted = mapShown.current;
 
   return (
     <div class={`app app--${tab}${drive ? ' app--driving' : ''}`}>
-      <MapView
-        stations={shown}
-        statuses={statuses}
-        selectedId={selectedId}
-        flyTarget={flyTarget}
-        dark={dark}
-        attribution={CHARGER_CREDITS}
-        insets={insets}
-        route={drive ? drive.route : tripView?.route ?? null}
-        altRoutes={drive ? NO_ALTS : tripView?.altRoutes ?? NO_ALTS}
-        stops={stopMarkers}
-        places={placeMarkers}
-        selectedPlace={selectedPlace}
-        car={drive ? carPos : null}
-        follow={Boolean(drive && carPos)}
-        onSelect={(id) => {
-          if (tab !== 'explore' && tab !== 'trip') setTab('explore');
-          select(id);
-        }}
-        onSelectPlace={(i) => selectPlace(i)}
-        onViewport={setMapView}
-      />
+      {mapWanted && (
+        <MapView
+          stations={shown}
+          statuses={statuses}
+          selectedId={selectedId}
+          flyTarget={flyTarget}
+          dark={dark}
+          attribution={CHARGER_CREDITS}
+          insets={insets}
+          route={drive ? drive.route : tripView?.route ?? null}
+          altRoutes={drive ? NO_ALTS : tripView?.altRoutes ?? NO_ALTS}
+          stops={stopMarkers}
+          places={placeMarkers}
+          selectedPlace={selectedPlace}
+          car={drive ? carPos : null}
+          follow={Boolean(drive && carPos)}
+          onSelect={(id) => {
+            if (tab !== 'explore' && tab !== 'trip') setTab('explore');
+            select(id);
+          }}
+          onSelectPlace={(i) => selectPlace(i)}
+          onViewport={setMapView}
+        />
+      )}
 
       {mapTab && !drive && (
         <header class="topbar">

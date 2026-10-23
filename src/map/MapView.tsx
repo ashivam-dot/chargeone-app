@@ -14,6 +14,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import type { FeatureCollection, LineString, Point } from 'geojson';
 import type { Station } from '../data/model.ts';
 import { INDIA_BBOX } from '../lib/geocode.ts';
+import { glInfo } from '../lib/gpu.ts';
 import type { Coord } from '../planner/geometry.ts';
 import { LIVE_COLOUR, liveState, type StationStatus } from '../shared/status.ts';
 import { addMapIcons, drawRoute, futuristicStyle, ROUTE_GRADIENT, setTerrain3d, shouldPlayIntro, Tilt3dControl } from './futuristic.ts';
@@ -419,6 +420,9 @@ export function MapView(props: Props) {
       attributionControl: false,
       maxPitch: 75,
       dragRotate: false,
+      // WebGL on the CPU (blocklisted phone GPUs, headless browsers) pays per pixel: at the screen's 2-3x a
+      // frame took 300-600 ms and the first seconds after launch left no time for taps. 1x keeps it usable.
+      ...(glInfo().software ? { pixelRatio: 1 } : {}),
     });
     map.touchZoomRotate.disableRotation();
     attributionControl.current = new AttributionControl({ compact: true, customAttribution: attribution });

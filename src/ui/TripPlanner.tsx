@@ -244,12 +244,9 @@ export function TripPlanner(props: Props) {
   const chooseRoute = (i: number) => {
     if (!result || i === result.active) return;
     const r = result.routes[i];
-    const swap = () => {
-      setResult({ ...result, active: i, journey: r.candidate.journey, tip: r.tip });
-      props.onShow(tripView(r.candidate.journey, r.destStays, r.candidate.coords, result.routes.filter((_, k) => k !== i).map((o) => o.candidate.coords)));
-    };
-    if (document.startViewTransition) document.startViewTransition(swap);
-    else swap();
+    // Applied directly: a View Transition would freeze the map's route redraw and swallow taps while it ran.
+    setResult({ ...result, active: i, journey: r.candidate.journey, tip: r.tip });
+    props.onShow(tripView(r.candidate.journey, r.destStays, r.candidate.coords, result.routes.filter((_, k) => k !== i).map((o) => o.candidate.coords)));
   };
 
   const openSaved = async (trip: SavedTrip) => {
