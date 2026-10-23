@@ -42,16 +42,10 @@ test.describe('find chargers and read the pins', () => {
     await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#000000');
   });
 
-  test('picking a 2-wheeler charger from search opens it for now, without changing the saved mode', async ({ page }) => {
+  test('a 2-wheeler-only charger is not on the map or in search', async ({ page }) => {
     await openApp(page);
-    await expect(page.getByTestId('mode-car')).toHaveAttribute('aria-pressed', 'true');
     await search(page).fill('Moto Store & Cafe');
-    await page.getByRole('listbox').first().getByRole('option').filter({ hasText: /Moto Store/ }).first().click();
-    await expect(page.getByTestId('live-status')).toBeVisible();
-    await expect(page.getByTestId('mode-car')).toHaveAttribute('aria-pressed', 'false');
-    await page.reload();
-    await expect(page.getByTestId('app-ready')).toBeAttached({ timeout: 30_000 });
-    await expect(page.getByTestId('mode-car')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('listbox').first().getByRole('option').filter({ hasText: /Moto Store/ })).toHaveCount(0);
   });
 
   test('"Working" keeps chargers listed as operational that no driver has reported yet', async ({ page }) => {
@@ -67,7 +61,7 @@ test.describe('find chargers and read the pins', () => {
     await expect(pill).toBeInViewport({ ratio: 1 });
     await expect(pill).toHaveText(/^\d+ hidden · Show$/);
     await pill.click();
-    await expect(page.getByTestId('mode-all')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('show-restricted')).toHaveAttribute('aria-pressed', 'true');
     await expect(pill).toHaveCount(0);
   });
 
@@ -108,7 +102,7 @@ test.describe('find chargers and read the pins', () => {
     if (await page.getByTestId('show-hidden-operator').count()) {
       await page.getByTestId('show-hidden-operator').click();
       await expect(page.getByTestId('show-hidden-operator')).toHaveCount(0);
-      await expect(page.getByTestId('mode-all')).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByTestId('show-restricted')).toHaveAttribute('aria-pressed', 'true');
       expect(await page.getByTestId('filter-count').innerText()).not.toBe(before);
     }
   });

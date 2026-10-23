@@ -89,25 +89,19 @@ test.describe('charger data you can trust', () => {
     }
   });
 
-  test('with a car saved, 2-wheeler-only chargers are hidden until the driver asks for them', async ({ page }) => {
+  test('there is no 2-wheeler mode, and customers-only chargers stay hidden until the driver asks', async ({ page }) => {
     await openApp(page);
-    await expect(page.getByTestId('mode-car')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('mode-car')).toHaveCount(0);
+    await expect(page.getByTestId('mode-2w')).toHaveCount(0);
     const hidden = page.getByTestId('show-hidden');
-    await expect(hidden).toHaveAttribute('title', /2-wheelers/);
-    const forCar = await count(page);
+    await expect(hidden).toHaveAttribute('title', /customers or residents/);
+    const publicOnly = await count(page);
 
-    await page.getByTestId('mode-2w').click();
-    await expect(page.getByTestId('mode-2w')).toHaveAttribute('aria-pressed', 'true');
-    const for2w = await count(page);
-
-    await page.getByTestId('mode-all').click();
     await page.getByTestId('show-restricted').click();
     await expect(page.getByTestId('show-hidden')).toHaveCount(0);
     const all = await count(page);
-    expect(forCar).toBeGreaterThan(0);
-    expect(for2w).toBeGreaterThan(0);
-    expect(all).toBeGreaterThan(forCar);
-    expect(all).toBeGreaterThan(for2w);
+    expect(publicOnly).toBeGreaterThan(0);
+    expect(all).toBeGreaterThan(publicOnly);
   });
 
   test('every planned stop is a DC charger drivers can trust, with a backup', async ({ page }) => {

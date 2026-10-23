@@ -1,6 +1,6 @@
 import { Route } from 'lucide-preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { DEFAULT_FILTERS, EMPTY_FILTERS, filterStations, hiddenBySettings, operatorsByCount, relaxToShow, type MapMode } from './data/filters.ts';
+import { DEFAULT_FILTERS, EMPTY_FILTERS, filterStations, forCars, hiddenBySettings, operatorsByCount, relaxToShow } from './data/filters.ts';
 import { loadDataset, loadStationDetail, type DataManifest } from './data/loader.ts';
 import { keepIfSame, statusesByStation, unknownStatusIds } from './data/statusIds.ts';
 import type { Dataset, Station } from './data/model.ts';
@@ -65,7 +65,6 @@ const CHARGER_CREDITS = ['Chargers © OpenStreetMap contributors (ODbL)', 'Conta
 const readViewport = () => ({ height: window.innerHeight, desktop: window.innerWidth >= 820 });
 const isVehicle = (v: unknown): v is MyVehicle => isObject(v) && typeof v.modelId === 'string' && typeof v.batteryKwh === 'number';
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
-const isMode = (v: unknown): v is MapMode => v === 'car' || v === '2w' || v === 'all';
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 /** Any solid colour: each model has its own official paints, and number lookup brings the car's own. */
 const isPaint = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
@@ -109,7 +108,6 @@ export function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [filters, setFilters] = useState<MapFilters>(() => ({
     ...DEFAULT_FILTERS,
-    mode: loadJson<MapMode>('map-mode', 'car', isMode),
     workingOnly: false,
     showFood: false,
     showStays: false,
@@ -154,6 +152,9 @@ export function App() {
   /** The language of a voice trip request, so its plan is read back when it's ready. */
   const voiceLang = useRef<VoiceTrip['lang'] | null>(null);
   const link = useCarLink();
+
+  // The car / 2-wheeler / all choice is gone (ChargeOne is for cars); drop what older versions saved.
+  useEffect(() => removeJson('map-mode'), []);
 
   // Fetch the other screens once the map is up, so they open instantly and still open offline.
   useEffect(() => {
@@ -303,7 +304,7 @@ export function App() {
   // The trial needs an account, so guests are only offered it once sign-in works here.
   const trialAvailable = !plusNow && (signedIn ? Boolean(me?.trial?.eligible) : canSignIn);
 
-  const stations = dataset?.stations ?? [];
+  const stations = useMemo(() => forCars(dataset?.stations ?? []), [dataset]);
   const byId = useMemo(() => new Map(stations.map((s) => [s.id, s])), [stations]);
   // Reports are kept under stable c1 ids (older ones under osm-/ocm- ids); the app keys stations by id.
   const statuses = useMemo(() => statusesByStation(stations, rawStatuses, aliasOf), [stations, rawStatuses, aliasOf]);
@@ -350,20 +351,16 @@ export function App() {
     };
   }, [selectedLite, details, dataset]);
   const hiddenCount = useMemo(() => hiddenBySettings(stations, filters), [stations, filters]);
-  /** Chargers the mode and customers-only setting keep, before any other filter. */
+  /** Chargers the customers-only setting keeps, before any other filter. */
   const listedCount = useMemo(
-    () => filterStations(stations, { ...EMPTY_FILTERS, mode: filters.mode, showRestricted: filters.showRestricted }).length,
-    [stations, filters.mode, filters.showRestricted],
+    () => filterStations(stations, { ...EMPTY_FILTERS, showRestricted: filters.showRestricted }).length,
+    [stations, filters.showRestricted],
   );
   const mapCentre = useMemo(
     () => (mapView ? { lat: (mapView.bounds.south + mapView.bounds.north) / 2, lng: (mapView.bounds.west + mapView.bounds.east) / 2 } : null),
     [mapView],
   );
-  /** `remember: false` for the app's own loosening (opening a hidden charger): only a driver's pick of mode sticks. */
-  const changeFilters = (f: MapFilters, remember = true) => {
-    if (remember && f.mode !== filters.mode) saveJson('map-mode', f.mode);
-    setFilters(f);
-  };
+  const changeFilters = (f: MapFilters) => setFilters(f);
   /** The operator banner: that operator's chargers every other filter hides, and showing them all. */
   const operatorAll = useMemo(
     () => (filters.operator ? filterStations(stations, { ...EMPTY_FILTERS, operator: filters.operator }).length : 0),
@@ -371,7 +368,7 @@ export function App() {
   );
   const operatorHidden = Math.max(0, operatorAll - shown.length);
   const showOperatorAll = () =>
-    changeFilters({ ...filters, ...EMPTY_FILTERS, operator: filters.operator, workingOnly: false }, false);
+    changeFilters({ ...filters, ...EMPTY_FILTERS, operator: filters.operator, workingOnly: false });
   const placeIndexById = useMemo(() => new Map(places?.places.map((p, i) => [p.id, i]) ?? []), [places]);
 
   // Places are a separate, larger file: fetch it only once something needs it.
@@ -622,7 +619,7 @@ export function App() {
                   const s = byId.get(p.stationId);
                   if (s && !shown.some((x) => x.id === s.id)) {
                     const relaxed = relaxToShow(s, filters);
-                    changeFilters(relaxed.workingOnly && !worksNow(s, statuses.get(s.id), new Date()) ? { ...relaxed, workingOnly: false } : relaxed, false);
+                    changeFilters(relaxed.workingOnly && !worksNow(s, statuses.get(s.id), new Date()) ? { ...relaxed, workingOnly: false } : relaxed);
                   }
                   select(p.stationId);
                 } else setFlyTarget(p.bbox ? { kind: 'bbox', bbox: p.bbox } : { kind: 'point', lat: p.lat, lng: p.lng, zoom: 12 });

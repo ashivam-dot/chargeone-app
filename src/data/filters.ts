@@ -1,8 +1,5 @@
 import type { ConnectorType, Station, Vehicle } from './model.ts';
 
-/** Who the map is for: car drivers (the default), 2-wheeler riders, or everyone. */
-export type MapMode = 'car' | '2w' | 'all';
-
 export interface Filters {
   dcOnly: boolean;
   open24x7: boolean;
@@ -10,7 +7,6 @@ export interface Filters {
   operator: string | null;
   vehicle: Vehicle | null;
   minKw: number;
-  mode: MapMode;
   /** Also show chargers only for a business's customers or residents. */
   showRestricted: boolean;
 }
@@ -23,12 +19,11 @@ export const EMPTY_FILTERS: Filters = {
   operator: null,
   vehicle: null,
   minKw: 0,
-  mode: 'all',
   showRestricted: true,
 };
 
-/** What the map starts with: chargers a car can use, open to the public (or not known to be closed). */
-export const DEFAULT_FILTERS: Filters = { ...EMPTY_FILTERS, mode: 'car', showRestricted: false };
+/** What the map starts with: chargers open to the public (or not known to be closed). */
+export const DEFAULT_FILTERS: Filters = { ...EMPTY_FILTERS, showRestricted: false };
 
 /** Plugs drivers pick from, with the names Indian chargers use. */
 export const CONNECTOR_OPTIONS: Array<{ type: ConnectorType; label: string }> = [
@@ -37,11 +32,10 @@ export const CONNECTOR_OPTIONS: Array<{ type: ConnectorType; label: string }> = 
   { type: 'CHAdeMO', label: 'CHAdeMO' },
   { type: 'Bharat DC', label: 'Bharat DC-001' },
   { type: 'Bharat AC', label: 'Bharat AC-001' },
-  { type: 'LECCS', label: 'LECCS' },
   { type: '3-pin socket', label: '15 A socket' },
 ];
 
-/** Filters the user chose (the mode and the customers-only toggle are settings, not filters). */
+/** Filters the user chose (the customers-only toggle is a setting, not a filter). */
 export function activeFilterCount(f: Filters): number {
   return (
     Number(f.dcOnly) +
@@ -53,9 +47,6 @@ export function activeFilterCount(f: Filters): number {
   );
 }
 
-/** Sockets a scooter or bike can use even at a car charger (Bharat AC-001 has 15 A outlets). */
-const TWO_WHEELER_PLUGS: ReadonlySet<ConnectorType> = new Set(['LECCS', '3-pin socket', 'Bharat AC']);
-
 /** Only for a vehicle type other than `v`: we know who it's for, and it isn't them. */
 function onlyForOthers(s: Station, v: Vehicle): boolean {
   if (s.vehicleClass && s.vehicleClass !== 'unknown') {
@@ -65,13 +56,16 @@ function onlyForOthers(s: Station, v: Vehicle): boolean {
   return s.vehicles.length > 0 && !s.vehicles.includes(v);
 }
 
+/** ChargeOne is for electric cars: chargers known to be only for 2-wheelers, 3-wheelers or buses are left out everywhere. */
+export function forCars(stations: Station[]): Station[] {
+  return stations.filter((s) => !onlyForOthers(s, 'car'));
+}
+
 /**
  * Stations with unknown data are kept unless a filter needs that data, so the map doesn't
  * hide chargers just because nobody has tagged them yet.
  */
 export function matchesFilters(s: Station, f: Filters): boolean {
-  if (f.mode === 'car' && onlyForOthers(s, 'car')) return false;
-  if (f.mode === '2w' && onlyForOthers(s, '2w') && !s.connectors.some((c) => TWO_WHEELER_PLUGS.has(c.type))) return false;
   if (!f.showRestricted && s.access === 'customers') return false;
   if (f.dcOnly && s.speed !== 'dc') return false;
   if (f.open24x7 && !s.is24x7) return false;
@@ -83,32 +77,28 @@ export function matchesFilters(s: Station, f: Filters): boolean {
 }
 
 export function filterStations(stations: Station[], f: Filters): Station[] {
-  return activeFilterCount(f) === 0 && f.mode === 'all' && f.showRestricted ? stations : stations.filter((s) => matchesFilters(s, f));
+  return activeFilterCount(f) === 0 && f.showRestricted ? stations : stations.filter((s) => matchesFilters(s, f));
 }
 
-/**
- * Stations the mode and the customers-only setting hide among those the other filters keep, so the count
- * can say so: with the operator set to Ather Grid in car mode, that's the Ather chargers for scooters.
- */
+/** Stations the customers-only setting hides among those the other filters keep, so the count can say so. */
 export function hiddenBySettings(stations: Station[], f: Filters): number {
-  const relaxed: Filters = { ...f, mode: 'all', showRestricted: true };
+  const relaxed: Filters = { ...f, showRestricted: true };
   return filterStations(stations, relaxed).length - filterStations(stations, f).length;
 }
 
-/** The filters with the mode and customers-only setting opened up: "show the hidden ones". */
+/** The filters with the customers-only setting opened up: "show the hidden ones". */
 export function showHidden<F extends Filters>(f: F): F {
-  return { ...f, mode: 'all', showRestricted: true };
+  return { ...f, showRestricted: true };
 }
 
 /**
  * The filters loosened only as far as `s` needs to pass them: a charger picked from search that a filter
- * hides opens without wiping the rest. The mode and the customers-only setting open together
- * (showHidden), every other filter is cleared only if this station fails it.
+ * hides opens without wiping the rest. The customers-only setting opens (showHidden), every other filter is cleared only if this station fails it.
  */
 export function relaxToShow<F extends Filters>(s: Station, f: F): F {
   let out: F = f;
   const fails = (k: Partial<Filters>) => !matchesFilters(s, { ...EMPTY_FILTERS, ...k });
-  if (fails({ mode: f.mode, showRestricted: f.showRestricted })) out = showHidden(out);
+  if (fails({ showRestricted: f.showRestricted })) out = showHidden(out);
   if (f.dcOnly && fails({ dcOnly: true })) out = { ...out, dcOnly: false };
   if (f.open24x7 && fails({ open24x7: true })) out = { ...out, open24x7: false };
   if (f.operator !== null && fails({ operator: f.operator })) out = { ...out, operator: null };

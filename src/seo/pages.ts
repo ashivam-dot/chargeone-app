@@ -1,3 +1,4 @@
+import { forCars } from '../data/filters.ts';
 import type { Dataset, Station } from '../data/model.ts';
 import { KIND_LABEL, formatDistance, slugify, walkMinutes, type Place, type PlacesData } from '../data/places.ts';
 
@@ -280,7 +281,8 @@ function indexPage(data: SiteData, ix: Indexed): Page {
   return { path, html: layout({ site, path, title, description, body, ld: [breadcrumbs(site, crumbs)] }) };
 }
 
-export function buildPages(data: SiteData): Page[] {
+export function buildPages(site: SiteData): Page[] {
+  const data = { ...site, dataset: { ...site.dataset, stations: forCars(site.dataset.stations) } };
   const ix = indexData(data);
   return [
     indexPage(data, ix),

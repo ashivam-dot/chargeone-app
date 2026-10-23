@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_FILTERS, EMPTY_FILTERS, activeFilterCount, filterStations, hiddenBySettings, operatorsByCount, relaxToShow } from './filters.ts';
+import { DEFAULT_FILTERS, EMPTY_FILTERS, activeFilterCount, filterStations, forCars, hiddenBySettings, operatorsByCount, relaxToShow } from './filters.ts';
 import type { Station } from './model.ts';
 
 function station(over: Partial<Station>): Station {
@@ -63,44 +63,45 @@ describe('relaxToShow: opening a charger the filters hide', () => {
   it('clears only the filters that hide it', () => {
     const r = relaxToShow(ac, picked);
     expect(filterStations([ac], r)).toEqual([ac]);
-    // AC, Tata, 7.4 kW, Type 2 and not 24x7 fail DC, plug, operator, min kW and 24x7; the mode is kept.
-    expect(r).toMatchObject({ dcOnly: false, connectors: [], operator: null, minKw: 0, open24x7: false, mode: 'car', showRestricted: false });
+    // AC, Tata, 7.4 kW, Type 2 and not 24x7 fail DC, plug, operator, min kW and 24x7.
+    expect(r).toMatchObject({ dcOnly: false, connectors: [], operator: null, minKw: 0, open24x7: false, showRestricted: false });
     const onlyDc = { ...DEFAULT_FILTERS, dcOnly: true, open24x7: true };
-    expect(relaxToShow(station({ id: 'ac24', speed: 'ac', is24x7: true }), onlyDc)).toMatchObject({ dcOnly: false, open24x7: true, mode: 'car' });
+    expect(relaxToShow(station({ id: 'ac24', speed: 'ac', is24x7: true }), onlyDc)).toMatchObject({ dcOnly: false, open24x7: true });
   });
 
-  it('opens the mode and customers-only setting only when they hide it', () => {
-    const r = relaxToShow(twoWheeler, { ...DEFAULT_FILTERS, dcOnly: false });
-    expect(r).toMatchObject({ mode: 'all', showRestricted: true });
-    expect(filterStations([twoWheeler], r)).toEqual([twoWheeler]);
+  it('opens the customers-only setting only when it hides it', () => {
+    const hotel = station({ id: 'hotel', access: 'customers' });
+    expect(relaxToShow(hotel, DEFAULT_FILTERS)).toMatchObject({ showRestricted: true });
+    expect(relaxToShow(dc, DEFAULT_FILTERS)).toBe(DEFAULT_FILTERS);
   });
 });
 
-describe('car-first defaults', () => {
+describe('cars only', () => {
   const ather = station({ id: 'ather', operator: 'Ather Grid', vehicleClass: '2w', vehicles: ['2w'], connectors: [{ type: 'LECCS', count: 1, kw: 3 }] });
   const hotel = station({ id: 'hotel', speed: 'ac', access: 'customers', vehicleClass: 'car', vehicles: ['car'] });
   const mixed = station({ id: 'mixed', vehicleClass: 'mixed', vehicles: ['car', '2w'] });
   const bharatAc = station({ id: 'bac', vehicleClass: 'car', vehicles: ['car'], connectors: [{ type: 'Bharat AC', count: 3, kw: 3.3 }] });
   const dcCar = { ...dc, vehicleClass: 'car' as const };
-  const list = [dcCar, ather, hotel, mixed, bharatAc, unknown];
+  const bus = station({ id: 'bus', vehicleClass: 'unknown', vehicles: ['bus'] });
+  const list = forCars([dcCar, ather, hotel, mixed, bharatAc, unknown, bus]);
   const ids = (f: typeof EMPTY_FILTERS) => filterStations(list, f).map((s) => s.id);
 
-  it('hides 2-wheeler-only and customers-only chargers for a car', () => {
+  it('leaves out chargers only for 2-wheelers, 3-wheelers or buses, whatever the filters', () => {
+    expect(list.map((s) => s.id)).toEqual(['dc', 'hotel', 'mixed', 'bac', 'unknown']);
+    expect(ids(EMPTY_FILTERS)).not.toContain('ather');
+  });
+
+  it('hides customers-only chargers until asked', () => {
     expect(ids(DEFAULT_FILTERS)).toEqual(['dc', 'mixed', 'bac', 'unknown']);
-    expect(hiddenBySettings(list, DEFAULT_FILTERS)).toBe(2);
+    expect(hiddenBySettings(list, DEFAULT_FILTERS)).toBe(1);
     expect(ids({ ...DEFAULT_FILTERS, showRestricted: true })).toContain('hotel');
   });
 
-  it('2-wheeler mode keeps scooter points and car chargers with sockets a scooter can use', () => {
-    expect(ids({ ...DEFAULT_FILTERS, mode: '2w' })).toEqual(['ather', 'mixed', 'bac', 'unknown']);
-  });
-
   it('falls back to the vehicles list on older data without a vehicle class', () => {
-    expect(filterStations([twoWheeler, unknown], DEFAULT_FILTERS).map((s) => s.id)).toEqual(['unknown']);
+    expect(forCars([twoWheeler, unknown]).map((s) => s.id)).toEqual(['unknown']);
   });
 
-  it('filters by every Indian plug type', () => {
-    expect(ids({ ...EMPTY_FILTERS, connectors: ['LECCS'] })).toEqual(['ather']);
+  it('filters by every Indian car plug type', () => {
     expect(ids({ ...EMPTY_FILTERS, connectors: ['Bharat AC'] })).toEqual(['bac']);
     expect(activeFilterCount(DEFAULT_FILTERS)).toBe(0);
   });
