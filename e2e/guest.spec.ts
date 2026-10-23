@@ -81,7 +81,7 @@ test.describe('guest on a server that is not fully set up', () => {
   });
 
   test("a guest's re-plan after today's trip shows why on the result, not silently", async ({ page }) => {
-    await withConfig(page, { googleClientId: null, devLogin: false });
+    await withConfig(page, { googleClientId: null, firebase: null, devLogin: false });
     await page.context().grantPermissions(['geolocation']);
     await page.context().setGeolocation({ latitude: 11.02, longitude: 77.0 });
     await mockPlaceSearch(page);
