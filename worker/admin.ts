@@ -604,7 +604,9 @@ async function runProbe(name: Probe, req: Request, env: Env, url: URL): Promise<
       try {
         const out = await (env.AI as unknown as { run(m: string, i: Record<string, unknown>): Promise<unknown> }).run(model, {
           messages: [{ role: 'user', content: 'Reply with one word: ready' }],
-          max_tokens: 16,
+          max_tokens: 64,
+          // As in the copilot: with thinking on, gemma-4 spends a small budget thinking and answers nothing.
+          chat_template_kwargs: { enable_thinking: false },
         });
         const text = readReply(out).text;
         return { ok: text.length > 0, detail: `${model} replied "${text.slice(0, 40)}" (counts as 1 of today's ${AGENT_CALLS_PER_DAY} runs).` };

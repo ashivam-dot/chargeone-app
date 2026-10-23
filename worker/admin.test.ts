@@ -394,6 +394,9 @@ describe('live self-tests', () => {
     const res = await browser('POST', '/api/admin/probe/ai', {});
     expect(res.body).toMatchObject({ ok: true });
     expect(ai.calls).toHaveLength(1);
+    // Like the copilot, with thinking off: gemma-4 otherwise spends a small budget thinking and answers "".
+    expect(ai.calls[0].inputs).toMatchObject({ chat_template_kwargs: { enable_thinking: false } });
+    expect(ai.calls[0].inputs.max_tokens).toBeGreaterThanOrEqual(32);
     expect((await browser('GET', '/api/admin/overview')).body.ai.runsToday).toBe(1);
   });
 
