@@ -1,21 +1,21 @@
-/* Admin console: the app's dark tokens (near-black, electric blue accent, Geist), laid out for a phone first. */
+/* Admin console: the app's light tokens (soft grey page, white cards, blue accent, Geist), laid out for a phone first. */
 
 :root {
-  --bg: #05070b;
-  --bg-elev: #0d0d0f;
-  --panel: #121214;
-  --text: #f5f5f7;
-  --muted: #98989f;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-strong: rgba(255, 255, 255, 0.16);
-  --accent: #2b6bff;
-  --accent-strong: #7fb0ff;
-  --good: #30d158;
-  --bad: #ff453a;
-  --warn: #ffb340;
+  --bg: #f2f2f4;
+  --bg-elev: #ffffff;
+  --panel: #ffffff;
+  --text: #0a0a0b;
+  --muted: #5f6368;
+  --line: rgba(0, 0, 0, 0.08);
+  --line-strong: rgba(0, 0, 0, 0.16);
+  --accent: #1f5fe0;
+  --accent-strong: #1a4fc0;
+  --good: #15803d;
+  --bad: #c5221f;
+  --warn: #b45309;
   --radius: 14px;
   --font: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  color-scheme: dark;
+  color-scheme: light;
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
@@ -293,7 +293,7 @@ code {
 
 .ad-danger {
   background: transparent;
-  border-color: rgba(255, 69, 58, 0.5);
+  border-color: rgba(197, 34, 31, 0.45);
   color: var(--bad);
 }
 
@@ -353,7 +353,7 @@ code {
   display: inline-block;
   padding: 1px 6px;
   border-radius: 6px;
-  background: rgba(43, 107, 255, 0.2);
+  background: rgba(31, 95, 224, 0.12);
   color: var(--accent-strong);
   font-size: 0.72rem;
   font-weight: 600;

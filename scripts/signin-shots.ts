@@ -54,7 +54,7 @@ async function session(
       Object.assign(window, { __CHARGEONE_E2E_PHONE__: true });
       localStorage.setItem("chargeone:welcomed", "true");
       localStorage.setItem("chargeone:vehicle", JSON.stringify(vehicle));
-      localStorage.setItem("chargeone:dark", JSON.stringify(d));
+      localStorage.setItem("chargeone:theme", JSON.stringify(d ? "dark" : "light"));
     },
     [NEXON, dark] as const,
   );

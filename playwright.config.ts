@@ -19,7 +19,7 @@ export default defineConfig({
     baseURL: process.env.BASE_URL ?? 'http://localhost:8787',
     locale: 'en-IN',
     timezoneId: 'Asia/Kolkata',
-    colorScheme: 'dark',
+    colorScheme: 'light',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     // Drive and copilot speak alerts aloud; tests must never play sound on the machine running them.
