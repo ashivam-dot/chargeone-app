@@ -100,12 +100,15 @@ async function routeWithOrs(apiKey: string, points: LatLng[], signal?: AbortSign
 /** The public OSRM demo server is for development only (its usage policy forbids production use). */
 async function routeWithOsrmDemo(points: LatLng[], signal?: AbortSignal): Promise<RouteResult> {
   const url = `${OSRM_DEMO_URL}/${points.map((p) => `${p.lng},${p.lat}`).join(';')}?overview=full&geometries=geojson`;
-  const res = await fetch(url, { headers: { 'User-Agent': 'ChargeOne-dev/0.1' }, signal });
-  if (!res.ok) throw BUSY();
-  const data = (await res.json()) as {
-    code: string;
-    routes?: Array<{ distance: number; duration: number; geometry: { coordinates: Coord[] } }>;
-  };
+  let data: { code: string; routes?: Array<{ distance: number; duration: number; geometry: { coordinates: Coord[] } }> };
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'ChargeOne-dev/0.1' }, signal: deadline(signal) });
+    if (!res.ok) throw BUSY();
+    data = (await res.json()) as typeof data;
+  } catch {
+    // A dropped connection, timeout or broken reply means "try again", not a server error.
+    throw BUSY();
+  }
   const r = data.routes?.[0];
   if (data.code !== 'Ok' || !r) throw NO_ROUTE();
   return { coords: r.geometry.coordinates, distanceKm: r.distance / 1000, durationMin: r.duration / 60, hasElevation: false, source: 'osrm' };

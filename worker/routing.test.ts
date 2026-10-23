@@ -114,6 +114,15 @@ describe('router without an openrouteservice key', () => {
     expect(stub.calls).toHaveLength(1);
   });
 
+  it('reports the OSRM demo as busy when the connection drops', async () => {
+    vi.stubGlobal('fetch', async () => {
+      throw new Error('Network connection lost.');
+    });
+    const { env } = fakeEnv();
+    const err = await refusal(router(env, CALLER)([MG_ROAD, ELECTRONIC_CITY]));
+    expect(err).toMatchObject({ code: 'routing_unavailable' });
+  });
+
   it('says planning is not switched on when the public router is off', async () => {
     vi.stubGlobal('fetch', async () => {
       throw new Error('no fetch expected');
