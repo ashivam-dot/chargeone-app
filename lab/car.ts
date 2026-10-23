@@ -27,11 +27,12 @@ const car = buildCar(design, q.get('paint') ?? design.paints[0]?.hex ?? '#8f9a92
 scene.add(car.group);
 const L = car.length;
 const camera = new PerspectiveCamera(q.get('view') === 'side' ? 11 : 20, innerWidth / innerHeight, 0.1, 200);
+// Framed so the car fills most of a 900 x 520 shot.
 const views: Record<string, [number, number, number]> = {
-  side: [0, 0.8, 26],
-  front34: [L * 1.5, 1.6, L * 1.5],
-  rear34: [-L * 1.5, 1.6, L * 1.5],
-  front: [L * 2.6, 0.9, 0],
+  side: [0, 0.8, L * 4.4],
+  front34: [L * 1.32, 1.5, L * 1.32],
+  rear34: [-L * 1.32, 1.5, L * 1.32],
+  front: [L * 1.7, 0.95, 0],
   close: [L * 0.95, 1.1, L * 0.7],
   rear: [-L * 2.6, 0.9, 0],
   top: [0, 26, 0.01],

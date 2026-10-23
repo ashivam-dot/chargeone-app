@@ -136,7 +136,8 @@ function materials(d: CarDesign, paint: string): Mats {
     chrome: new MeshStandardMaterial({ color: '#dfe3e8', metalness: 1, roughness: 0.14, ...decal }),
     satin: new MeshStandardMaterial({ color: '#aeb3ba', metalness: 0.75, roughness: 0.38, ...decal }),
     housing: new MeshPhysicalMaterial({ color: '#0b0d11', metalness: 0.3, roughness: 0.06, clearcoat: 1, ...decal }),
-    lens: new MeshPhysicalMaterial({ color: '#4a070c', metalness: 0.1, roughness: 0.08, clearcoat: 1, ...lamp }),
+    // A softer coat than the paint: on a small, sharply curved lens a mirror coat shows the faceting as blotches.
+    lens: new MeshPhysicalMaterial({ color: '#4a070c', metalness: 0.1, roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.25, ...lamp }),
     drl: new MeshStandardMaterial({ color: '#ffffff', emissive: new Color('#e4eeff'), emissiveIntensity: d.lampGlow, roughness: 0.25, ...lamp }),
     turn: new MeshStandardMaterial({ color: '#ffb84a', emissive: new Color('#ff9a1f'), emissiveIntensity: 0.25, roughness: 0.3, ...lamp }),
     tail: new MeshStandardMaterial({ color: '#b3121b', emissive: new Color('#ff1e2c'), emissiveIntensity: 0.7, roughness: 0.3, ...lamp }),
@@ -626,7 +627,9 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
       const a = (Math.PI / 2) * (i / 6);
       pts.push([zA - rtz * (1 - Math.cos(a)), yA + rty * Math.sin(a)]);
     }
-    const crown = Math.min(0.022, w * 0.025);
+    // The bonnet is domed more than the rest of the body top; the dome fades out at the scuttle.
+    const crownMax = lerp(0.022, d.hoodCrown, smooth((p.cowlX - t) / 0.06));
+    const crown = Math.min(crownMax, w * 0.06);
     const zc = zA - rtz;
     for (let i = 1; i <= 5; i++) {
       const z = zc * (1 - i / 5);
@@ -694,7 +697,9 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
       const e = lowerRings[i + 1][(j + 1) % n];
       const x = (a.x + b.x + c.x + e.x) / 4;
       const y = (a.y + b.y + c.y + e.y) / 4;
-      return onClad(x, y, (tList[i] + tList[i + 1]) / 2) && src <= SILL_IDX + 12 ? 1 : 0;
+      // Everything below the section's sill vertex row is cladding, so its top edge is one clean line round
+      // the car, rising over the bumpers where the body lifts, instead of stepping from ring to ring.
+      return src < SILL_IDX - 1 && onClad(x, Math.min(y, sillTop - 0.001), (tList[i] + tList[i + 1]) / 2) ? 1 : 0;
     },
     lowerMats,
   );
@@ -765,8 +770,12 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     for (let j = side.length - 2; j >= 0; j--) out.push(new Vector3(x, side[j][1], -side[j][0]));
     return out;
   };
+  // The rear edge of the side glass slants, and the window graphic is picked per quad, so the rings are
+  // packed closer there to keep that edge from stepping.
+  const slantT0 = p.dloX - d.glass.rearSlant / L - 0.006;
+  const slantT1 = p.dloX + 0.004;
   const ghT: number[] = [];
-  for (let t = p.cowlX; t < p.rearGlassX; t += 0.005) ghT.push(t);
+  for (let t = p.cowlX; t < p.rearGlassX; t += t > slantT0 && t < slantT1 ? 0.0012 : 0.005) ghT.push(t);
   ghT.push(p.rearGlassX);
   const ghRings = ghT.map(ghRing);
   const ghN = ghRings[0].length;

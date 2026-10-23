@@ -133,6 +133,8 @@ export interface CarDesign {
   };
   /** How far the top of the front face leans back from the bumper line, metres (a wedge nose is large). */
   faceRake: number;
+  /** How much the bonnet is domed: metres the centre line stands above its edges. */
+  hoodCrown: number;
   /** Roof width as a share of body width. */
   roofWidth: number;
   /** How rounded the nose is (0 boxy, 1 very round); it also rounds the bonnet's top corners. */
