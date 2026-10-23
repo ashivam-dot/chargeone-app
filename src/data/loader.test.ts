@@ -202,3 +202,13 @@ describe('driver report statuses', () => {
     expect(ids).not.toContain('ocm-9');
   });
 });
+
+describe('places.json', () => {
+  // Built from stations.json by scripts/import-places.ts; rebuild it whenever the stations change.
+  it('matches the published stations: every charger has its town, and nothing points at a charger that is gone', () => {
+    const ids = new Set((read('stations.json') as { stations: Array<{ id: string }> }).stations.map((s) => s.id));
+    const places = read('places.json') as { area: Record<string, string>; near: Record<string, unknown> };
+    expect([...ids].filter((id) => !places.area[id])).toEqual([]);
+    expect(Object.keys(places.near).filter((id) => !ids.has(id))).toEqual([]);
+  });
+});
