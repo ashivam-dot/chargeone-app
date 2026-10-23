@@ -31,6 +31,17 @@ export const THRESHOLDS = {
   siteMetres: 60,
   /** Existence confidence. */
   halfLifeDays: 182,
+  /** Share of DC stations at or above the planner's confidence line (src/data/trust.ts). Below it, plans fail. */
+  minPlannableDcShare: 0.25,
+  /** Cloudflare Workers static assets: 25 MiB per file. Kept a little under. */
+  assetBytes: 24 * 1024 * 1024,
+  /**
+   * stations.json, the old all-in-one file, is written only while it stays this small (about 10k stations).
+   * The app, the worker and the SEO build read index.json, the shards and the alias buckets instead.
+   */
+  legacyStationsBytes: 8 * 1024 * 1024,
+  /** Files under public/data. The whole deployment may hold 20,000 (scripts/prerender.ts budgets the rest). */
+  maxDataFiles: 3000,
 };
 
 export async function readJson<T>(file: string): Promise<T> {

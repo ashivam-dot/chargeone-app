@@ -22,6 +22,7 @@ import { emptyRegistry, serializeRegistry, type Registry } from './ids.ts';
 import { stateShapes, type StateShape } from './lib/geo.ts';
 import { canonicalState } from './lib/states.ts';
 import { buildOutputs, type Manifest, type SourceRun } from './outputs.ts';
+import { readPublishedDataset } from './published.ts';
 import { validateStations } from './schema.ts';
 import { buildStations } from './stations.ts';
 import type { Adapter, HealthReport, SourceKey, SourceRecord } from './types.ts';
@@ -87,7 +88,8 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   const records: SourceRecord[] = runs.flatMap((r) => r.result.records);
   const registry = (await maybeJson<Registry>(REGISTRY_FILE)) ?? emptyRegistry();
-  const previous = await maybeJson<Dataset>(join(OUT_DIR, 'stations.json'));
+  // The last published build: stations.json while it's small enough to ship, else index.json and shards.
+  const previous: Dataset | null = readPublishedDataset(OUT_DIR, { details: false });
   const previousManifest = await maybeJson<Manifest>(join(OUT_DIR, 'manifest.json'));
   const layer = buildStations(records, {
     registry,
@@ -112,6 +114,8 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     stations: built.dataset.stations,
     schemaErrors: validateStations(built.dataset.stations),
     shardBytes: built.shardBytes,
+    fileBytes: new Map([...built.files].map(([name, b]) => [name, b.length])),
+    aliasCollisions: built.aliasCollisions,
   });
   for (const c of gates.checks) console.log(`  check: ${c}`);
   const m = built.manifest.counts;
@@ -129,9 +133,15 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 0;
   }
 
-  for (const sub of ['shards', 'cells']) {
+  for (const sub of ['shards', 'cells', 'aliases']) {
     const dir = join(OUT_DIR, sub);
     if (existsSync(dir)) for (const f of await readdir(dir)) await rm(join(dir, f));
+  }
+  // Files this build no longer writes: stations.json past its size limit, the old single aliases.json,
+  // ODbL parts from a bigger build.
+  for (const f of await readdir(OUT_DIR)) {
+    const stale = f === 'stations.json' || f === 'aliases.json' || /^chargeone-stations-odbl(-\d+)?\.zip$/.test(f);
+    if (stale && !built.files.has(f)) await rm(join(OUT_DIR, f));
   }
   for (const [name, bytes] of built.files) {
     const file = join(OUT_DIR, name);

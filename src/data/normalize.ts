@@ -380,7 +380,7 @@ export function dedupeStations(stations: Station[]): Station[] {
     const copy: Station = { ...s, connectors: [...s.connectors], sources: [...s.sources], vehicles: [...s.vehicles] };
     result.push(copy);
     const k = key(copy.lat, copy.lng);
-    grid.set(k, [...(grid.get(k) ?? []), copy]);
+    (grid.get(k) ?? grid.set(k, []).get(k)!).push(copy);
   }
   return result.sort((a, b) => a.id.localeCompare(b.id));
 }

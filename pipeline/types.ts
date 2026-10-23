@@ -98,6 +98,13 @@ export interface SourceRecord {
   status: SourceStatus;
   /** Anything worth showing or reviewing: `ocm-status-30`, `bulk-unverified`, ... */
   flags: string[];
+  /**
+   * A charging network the listing's title names when it differs from `operator` ("Earthtron EV" filed under
+   * OCM's CHARGE+). Either may be wrong, so this record may merge with a station of that network.
+   */
+  titleOperator?: string | null;
+  /** When the source snapshot holding this record was taken; confidence ages records against it. */
+  snapshotAt?: string | null;
 }
 
 /** Why a record never reached the station layer. */
@@ -194,7 +201,8 @@ export interface Site {
 }
 
 export interface ReviewItem {
-  kind: 'possible-duplicate' | 'operator-conflict';
+  /** `operator-title`: one listing whose title names a different network than its operator (a === b). */
+  kind: 'possible-duplicate' | 'operator-conflict' | 'operator-title';
   score: number;
   distanceM: number;
   a: { id: string; legacyId: string; name: string; operator: string | null; sources: string[] };

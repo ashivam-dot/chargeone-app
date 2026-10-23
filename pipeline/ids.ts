@@ -66,6 +66,8 @@ export function assignIds(clusters: string[][], registry: Registry, today: strin
   const taken = new Set<string>();
   const result: Assigned[] = new Array(clusters.length);
 
+  /** The ids registered to these members as they were, before following merges. */
+  const direct = (members: string[]) => members.map((s) => registry.sources[s]).filter((id): id is string => !!id && !!registry.stations[id]);
   const known = (members: string[]) => {
     const ids = new Set<string>();
     for (const s of members) {
@@ -82,11 +84,15 @@ export function assignIds(clusters: string[][], registry: Registry, today: strin
   };
 
   // Pass 1: a cluster that still holds an id's anchor keeps that id, so a split leaves the id with its origin.
+  // That includes an id that had merged away: when the merge splits again, the id comes back to life.
   // Pass 2: everything else takes its earliest free known id, or a new one.
   const chosen = new Map<number, string>();
   for (const i of order) {
     const members = sorted[i];
-    const id = known(members).find((k) => members.includes(registry.stations[k].anchor) && !taken.has(k));
+    const candidates = [...new Set([...known(members), ...direct(members)])].sort(
+      (a, b) => registry.stations[a].created.localeCompare(registry.stations[b].created) || a.localeCompare(b),
+    );
+    const id = candidates.find((k) => members.includes(registry.stations[k].anchor) && !taken.has(k));
     if (id) {
       chosen.set(i, id);
       taken.add(id);
@@ -108,14 +114,18 @@ export function assignIds(clusters: string[][], registry: Registry, today: strin
     taken.add(id);
   }
 
+  // Every id issued this run is live: a reissued id stops pointing at the station it once merged into.
+  for (const id of taken) {
+    delete registry.stations[id].gone;
+    delete registry.stations[id].mergedInto;
+  }
   for (const i of order) {
     const members = sorted[i];
     const id = chosen.get(i)!;
     const entry = registry.stations[id];
-    delete entry.gone;
     // Other known ids in this cluster retire into the surviving one.
-    const retired = known(members).filter((k) => k !== id && !taken.has(k));
-    for (const k of retired) {
+    for (const k of [...known(members), ...direct(members)]) {
+      if (k === id || taken.has(k)) continue;
       registry.stations[k].mergedInto = id;
       delete registry.stations[k].gone;
     }
@@ -126,16 +136,37 @@ export function assignIds(clusters: string[][], registry: Registry, today: strin
         members[0];
     }
     for (const m of members) registry.sources[m] = id;
-    const formerIds = Object.entries(registry.stations)
-      .filter(([, e]) => e.mergedInto === id)
-      .map(([k]) => k);
-    result[i] = { id, legacyId: entry.legacy, aliases: [...members.filter((m) => m !== entry.legacy), ...formerIds].sort() };
   }
 
   for (const [id, entry] of Object.entries(registry.stations)) {
     if (!taken.has(id) && !entry.mergedInto) entry.gone = true;
   }
+
+  // Retired ids by the live id they lead to (following chains), built once: scanning the registry per
+  // cluster made this quadratic.
+  const formerOf = new Map<string, string[]>();
+  for (const [k, e] of Object.entries(registry.stations)) {
+    if (!e.mergedInto || taken.has(k)) continue;
+    let to = e.mergedInto;
+    for (let hops = 0; registry.stations[to]?.mergedInto && hops < 20; hops++) to = registry.stations[to].mergedInto!;
+    if (!taken.has(to)) continue;
+    const list = formerOf.get(to);
+    if (list) list.push(k);
+    else formerOf.set(to, [k]);
+  }
+  for (const i of order) {
+    const members = sorted[i];
+    const id = chosen.get(i)!;
+    const legacy = registry.stations[id].legacy;
+    result[i] = { id, legacyId: legacy, aliases: [...members.filter((m) => m !== legacy), ...(formerOf.get(id) ?? [])].sort() };
+  }
   return result;
+}
+
+/** Alias keys that are also a live station id or legacy id: they would send that station's links elsewhere. */
+export function aliasCollisions(assigned: Array<Pick<Assigned, 'id' | 'legacyId' | 'aliases'>>): string[] {
+  const live = new Set(assigned.flatMap((a) => [a.id, a.legacyId]));
+  return assigned.flatMap((a) => a.aliases.filter((x) => live.has(x)).map((x) => `${x} (alias of ${a.id})`));
 }
 
 /** Sorted keys so the committed registry diffs cleanly. */

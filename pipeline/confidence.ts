@@ -1,17 +1,27 @@
 // Existence confidence: how sure we are that a charger is really there today.
 //
 // Each source record is a piece of evidence that decays with age (half-life THRESHOLDS.halfLifeDays)
-// towards a floor: a mapped charger rarely vanishes, but an old unchecked one is worth less. Verified
-// observations (OSM check_date/survey, OCM DateLastVerified) start higher than bulk imports. Records
+// towards a floor: a mapped charger rarely vanishes, but an old unchecked one is worth less. Age counts
+// to the source's snapshot, not to today: a record in an April export was at most "now" in April, and the
+// export's own staleness is the pipeline's to fix by refreshing it. Verified observations (OSM
+// check_date/survey, OCM DateLastVerified) start higher than bulk imports. A specific listing (a named
+// network, typed plugs with their kW, stated operational) is extra evidence: nobody invents that. Records
 // from different sources combine as independent evidence (noisy-OR), so agreement raises confidence.
 // Negative statuses reduce it.
+//
+// Calibrated against the 2026-04-22 OCM export (1,372 DC records) so that, with the client's 0.6
+// planning line: a specific listing verified within a year, or bulk-imported within about 90 days, is
+// plannable; older single-source listings are not; OSM and OCM agreeing usually are.
 import { THRESHOLDS } from './config.ts';
 import type { Claim, SourceRecord } from './types.ts';
 
-const FLOOR = 0.25;
-const BASE_VERIFIED = 0.7;
-const BASE_UNVERIFIED_OSM = 0.65;
-const BASE_BULK = 0.5;
+/** [base, floor] by kind of observation. */
+const VERIFIED: [number, number] = [0.8, 0.3];
+const UNVERIFIED_OSM: [number, number] = [0.65, 0.35];
+const BULK: [number, number] = [0.5, 0.25];
+const FLOOR = BULK[1];
+/** A specific listing: mapped operator, typed connector with kW, stated operational (or mapped on OSM). */
+export const SPECIFICITY = 0.35;
 const DAY = 86_400_000;
 
 const STATUS_FACTOR: Record<SourceRecord['status'], number> = {
@@ -28,15 +38,34 @@ export function ageDays(observedAt: string | null, now: Date): number | null {
   return Math.max(0, (now.getTime() - t) / DAY);
 }
 
-export function decay(base: number, age: number | null): number {
-  if (age === null) return FLOOR;
-  return FLOOR + (base - FLOOR) * 0.5 ** (age / THRESHOLDS.halfLifeDays);
+export function decay(base: number, age: number | null, floor = FLOOR): number {
+  if (age === null) return floor;
+  return floor + (base - floor) * 0.5 ** (age / THRESHOLDS.halfLifeDays);
+}
+
+/** Ages count to the source snapshot when it predates the build (never to a future snapshot). */
+export function referenceDate(snapshotAt: string | null | undefined, now: Date): Date {
+  const t = snapshotAt ? Date.parse(snapshotAt) : Number.NaN;
+  return Number.isFinite(t) && t < now.getTime() ? new Date(t) : now;
+}
+
+type EvidenceInput = Pick<SourceRecord, 'source' | 'verified' | 'observedAt' | 'status'> &
+  Partial<Pick<SourceRecord, 'snapshotAt' | 'operatorMethod' | 'evses' | 'stationKw'>>;
+
+/** Mapped operator, at least one typed connector with its kW, and the source says it works (OSM never says). */
+export function isSpecific(r: EvidenceInput): boolean {
+  if (r.operatorMethod !== 'mapped') return false;
+  if (!(r.status === 'operational' || r.source === 'osm')) return false;
+  const typed = (r.evses ?? []).some((e) => e.connectors.some((c) => c.standard !== 'Other' && (c.maxKw !== null || r.stationKw != null)));
+  return typed;
 }
 
 /** How much one record on its own says the charger exists (0-1). */
-export function recordEvidence(r: Pick<SourceRecord, 'source' | 'verified' | 'observedAt' | 'status'>, now: Date): number {
-  const base = r.verified ? BASE_VERIFIED : r.source === 'osm' ? BASE_UNVERIFIED_OSM : BASE_BULK;
-  return decay(base, ageDays(r.observedAt, now)) * STATUS_FACTOR[r.status];
+export function recordEvidence(r: EvidenceInput, now: Date): number {
+  const [base, floor] = r.verified ? VERIFIED : r.source === 'osm' ? UNVERIFIED_OSM : BULK;
+  const aged = decay(base, ageDays(r.observedAt, referenceDate(r.snapshotAt, now)), floor);
+  const evidence = isSpecific(r) ? noisyOr([aged, SPECIFICITY]) : aged;
+  return evidence * STATUS_FACTOR[r.status];
 }
 
 export function noisyOr(values: number[]): number {

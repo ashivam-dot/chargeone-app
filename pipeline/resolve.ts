@@ -3,8 +3,11 @@
 // Candidates come from geohash-7 blocks (a cell and its 8 neighbours, about 450 m across), within
 // THRESHOLDS.candidateMetres. Each pair gets a log-odds score from distance, operator, name and
 // connectors. Hard rules first: two different known operators never merge, nor does a two-wheeler
-// point with a car charger (they may share a Site). A missing operator is never a wildcard: it
-// lowers the score instead. Pairs at or above THRESHOLDS.autoMerge merge; pairs between
+// point with a car charger (they may share a Site), nor do two numbered listings of one source ("Hub - 1",
+// "Hub - 2"). The operator rule bends when a listing's title names the other operator (OCM files many
+// stations under the wrong network) or two identically titled listings sit within TWIN_METRES. A
+// missing operator is never a wildcard: it lowers the score instead. Joining clusters re-checks every
+// rule across all members, so A~B and B~C can't chain two same-source listings with different names. Pairs at or above THRESHOLDS.autoMerge merge; pairs between
 // THRESHOLDS.review and autoMerge go to the review queue for the admin console.
 import { THRESHOLDS } from './config.ts';
 import { connectorsCompatible, connectorsOf } from './lib/connectors.ts';
@@ -12,11 +15,13 @@ import { distanceMetres, geohash, geohashBlock } from './lib/geo.ts';
 import { differentOperators, sameOperator } from './lib/operators.ts';
 import { nameSimilarity, nameTokens } from './lib/text.ts';
 import { vehicleClass, vehicleConflict } from './lib/vehicle.ts';
-import type { CanonicalConnector, SourceRecord, VehicleClass } from './types.ts';
+import type { CanonicalConnector, ReviewItem, SourceRecord, VehicleClass } from './types.ts';
 
 const BLOCK_PRECISION = 7;
 /** Different operators closer than this are listed for review (see resolve). */
 const OPERATOR_CONFLICT_METRES = 25;
+/** Identically titled listings this close are one charger, whatever operator each source files it under. */
+const TWIN_METRES = 10;
 
 interface Prepared {
   r: SourceRecord;
@@ -24,6 +29,8 @@ interface Prepared {
   tokens: Set<string>;
   connectors: CanonicalConnector[];
   vclass: VehicleClass;
+  title: string;
+  listing: number | null;
 }
 
 export interface PairScore {
@@ -37,7 +44,44 @@ export interface PairScore {
 const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
 
 function prepare(r: SourceRecord, index: number): Prepared {
-  return { r, index, tokens: nameTokens(r.name, r.operator), connectors: connectorsOf(r.evses), vclass: vehicleClass(r.vehicles) };
+  return {
+    r,
+    index,
+    tokens: nameTokens(r.name, r.operator),
+    connectors: connectorsOf(r.evses),
+    vclass: vehicleClass(r.vehicles),
+    title: (r.name ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(),
+    listing: listingNumber(r.name),
+  };
+}
+
+/** The number in "Statiq Hub - 2" or "Charger #3": one source listing each charger of a site separately. */
+export function listingNumber(name: string | null): number | null {
+  const m = name?.match(/(?:\s[-–—#]\s*|\s(?:no\.?|unit|charger|point|gun)\s*#?\s*)(\d{1,3})\s*\)?\s*$/i);
+  return m ? Number(m[1]) : null;
+}
+
+/** Two numbered listings of one source with different numbers are different chargers. */
+function distinctListings(a: Prepared, b: Prepared): boolean {
+  return a.r.source === b.r.source && a.listing !== null && b.listing !== null && a.listing !== b.listing;
+}
+
+/**
+ * Known, different operators that nothing reconciles. A title naming the other record's operator, or the same
+ * title within TWIN_METRES, says one of the two sources filed the charger under the wrong network.
+ */
+function operatorClash(a: Prepared, b: Prepared, d: number): boolean {
+  if (!differentOperators(a.r.operator, b.r.operator)) return false;
+  if (sameOperator(a.r.titleOperator ?? null, b.r.operator) || sameOperator(b.r.titleOperator ?? null, a.r.operator)) return false;
+  return !(a.title !== '' && a.title === b.title && d <= TWIN_METRES);
+}
+
+/** Two records of one source with different names (or listing numbers) are two listings, never one station. */
+function sameSourceDistinct(a: Prepared, b: Prepared): boolean {
+  if (a.r.source !== b.r.source) return false;
+  if (distinctListings(a, b)) return true;
+  const sim = nameSimilarity(a.tokens, b.tokens);
+  return sim !== null && sim < 0.5;
 }
 
 export function scorePair(a: SourceRecord, b: SourceRecord): PairScore {
@@ -47,8 +91,11 @@ export function scorePair(a: SourceRecord, b: SourceRecord): PairScore {
 function scorePrepared(a: Prepared, b: Prepared): PairScore {
   const d = distanceMetres(a.r, b.r);
   const reasons: string[] = [`${Math.round(d)} m apart`];
-  if (differentOperators(a.r.operator, b.r.operator)) {
+  if (operatorClash(a, b, d)) {
     return { score: 0, distanceM: d, blocked: `different operators (${a.r.operator} / ${b.r.operator})`, reasons };
+  }
+  if (distinctListings(a, b)) {
+    return { score: 0, distanceM: d, blocked: `numbered listings ${a.listing} / ${b.listing}`, reasons };
   }
   if (vehicleConflict(a.vclass, b.vclass)) {
     return { score: 0, distanceM: d, blocked: `vehicle classes differ (${a.vclass} / ${b.vclass})`, reasons };
@@ -59,6 +106,9 @@ function scorePrepared(a: Prepared, b: Prepared): PairScore {
   if (sameOperator(a.r.operator, b.r.operator)) {
     logit += 2.5;
     reasons.push(`same operator (${a.r.operator})`);
+  } else if (differentOperators(a.r.operator, b.r.operator)) {
+    logit -= 0.5;
+    reasons.push(`operators disagree (${a.r.operator} / ${b.r.operator}), title reconciles them`);
   } else if (a.r.operator !== null || b.r.operator !== null) {
     logit -= 0.5;
     reasons.push('one operator unknown');
@@ -99,8 +149,7 @@ export interface Candidate {
 }
 
 /** All scored pairs within the candidate radius, blocked by geohash-7. */
-export function candidatePairs(records: SourceRecord[]): Candidate[] {
-  const prepared = records.map(prepare);
+export function candidatePairs(records: SourceRecord[], prepared: Prepared[] = records.map(prepare)): Candidate[] {
   const cells = new Map<string, number[]>();
   for (const p of prepared) {
     const cell = geohash(p.r.lat, p.r.lng, BLOCK_PRECISION);
@@ -147,19 +196,28 @@ class Clusters {
   }
 }
 
-/** Would joining these two clusters put two operators or a 2W point and a car charger in one station? */
-function clusterConflict(records: SourceRecord[], a: number[], b: number[]): string | null {
-  const all = [...a, ...b].map((i) => records[i]);
-  const ops = all.map((r) => r.operator).filter((o): o is string => o !== null);
-  for (const o of ops) if (differentOperators(o, ops[0])) return `different operators (${ops[0]} / ${o})`;
-  const classes = all.map((r) => vehicleClass(r.vehicles));
-  for (const c of classes) for (const d of classes) if (vehicleConflict(c, d)) return `vehicle classes differ (${c} / ${d})`;
-  for (const x of all) for (const y of all) if (distanceMetres(x, y) > THRESHOLDS.candidateMetres) return 'cluster would span too far';
+/**
+ * Would joining these two clusters put two operators, a 2W point and a car charger, or two distinct listings
+ * of one source in one station? Every cross pair is checked, not just the pair that scored.
+ */
+function clusterConflict(prepared: Prepared[], a: number[], b: number[]): string | null {
+  for (const i of a) {
+    for (const j of b) {
+      const x = prepared[i];
+      const y = prepared[j];
+      const d = distanceMetres(x.r, y.r);
+      if (operatorClash(x, y, d)) return `different operators (${x.r.operator} / ${y.r.operator})`;
+      if (vehicleConflict(x.vclass, y.vclass)) return `vehicle classes differ (${x.vclass} / ${y.vclass})`;
+      if (sameSourceDistinct(x, y)) return `same source, different listings (${x.r.name} / ${y.r.name})`;
+      if (d > THRESHOLDS.candidateMetres) return 'cluster would span too far';
+    }
+  }
   return null;
 }
 
 export interface ReviewPair {
-  kind: 'possible-duplicate' | 'operator-conflict';
+  kind: ReviewItem['kind'];
+  /** The same record twice for a single-listing item (a title naming another network). */
   i: number;
   j: number;
   score: number;
@@ -176,7 +234,8 @@ export interface Resolution {
 }
 
 export function resolve(records: SourceRecord[]): Resolution {
-  const pairs = candidatePairs(records).sort(
+  const prepared = records.map(prepare);
+  const pairs = candidatePairs(records, prepared).sort(
     (x, y) => y.pair.score - x.pair.score || records[x.i].sourceId.localeCompare(records[y.i].sourceId) || records[x.j].sourceId.localeCompare(records[y.j].sourceId),
   );
   const uf = new Clusters(records.length);
@@ -194,7 +253,7 @@ export function resolve(records: SourceRecord[]): Resolution {
     const ra = uf.find(c.i);
     const rb = uf.find(c.j);
     if (ra === rb) continue;
-    const conflict = clusterConflict(records, uf.members[ra], uf.members[rb]);
+    const conflict = clusterConflict(prepared, uf.members[ra], uf.members[rb]);
     if (conflict) {
       pending.push({ ...c, pair: { ...c.pair, reasons: [...c.pair.reasons, `not merged: ${conflict}`] } });
       continue;
@@ -223,6 +282,21 @@ export function resolve(records: SourceRecord[]): Resolution {
     if (!review.has(key)) review.set(key, { kind: 'operator-conflict', i: c.i, j: c.j, score: 0, distanceM: c.pair.distanceM, reasons: [...c.pair.reasons, c.pair.blocked] });
   }
 
+  // A title naming another network that no nearby record of that network confirms: which one is right?
+  records.forEach((r, i) => {
+    if (!r.titleOperator) return;
+    const root = uf.find(i);
+    if (uf.members[root].some((k) => sameOperator(records[k].operator, r.titleOperator ?? null))) return;
+    review.set(`title:${i}`, {
+      kind: 'operator-title',
+      i,
+      j: i,
+      score: 0,
+      distanceM: 0,
+      reasons: [`listed under ${r.operator}, title names ${r.titleOperator}`],
+    });
+  });
+
   const clusters = uf.members
     .filter((m) => m.length > 0)
     .map((m) => m.sort((x, y) => records[x].sourceId.localeCompare(records[y].sourceId)));
@@ -235,7 +309,7 @@ export function groupSites(points: Array<{ lat: number; lng: number }>): number[
   const cells = new Map<string, number[]>();
   points.forEach((p, i) => {
     const cell = geohash(p.lat, p.lng, BLOCK_PRECISION);
-    cells.set(cell, [...(cells.get(cell) ?? []), i]);
+    (cells.get(cell) ?? cells.set(cell, []).get(cell)!).push(i);
   });
   points.forEach((p, i) => {
     for (const cell of geohashBlock(p.lat, p.lng, BLOCK_PRECISION)) {

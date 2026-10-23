@@ -108,6 +108,11 @@ function explicitVehicles(tags: Record<string, string>): VehicleFlags {
   };
 }
 
+/** `charging_station:battery_swapping=yes` (or the bare `battery_swapping`) marks a swap station. */
+export function explicitSwap(tags: Record<string, string>): Tri {
+  return anyOf(yesNo(tags['charging_station:battery_swapping']), yesNo(tags.battery_swapping));
+}
+
 function parseCount(raw: string | undefined): number | null {
   if (!raw || !/^\s*\d+\s*$/.test(raw)) return null;
   const n = Number.parseInt(raw, 10);
@@ -214,7 +219,7 @@ export function osmRecord(el: OsmElement): SourceRecord | Rejection {
     stateHint: canonicalState(tags['addr:state']),
     website: safeUrl(tags.website ?? tags['contact:website'] ?? tags['operator:website']),
     vehicles: inferVehicles({ explicit: explicitVehicles(tags), connectors, operator, name, stationKw }),
-    batterySwap: inferSwap(operator, name),
+    batterySwap: inferSwap(operator, name, explicitSwap(tags)),
     status: 'unknown',
     flags,
   };
@@ -226,7 +231,7 @@ export function osmToCanonical(raw: OsmRaw): AdapterResult {
   for (const el of raw.elements) {
     const r = osmRecord(el);
     if ('reason' in r) rejected.push(r);
-    else records.push(r);
+    else records.push({ ...r, snapshotAt: raw.snapshotAt });
   }
   return { records, rejected, rawCount: raw.elements.length, snapshotAt: raw.snapshotAt };
 }

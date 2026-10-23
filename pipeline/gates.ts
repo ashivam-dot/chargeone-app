@@ -2,6 +2,7 @@
 // merge can never replace the published data. The baseline is the last published build: manifest.json
 // when there is one, else the legacy stations.json.
 import type { Dataset, Station } from '../src/data/model.ts';
+import { PLAN_MIN_CONFIDENCE } from '../src/data/trust.ts';
 import { THRESHOLDS } from './config.ts';
 import { distanceMetres } from './lib/geo.ts';
 import type { HealthReport, SourceKey } from './types.ts';
@@ -31,6 +32,10 @@ export interface GateInput {
   stations: Station[];
   schemaErrors: string[];
   shardBytes: Map<string, number>;
+  /** Every file to publish under public/data, by size. */
+  fileBytes?: Map<string, number>;
+  /** Alias keys that are some live station's own id (outputs.ts leaves them out; any is a registry bug). */
+  aliasCollisions?: string[];
 }
 
 export interface GateResult {
@@ -87,5 +92,30 @@ export function runGates(g: GateInput): GateResult {
     if (bytes > THRESHOLDS.shardBytes) failures.push(`shard ${cell} is ${bytes} bytes (limit ${THRESHOLDS.shardBytes})`);
   }
   checks.push(`${g.shardBytes.size} shards, largest ${Math.max(0, ...g.shardBytes.values())} bytes`);
+
+  // The planner only stops at chargers at or above PLAN_MIN_CONFIDENCE. Too few of those and every
+  // strict plan fails, which is what a miscalibrated confidence model looks like from the outside.
+  const dc = g.stations.filter((s) => s.speed === 'dc');
+  const plannable = dc.filter((s) => (s.confidence ?? 0) >= PLAN_MIN_CONFIDENCE).length;
+  const plannableShare = dc.length ? plannable / dc.length : 1;
+  checks.push(`plannable DC (confidence >= ${PLAN_MIN_CONFIDENCE}): ${plannable} of ${dc.length} (${pct(plannableShare)})`);
+  if (plannableShare < THRESHOLDS.minPlannableDcShare) {
+    failures.push(`only ${pct(plannableShare)} of DC stations are plannable (limit ${pct(THRESHOLDS.minPlannableDcShare)})`);
+  }
+
+  // "Operational" with nothing to plug into is a contradiction an adapter let through.
+  const empty = g.stations.filter((s) => s.status === 'operational' && s.connectors.length === 0);
+  if (empty.length) failures.push(`${empty.length} operational stations list no connectors, first: ${empty.slice(0, 3).map((s) => s.id).join(', ')}`);
+
+  if (g.aliasCollisions?.length) failures.push(`${g.aliasCollisions.length} aliases are live station ids, first: ${g.aliasCollisions.slice(0, 3).join(', ')}`);
+
+  if (g.fileBytes) {
+    for (const [name, bytes] of g.fileBytes) {
+      if (bytes > THRESHOLDS.assetBytes) failures.push(`${name} is ${bytes} bytes (asset limit ${THRESHOLDS.assetBytes})`);
+    }
+    const largest = [...g.fileBytes].sort(([, a], [, b]) => b - a)[0];
+    checks.push(`${g.fileBytes.size} data files, largest ${largest ? `${largest[0]} ${largest[1]} bytes` : 'none'}`);
+    if (g.fileBytes.size > THRESHOLDS.maxDataFiles) failures.push(`${g.fileBytes.size} data files (limit ${THRESHOLDS.maxDataFiles})`);
+  }
   return { ok: failures.length === 0, failures, checks };
 }

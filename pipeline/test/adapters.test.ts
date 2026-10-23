@@ -17,7 +17,8 @@ describe('OSM adapter (recorded Overpass sample)', () => {
   const result = osmToCanonical(readOsmCache({ snapshotAt: overpass.osm3s.timestamp_osm_base, fetchedAt: null, endpoint: null, elements: overpass.elements }));
 
   it('is pure: the same input gives the same records', () => {
-    expect(osmToCanonical({ snapshotAt: null, fetchedAt: null, endpoint: null, elements: overpass.elements })).toEqual({ ...result, snapshotAt: null });
+    expect(osmToCanonical({ snapshotAt: overpass.osm3s.timestamp_osm_base, fetchedAt: null, endpoint: null, elements: overpass.elements })).toEqual(result);
+    expect(result.records.every((r) => r.snapshotAt === overpass.osm3s.timestamp_osm_base)).toBe(true);
   });
 
   it('maps socket:type7 to LECCS (Ather) and marks the point two-wheeler only', () => {

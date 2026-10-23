@@ -1,5 +1,5 @@
 // Name comparison for entity resolution: generic words ("EV charging station") carry no evidence.
-const STOPWORDS = new Set([
+export const STOPWORDS: ReadonlySet<string> = new Set([
   'ev', 'evs', 'evcs', 'charging', 'charge', 'charger', 'chargers', 'station', 'stations', 'point', 'points', 'electric',
   'vehicle', 'vehicles', 'hub', 'the', 'and', 'of', 'at', 'near', 'opp', 'opposite', 'fast', 'dc', 'ac', 'kw', 'public',
   'india', 'pvt', 'ltd', 'limited', 'private', 'pcs', 'ccs', 'ccs2', 'type', 'plug', 'power', 'by', 'in', 'on', 'for',
@@ -12,7 +12,7 @@ export function nameTokens(name: string | null, operator: string | null = null):
   return new Set(tokenize(name).filter((t) => !STOPWORDS.has(t) && !opTokens.has(t) && !/^\d+$/.test(t)));
 }
 
-function tokenize(s: string): string[] {
+export function tokenize(s: string): string[] {
   return s
     .toLowerCase()
     .normalize('NFD')

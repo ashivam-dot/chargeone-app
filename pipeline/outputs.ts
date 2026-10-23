@@ -2,6 +2,7 @@
 // is written. Pure: the same station layer and run date give the same bytes.
 import { createHash } from 'node:crypto';
 import { encodeCell, encodeIndex } from '../src/data/compact.ts';
+import { aliasBucket, bucketCount, LOOKUP_SCHEMA, type AliasBucket, type LookupFile } from '../src/data/lookup.ts';
 import { hasDc, type Connector, type Dataset, type DatasetSource, type SourceRef, type Station, type Vehicle } from '../src/data/model.ts';
 import { THRESHOLDS } from './config.ts';
 import { geohash } from './lib/geo.ts';
@@ -100,7 +101,9 @@ export function toDetailedStation(s: CanonicalStation, position: string) {
 
 /**
  * Splits stations into geohash cells of at most THRESHOLDS.shardMaxStations (and, through `fits`, under the
- * shard byte limit), finer only where it's dense.
+ * shard byte limit), finer only where it's dense. A split keeps the sparse children in the parent cell
+ * while they fit, so a city with one dense block makes a few files, not 32 nearly empty ones. Cells can
+ * therefore nest (`tdr` holds what `tdr1` doesn't); readers pick cells by bounds, which covers both.
  */
 export function adaptiveCells(
   points: Array<{ lat: number; lng: number }>,
@@ -108,25 +111,35 @@ export function adaptiveCells(
   fits: (members: number[]) => boolean = () => true,
 ): Map<string, number[]> {
   const out = new Map<string, number[]>();
+  const group = (members: number[], precision: number) => {
+    const cells = new Map<string, number[]>();
+    for (const i of members) {
+      const cell = geohash(points[i].lat, points[i].lng, precision);
+      const list = cells.get(cell);
+      if (list) list.push(i);
+      else cells.set(cell, [i]);
+    }
+    return [...cells].sort(([a], [b]) => a.localeCompare(b));
+  };
+  const ok = (members: number[]) => members.length <= max && fits(members);
   const split = (prefix: string, members: number[]) => {
-    if ((members.length <= max && fits(members)) || prefix.length >= 6) {
+    if (ok(members) || prefix.length >= 6) {
       out.set(prefix, members);
       return;
     }
-    const children = new Map<string, number[]>();
-    for (const i of members) {
-      const cell = geohash(points[i].lat, points[i].lng, prefix.length + 1);
-      children.set(cell, [...(children.get(cell) ?? []), i]);
+    const children = group(members, prefix.length + 1);
+    // Smallest children first back into the parent, while the parent still fits.
+    const keep: number[] = [];
+    const rest: Array<[string, number[]]> = [];
+    for (const [cell, m] of [...children].sort(([a, x], [b, y]) => x.length - y.length || a.localeCompare(b))) {
+      if (m.length <= max / 4 && ok([...keep, ...m])) keep.push(...m);
+      else rest.push([cell, m]);
     }
-    for (const [cell, m] of [...children].sort(([a], [b]) => a.localeCompare(b))) split(cell, m);
+    if (keep.length) out.set(prefix, keep.sort((a, b) => a - b));
+    for (const [cell, m] of rest.sort(([a], [b]) => a.localeCompare(b))) split(cell, m);
   };
-  const top = new Map<string, number[]>();
-  points.forEach((p, i) => {
-    const cell = geohash(p.lat, p.lng, 2);
-    top.set(cell, [...(top.get(cell) ?? []), i]);
-  });
-  for (const [cell, m] of [...top].sort(([a], [b]) => a.localeCompare(b))) split(cell, m);
-  return out;
+  for (const [cell, m] of group(points.map((_, i) => i), 2)) split(cell, m);
+  return new Map([...out].sort(([a], [b]) => a.localeCompare(b)));
 }
 
 export interface SourceRun {
@@ -151,6 +164,8 @@ export interface Built {
   dataset: Dataset;
   manifest: Manifest;
   shardBytes: Map<string, number>;
+  /** Alias keys that are some live station's own id, left out of the alias files (a gate fails on any). */
+  aliasCollisions: string[];
 }
 
 export interface SourceSummary {
@@ -190,6 +205,12 @@ export interface Manifest {
   sources: SourceSummary[];
   files: Record<string, { bytes: number; sha256: string }>;
   shards: Array<{ cell: string; stations: number; bytes: number }>;
+  /** Alias bucket count (see cells.json and src/data/lookup.ts). */
+  aliasBuckets: number;
+  /** False once stations.json outgrew THRESHOLDS.legacyStationsBytes and is no longer published. */
+  legacyStations: boolean;
+  /** The ODbL dump, in parts when one zip would pass the asset size limit. */
+  odbl: string[];
   thresholds: typeof THRESHOLDS;
   attribution: string[];
 }
@@ -201,7 +222,9 @@ export function coverage(stations: Station[], generatedAt: string) {
   const byState = new Map<string, Station[]>();
   for (const s of stations) {
     const k = s.state ?? 'Unknown';
-    byState.set(k, [...(byState.get(k) ?? []), s]);
+    const list = byState.get(k);
+    if (list) list.push(s);
+    else byState.set(k, [s]);
   }
   const row = (state: string, list: Station[], gov: number | null) => {
     const withKw = list.filter((s) => s.maxKw !== null).length;
@@ -286,11 +309,15 @@ export function buildOutputs(input: BuildInput): Built {
   const dataset: Dataset = { generatedAt: input.generatedAt, version, sources: datasetSources, stations: appStations };
 
   const files = new Map<string, Buffer>();
-  files.set('stations.json', json(dataset));
+  const legacyFile = json(dataset);
+  const legacyStations = legacyFile.length <= THRESHOLDS.legacyStationsBytes;
+  if (legacyStations) files.set('stations.json', legacyFile);
 
   // Shards with full provenance.
   const detailed = ordered.map((s) => toDetailedStation(s, positionOf(s)));
-  const sizeOf = (members: number[]) => members.reduce((n, i) => n + JSON.stringify(detailed[i]).length + 1, 64);
+  // Each station's serialised size, once: the cell split asks about the same stations many times.
+  const bytesOf = detailed.map((d) => Buffer.byteLength(JSON.stringify(d)) + 1);
+  const sizeOf = (members: number[]) => members.reduce((n, i) => n + bytesOf[i], 64);
   const cells = adaptiveCells(ordered, THRESHOLDS.shardMaxStations, (m) => sizeOf(m) <= THRESHOLDS.shardBytes * 0.9);
   const shardOf = new Map<string, string>();
   const shardBytes = new Map<string, number>();
@@ -310,17 +337,38 @@ export function buildOutputs(input: BuildInput): Built {
     files.set(`cells/${cell}.json`, json(encodeCell(cell, version, list, hasDc)));
   }
 
-  const aliases: Record<string, string> = {};
-  const legacy: Record<string, string> = {};
-  const cellOf: Record<string, string> = {};
+  // Id lookups, split into hash buckets (src/data/lookup.ts) so no reader parses one file of every id.
+  // An alias is never a live station's own c1 or legacy id: that would send its links elsewhere.
+  const live = new Set(ordered.flatMap((s) => [s.id, s.legacyId]));
+  const aliasCollisions: string[] = [];
+  const aliasPairs: Array<[string, string]> = [];
   for (const s of ordered) {
-    legacy[s.id] = s.legacyId;
-    cellOf[s.id] = shardOf.get(s.id)!;
-    aliases[s.legacyId] = s.id;
-    for (const a of s.aliases) aliases[a] = s.id;
+    if (s.legacyId !== s.id) aliasPairs.push([s.legacyId, s.id]);
+    for (const a of s.aliases) {
+      if (live.has(a)) aliasCollisions.push(`${a} (alias of ${s.id})`);
+      else aliasPairs.push([a, s.id]);
+    }
+  }
+  const buckets = bucketCount(aliasPairs.length + ordered.length);
+  const bucketFiles = new Map<string, AliasBucket>();
+  const bucketOf = (key: string) => {
+    const name = aliasBucket(key, buckets);
+    let b = bucketFiles.get(name);
+    if (!b) bucketFiles.set(name, (b = { version, bucket: name, aliases: {}, legacy: {}, cells: {} }));
+    return b;
+  };
+  for (const [from, to] of aliasPairs) bucketOf(from).aliases[from] = to;
+  for (const s of ordered) {
+    const b = bucketOf(s.id);
+    b.legacy[s.id] = s.legacyId;
+    b.cells[s.id] = shardOf.get(s.id)!;
   }
   const sortObj = (o: Record<string, string>) => Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
-  files.set('aliases.json', json({ version, note: 'aliases: any osm-/ocm- id or retired c1 id -> current c1 id. legacy: c1 id -> the id stations.json uses. cells: c1 id -> its shard and cell file.', aliases: sortObj(aliases), legacy: sortObj(legacy), cells: sortObj(cellOf) }));
+  for (const [name, b] of [...bucketFiles].sort(([a], [b]) => a.localeCompare(b))) {
+    files.set(`aliases/${name}.json`, json({ ...b, aliases: sortObj(b.aliases), legacy: sortObj(b.legacy), cells: sortObj(b.cells) }));
+  }
+  const lookup: LookupFile = { version, schema: LOOKUP_SCHEMA, aliasBuckets: buckets, cells: [...cells.keys()].sort() };
+  files.set('cells.json', json(lookup));
 
   files.set('coverage.json', Buffer.from(`${JSON.stringify(coverage(appStations, input.generatedAt), null, 2)}\n`));
   files.set('review-queue.json', Buffer.from(`${JSON.stringify({ version, generatedAt: input.generatedAt, items: input.review }, null, 2)}\n`));
@@ -339,13 +387,26 @@ export function buildOutputs(input: BuildInput): Built {
     })),
     sites: input.sites,
   };
-  files.set(
-    'chargeone-stations-odbl.zip',
-    zip([
-      { name: 'LICENSE.txt', data: ODBL_LICENSE },
-      { name: 'chargeone-stations.geojson', data: JSON.stringify(geojson) },
-    ]),
-  );
+  // One zip while it fits the asset limit; past it, parts of whole features, each with the licence.
+  const odbl: string[] = [];
+  const whole = zip([
+    { name: 'LICENSE.txt', data: ODBL_LICENSE },
+    { name: 'chargeone-stations.geojson', data: JSON.stringify(geojson) },
+  ]);
+  if (whole.length <= THRESHOLDS.assetBytes * 0.9) {
+    files.set('chargeone-stations-odbl.zip', whole);
+    odbl.push('chargeone-stations-odbl.zip');
+  } else {
+    const parts = Math.ceil(whole.length / (THRESHOLDS.assetBytes * 0.7));
+    const per = Math.ceil(geojson.features.length / parts);
+    const names = Array.from({ length: parts }, (_, k) => (k === 0 ? 'chargeone-stations-odbl.zip' : `chargeone-stations-odbl-${k + 1}.zip`));
+    names.forEach((name, k) => {
+      const part = { ...geojson, part: k + 1, parts, features: geojson.features.slice(k * per, (k + 1) * per), sites: k === 0 ? input.sites : [] };
+      const readme = `Part ${k + 1} of ${parts}: ${names.join(', ')}. Sites are in part 1.\n`;
+      files.set(name, zip([{ name: 'LICENSE.txt', data: `${ODBL_LICENSE}\n${readme}` }, { name: `chargeone-stations-${k + 1}.geojson`, data: JSON.stringify(part) }]));
+      odbl.push(name);
+    });
+  }
   files.set('LICENSE-data.txt', Buffer.from(ODBL_LICENSE));
 
   const count = (f: (s: Station) => boolean) => appStations.filter(f).length;
@@ -389,10 +450,13 @@ export function buildOutputs(input: BuildInput): Built {
     sources,
     files: {},
     shards: [...cells].map(([cell, m]) => ({ cell, stations: m.length, bytes: shardBytes.get(cell)! })),
+    aliasBuckets: buckets,
+    legacyStations,
+    odbl,
     thresholds: THRESHOLDS,
     attribution: [LICENCES['ODbL-1.0'].attribution, LICENCES['CC-BY-4.0'].attribution, GOVERNMENT_COUNTS_ATTRIBUTION],
   };
   for (const [name, bytes] of [...files].sort(([a], [b]) => a.localeCompare(b))) manifest.files[name] = { bytes: bytes.length, sha256: sha(bytes) };
   files.set('manifest.json', Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`));
-  return { files, dataset, manifest, shardBytes };
+  return { files, dataset, manifest, shardBytes, aliasCollisions };
 }

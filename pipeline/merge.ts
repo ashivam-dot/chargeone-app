@@ -2,10 +2,11 @@
 //
 // Position: OSM first (mappers place the pin on the charger; OCM often geocodes an address). Within a
 // source, the most recently verified record wins. Attributes: a verified record beats an unverified one,
-// then OCM beats OSM (OCM carries connector power and status), then the newest wins. Connectors are the
-// union across sources. Unknown stays unknown: nothing defaults to false.
+// then OCM beats OSM (OCM carries connector power and status), then the newest wins. Connectors are
+// summed within a source and merged (not added) across sources, per kW tier. Unknown stays unknown:
+// nothing defaults to false.
 import { unnamedStation } from '../src/data/normalize.ts';
-import { connectorsOf, maxKwOf, maxOrNull, mergeCanonicalConnectors, speedOf } from './lib/connectors.ts';
+import { connectorsOf, maxKwOf, maxOrNull, mergeSourceConnectors, sourceConnectors, speedOf } from './lib/connectors.ts';
 import { mergeVehicleFlags, vehicleClass } from './lib/vehicle.ts';
 import { existenceConfidence, fieldConfidence, recordEvidence } from './confidence.ts';
 import type { Access, CanonicalConnector, CanonicalStation, Claim, FieldValue, SourceRecord, Tri } from './types.ts';
@@ -69,7 +70,9 @@ export function mergeCluster(members: SourceRecord[], now: Date): Omit<Canonical
   const evidence = new Map(members.map((r) => [r.sourceId, recordEvidence(r, now)]));
   const pos = positionRecord(members);
 
-  const operator = pick(ranked, (r) => r.operator, evidence, (r) => (r.operatorMethod === 'inferred' ? 'inferred' : 'mapped'));
+  // A listing whose title names another network is the least trusted word on who runs the station.
+  const byOperatorTrust = [...ranked].sort((a, b) => Number(a.flags.includes('operator-conflict')) - Number(b.flags.includes('operator-conflict')));
+  const operator = pick(byOperatorTrust, (r) => r.operator, evidence, (r) => (r.operatorMethod === 'inferred' ? 'inferred' : 'mapped'));
   const rawName = pick(ranked, (r) => r.name, evidence);
   const name: FieldValue<string> = rawName.value !== null
     ? { value: rawName.value, confidence: rawName.confidence, claims: rawName.claims }
@@ -79,7 +82,10 @@ export function mergeCluster(members: SourceRecord[], now: Date): Omit<Canonical
     .map((r) => ({ r, list: connectorsOf(r.evses) }))
     .filter(({ list }) => list.length > 0)
     .map(({ r, list }) => claim(r, list));
-  const connectorList = mergeCanonicalConnectors(connectorClaims.map((c) => c.value));
+  // Distinct records of one source add up (sourceConnectors); different sources describing one site don't.
+  const bySource = new Map<SourceRecord['source'], CanonicalConnector[][]>();
+  for (const c of connectorClaims) (bySource.get(c.source) ?? bySource.set(c.source, []).get(c.source)!).push(c.value);
+  const connectorList = mergeSourceConnectors([...bySource].map(([source, lists]) => sourceConnectors(source, lists)));
   const sameTypes = (a: CanonicalConnector[], b: CanonicalConnector[]) =>
     a.map((c) => c.standard).sort().join() === b.map((c) => c.standard).sort().join();
   const connectors: FieldValue<CanonicalConnector[]> = {

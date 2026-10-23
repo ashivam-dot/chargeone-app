@@ -46,8 +46,8 @@ describe('existence confidence', () => {
     const halfYear = recordEvidence(record({ observedAt: '2026-04-23T00:00:00Z' }), now);
     const old = recordEvidence(record({ observedAt: '2022-01-01T00:00:00Z' }), now);
     expect(fresh).toBeGreaterThan(halfYear);
-    expect(halfYear - 0.25).toBeCloseTo((fresh - 0.25) / 2, 1);
-    expect(old).toBeCloseTo(0.25, 1);
+    expect(halfYear - 0.3).toBeCloseTo((fresh - 0.3) / 2, 1);
+    expect(old).toBeCloseTo(0.3, 1); // the verified floor
   });
 
   it('rises when independent sources agree, falls with a negative status', () => {
