@@ -1,4 +1,4 @@
-import { FREE_TRIP_KM, MAX_REPLANS_PER_TRIP, PLANS, REPLAN_WINDOW_HOURS, decideTrip } from '../src/shared/plans.ts';
+import { FREE_TRIP_KM, MAX_REPLANS_PER_TRIP, PLANS, REPLAN_WINDOW_HOURS, decideTrip, type TripDecision } from '../src/shared/plans.ts';
 import type { RouteAlternativeWire } from '../src/shared/contracts.ts';
 import type { Coord } from '../src/planner/geometry.ts';
 import { alternativeRoutes } from './alternatives.ts';
@@ -30,6 +30,9 @@ const SAME_DESTINATION_M = 2000;
 /** Detours after a failed charger can add some distance to the remaining route. */
 const REPLAN_DISTANCE_SLACK = 0.15;
 const REPLAN_DISTANCE_EXTRA_KM = 10;
+/** A request for the same trip (destination to ~1 km, road length to 0.5 km) this soon after is a retry. */
+const REPEAT_WINDOW_MS = 10 * 60_000;
+const REPEAT_DISTANCE_KM = 0.5;
 
 export type RouteSource = 'ors' | 'valhalla' | 'osrm';
 
@@ -55,23 +58,34 @@ export interface RouteCaller {
 const BUSY = () => new HttpError(502, 'routing_unavailable', 'The route service is busy. Please try again in a minute.');
 const NO_ROUTE = () => new HttpError(422, 'no_route', 'No road route found between these places.');
 
+/** A deadline for one call, together with the caller's own signal when there is one. */
+const deadline = (signal?: AbortSignal) =>
+  signal ? AbortSignal.any([signal, AbortSignal.timeout(PUBLIC_TIMEOUT_MS)]) : AbortSignal.timeout(PUBLIC_TIMEOUT_MS);
+
 async function routeWithOrs(apiKey: string, points: LatLng[], signal?: AbortSignal): Promise<RouteResult> {
-  const res = await fetch(ORS_URL, {
-    method: 'POST',
-    headers: { Authorization: apiKey, 'Content-Type': 'application/json', Accept: 'application/geo+json' },
-    body: JSON.stringify({
-      coordinates: points.map((p) => [p.lng, p.lat]),
-      elevation: true,
-      instructions: false,
-      preference: 'fastest',
-    }),
-    signal,
-  });
-  if (res.status === 404 || res.status === 400) throw NO_ROUTE();
-  if (!res.ok) throw BUSY();
-  const data = (await res.json()) as {
+  let data: {
     features?: Array<{ geometry: { coordinates: Coord[] }; properties: { summary: { distance?: number; duration?: number } } }>;
   };
+  try {
+    const res = await fetch(ORS_URL, {
+      method: 'POST',
+      headers: { Authorization: apiKey, 'Content-Type': 'application/json', Accept: 'application/geo+json' },
+      body: JSON.stringify({
+        coordinates: points.map((p) => [p.lng, p.lat]),
+        elevation: true,
+        instructions: false,
+        preference: 'fastest',
+      }),
+      signal: deadline(signal),
+    });
+    if (res.status === 404 || res.status === 400) throw NO_ROUTE();
+    if (!res.ok) throw BUSY();
+    data = (await res.json()) as typeof data;
+  } catch (err) {
+    // A network error, a timeout or a body that isn't JSON: busy, so the public fallback can answer.
+    if (err instanceof HttpError) throw err;
+    throw BUSY();
+  }
   const f = data.features?.[0];
   if (!f) throw NO_ROUTE();
   return {
@@ -147,9 +161,17 @@ const cacheKey = (points: LatLng[]) =>
   `https://chargeone.internal/route/valhalla/${points.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join(';')}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Gives back a day's public routing call that got no answer (network error, timeout, 5xx, 429, or
+ * no free second), so an outage doesn't leave routing "at today's limit" once the server is back.
+ */
+async function releasePublic(env: Env, caller: RouteCaller | undefined, day: number): Promise<void> {
+  await releaseSlot(env.DB, PUBLIC_ROUTE_DAY_SLOT, day);
+  if (caller) await releaseSlot(env.DB, `public-route-ip:${caller.ip}`, day);
+}
+
 /** Takes one of the day's public routing calls and waits for this second's single slot. */
-async function publicSlot(env: Env, caller: RouteCaller | undefined): Promise<void> {
-  const day = indianDayStart();
+async function publicSlot(env: Env, caller: RouteCaller | undefined, day: number): Promise<void> {
   const ipKey = caller ? `public-route-ip:${caller.ip}` : null;
   if (ipKey && (await claimSlot(env.DB, ipKey, PUBLIC_ROUTES_PER_IP_PER_DAY, day)) === null) {
     throw new HttpError(429, 'rate_limited', 'This network has planned a lot of routes today. Please try again tomorrow.');
@@ -162,6 +184,8 @@ async function publicSlot(env: Env, caller: RouteCaller | undefined): Promise<vo
     if ((await claimSlot(env.DB, 'public-route:second', 1, Math.floor(Date.now() / 1000))) !== null) return;
     await sleep(1000 - (Date.now() % 1000) + 20);
   }
+  // Nothing was sent, so nothing is counted.
+  await releasePublic(env, caller, day);
   throw BUSY();
 }
 
@@ -171,7 +195,8 @@ async function routeWithValhalla(env: Env, points: LatLng[], caller: RouteCaller
   const hit = await cache?.match(key);
   if (hit) return (await hit.json()) as RouteResult;
 
-  await publicSlot(env, caller);
+  const day = indianDayStart();
+  await publicSlot(env, caller, day);
   let res: Response;
   try {
     res = await fetch(VALHALLA_URL, {
@@ -188,11 +213,13 @@ async function routeWithValhalla(env: Env, points: LatLng[], caller: RouteCaller
         directions_type: 'none',
         shape_format: 'polyline6',
       }),
-      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(PUBLIC_TIMEOUT_MS)]) : AbortSignal.timeout(PUBLIC_TIMEOUT_MS),
+      signal: deadline(signal),
     });
   } catch {
+    await releasePublic(env, caller, day);
     throw BUSY();
   }
+  if (res.status === 429 || res.status >= 500) await releasePublic(env, caller, day);
   const route = parseValhalla(res.status, await res.json().catch(() => null));
   await cache?.put(key, Response.json(route, { headers: { 'Cache-Control': `public, max-age=${PUBLIC_CACHE_SECONDS}` } }));
   return route;
@@ -294,18 +321,35 @@ export async function planRoute(req: Request, env: Env, user: User) {
   const usage = await usageCounts(env, user.id, planId, now);
   // A road is never shorter than the straight line, so this refuses obviously-too-long trips
   // without spending a routing call.
+  // The same trip asked for again within a few minutes (a retry after the answer was lost on a weak
+  // signal) is the trip already counted, not a new one.
+  const toLat = Math.round(to.lat * 100) / 100;
+  const toLng = Math.round(to.lng * 100) / 100;
+  const recent = original
+    ? null
+    : await env.DB.prepare(
+        'SELECT id, counts, distance_km FROM trips WHERE user_id = ?1 AND to_lat = ?2 AND to_lng = ?3 AND created_at >= ?4 ORDER BY created_at DESC LIMIT 1',
+      )
+        .bind(user.id, toLat, toLng, new Date(now.getTime() - REPEAT_WINDOW_MS).toISOString())
+        .first<{ id: string; counts: 'short' | 'long'; distance_km: number }>();
   const early = decideTrip(planId, straightKm, usage, isReplan(straightKm), true);
-  if (!early.allowed) throw new HttpError(402, early.reason, early.message, { plan: planId, usage });
+  if (!early.allowed && !recent) throw new HttpError(402, early.reason, early.message, { plan: planId, usage });
 
   const routeFn = router(env, await routeCaller(req));
   const route = await routeFn([from, to]);
-  const decision = decideTrip(planId, route.distanceKm, usage, isReplan(route.distanceKm));
+  const repeat = recent && Math.abs(recent.distance_km - route.distanceKm) <= REPEAT_DISTANCE_KM ? recent : null;
+  if (!early.allowed && !repeat) throw new HttpError(402, early.reason, early.message, { plan: planId, usage });
+  const decision: TripDecision = repeat
+    ? { allowed: true, counts: repeat.counts }
+    : decideTrip(planId, route.distanceKm, usage, isReplan(route.distanceKm));
   if (!decision.allowed) {
     throw new HttpError(402, decision.reason, decision.message, { plan: planId, usage, distanceKm: Math.round(route.distanceKm) });
   }
 
   let id: string;
-  if (decision.counts === 'replan') {
+  if (repeat) {
+    id = repeat.id;
+  } else if (decision.counts === 'replan') {
     id = original!.id;
     const res = await env.DB.prepare('UPDATE trips SET replans = replans + 1 WHERE id = ?1 AND replans < ?2')
       .bind(id, MAX_REPLANS_PER_TRIP)
@@ -323,7 +367,7 @@ export async function planRoute(req: Request, env: Env, user: User) {
        WHERE (SELECT COUNT(*) FROM trips WHERE user_id = ?2 AND counts = ?3 AND created_at >= ?8) < ?9`,
     )
       // Only the destination area (~1 km) is kept, which is enough to recognise a re-plan.
-      .bind(id, user.id, decision.counts, route.distanceKm, Math.round(to.lat * 100) / 100, Math.round(to.lng * 100) / 100, now.toISOString(), since, limit)
+      .bind(id, user.id, decision.counts, route.distanceKm, toLat, toLng, now.toISOString(), since, limit)
       .run();
     if ((res.meta.changes ?? 0) === 0) {
       const latest = await usageCounts(env, user.id, planId, now);

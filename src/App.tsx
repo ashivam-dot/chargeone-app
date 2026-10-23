@@ -21,9 +21,7 @@ import { DEFAULT_PAINTS } from './ui/car/carDesigns.ts';
 import { useCarLink } from './ui/car/carLink.ts';
 import type { VoiceTrip } from './ui/copilot/CopilotScreen.tsx';
 import type { CarPosition } from './ui/drive/DriveMode.tsx';
-import { Feedback } from './ui/Feedback.tsx';
 import { FilterBar, type MapFilters } from './ui/FilterBar.tsx';
-import { Garage } from './ui/Garage.tsx';
 import { Onboarding } from './ui/onboarding/Onboarding.tsx';
 import { PlaceInput, type PickedPlace } from './ui/PlaceInput.tsx';
 import { PlaceSheet } from './ui/PlaceSheet.tsx';
@@ -39,6 +37,9 @@ import { YouScreen } from './ui/YouScreen.tsx';
 const CarScreen = lazy(() => import('./ui/car/CarScreen.tsx').then((m) => m.CarScreen));
 const CopilotScreen = lazy(() => import('./ui/copilot/CopilotScreen.tsx').then((m) => m.CopilotScreen));
 const DriveMode = lazy(() => import('./ui/drive/DriveMode.tsx').then((m) => m.DriveMode));
+// Feedback and the garage open on a tap, so they load then: it keeps the start-up bundle in budget.
+const Feedback = lazy(() => import('./ui/Feedback.tsx').then((m) => m.Feedback));
+const Garage = lazy(() => import('./ui/Garage.tsx').then((m) => m.Garage));
 const About = lazy(() => import('./ui/About.tsx').then((m) => m.About));
 const Plans = lazy(() => import('./ui/Plans.tsx').then((m) => m.Plans));
 /** Alias buckets, fetched only for an id the index doesn't list (src/data/aliasLookup.ts). */
@@ -64,6 +65,8 @@ const isMode = (v: unknown): v is MapMode => v === 'car' || v === '2w' || v === 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 /** Any solid colour: each model has its own official paints, and number lookup brings the car's own. */
 const isPaint = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+/** Forgets chargers whose details failed to load, so the next look at one reads it again. */
+const withoutFailed = (m: Map<string, Station | null>) => ([...m.values()].includes(null) ? new Map([...m].filter(([, v]) => v !== null)) : m);
 
 /** The last plan /api/me reported, so a paid user offline (or before /api/me answers) still gets their features. */
 interface CachedPlan {
@@ -173,9 +176,16 @@ export function App() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  useEffect(() => {
+  const dataLoading = useRef(false);
+  const dataLoaded = useRef(false);
+  /** Reads the charger data; again from Retry or when the connection comes back, if it failed. */
+  const loadData = useCallback(() => {
+    if (dataLoading.current || dataLoaded.current) return;
+    dataLoading.current = true;
+    setLoadError(null);
     loadDataset()
       .then(({ dataset: d, manifest: m }) => {
+        dataLoaded.current = true;
         setDataset(d);
         setManifest(m);
         const id = new URLSearchParams(location.search).get('s');
@@ -189,7 +199,14 @@ export function App() {
         // The index lists each station's own ids only; a link may use a merged record's or a retired one.
         else if (id) void resolveAlias(id).then((r) => r && open(d.stations.find((x) => x.c1Id === r.c1Id || x.id === r.legacyId)));
       })
-      .catch(() => setLoadError("Couldn't load the charger map. Check your connection and reload."));
+      .catch(() => setLoadError("Couldn't load the charger map. Check your connection and try again."))
+      .finally(() => {
+        dataLoading.current = false;
+      });
+  }, []);
+
+  useEffect(() => {
+    loadData();
     const placeId = new URLSearchParams(location.search).get('p');
     if (placeId) {
       ensurePlaces().then((d) => {
@@ -250,7 +267,13 @@ export function App() {
       refreshStatuses();
       refreshMe();
     });
-    const onOnline = () => setOnline(true);
+    const onOnline = () => {
+      setOnline(true);
+      // Back in signal: what failed while out of it is read again.
+      loadData();
+      setDetails((prev) => withoutFailed(prev));
+      refreshStatuses();
+    };
     const onOffline = () => setOnline(false);
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
@@ -260,7 +283,7 @@ export function App() {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, [refreshStatuses, refreshMe]);
+  }, [refreshStatuses, refreshMe, loadData]);
 
   useEffect(() => {
     if (!me) return;
@@ -337,6 +360,8 @@ export function App() {
       userPicked.current = true;
       setSelectedId(id);
       setSelectedPlace(null);
+      // Opening a charger whose details failed before (say, in a dead zone) tries again.
+      setDetails(withoutFailed);
       const url = new URL(location.href);
       url.searchParams.delete('p');
       if (id) url.searchParams.set('s', id);
@@ -580,7 +605,10 @@ export function App() {
       {!online && <div class="banner" role="status">You're offline. The map and saved chargers still work; status may be out of date.</div>}
       {loadError && (
         <div class="banner banner--error" role="alert">
-          {loadError}
+          {loadError}{' '}
+          <button type="button" class="link link--inline" onClick={loadData} data-testid="retry-data">
+            Try again
+          </button>
         </div>
       )}
 
@@ -598,6 +626,8 @@ export function App() {
           <TripPlanner
             key={tripKey}
             stations={stations}
+            dataState={dataset ? 'ready' : loadError ? 'failed' : 'loading'}
+            onRetryData={loadData}
             statuses={statuses}
             vehicle={vehicle}
             me={me}
@@ -646,6 +676,7 @@ export function App() {
           placesFailed={placesFailed}
           onOpenPlace={openPlace}
           detailFailed={detailFailed}
+          onRetryDetail={() => setDetails(withoutFailed)}
         />
       )}
 

@@ -28,6 +28,8 @@ interface Props {
   onOpenPlace: (p: Place) => void;
   /** True when the charger's details (hours, price, address, sources) couldn't be read. */
   detailFailed?: boolean;
+  /** Read the charger's details again after they failed. */
+  onRetryDetail?: () => void;
 }
 
 const GOOD: ReportKind[] = ['worked', 'charging_now'];
@@ -107,7 +109,9 @@ export function StationSheet(props: Props) {
   const stays = useMemo(() => sortStays(nearbyPlaces(places, station.id, 's')), [places, station.id]);
   const area = places?.area[station.id] ?? null;
   const operatorApp = useMemo(() => operatorAppFor(station), [station.id]);
-  const [reports, setReports] = useState<Report[] | null>(null);
+  // 'error' when the reports couldn't be read: that is not the same as "no reports yet".
+  const [reports, setReports] = useState<Report[] | 'error' | null>(null);
+  const [reportsTry, setReportsTry] = useState(0);
   const [sending, setSending] = useState<ReportKind | null>(null);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [kw, setKw] = useState('');
@@ -123,11 +127,11 @@ export function StationSheet(props: Props) {
     api
       .reports(reportId)
       .then((r) => live && setReports(r.reports))
-      .catch(() => live && setReports([]));
+      .catch(() => live && setReports('error'));
     return () => {
       live = false;
     };
-  }, [reportId]);
+  }, [reportId, reportsTry]);
 
   const report = async (kind: ReportKind) => {
     if (!signedIn) {
@@ -306,11 +310,26 @@ export function StationSheet(props: Props) {
           </div>
         )}
       </dl>
+      {pending && props.detailFailed && props.onRetryDetail && (
+        <p class="small muted" data-testid="detail-failed">
+          Couldn't load this charger's hours and price. Check your connection.{' '}
+          <button class="link link--inline" onClick={props.onRetryDetail} data-testid="retry-detail">
+            Try again
+          </button>
+        </p>
+      )}
 
       <section aria-label="Recent reports">
         <h3>Recent reports</h3>
         {reports === null ? (
           <p class="muted">Loading…</p>
+        ) : reports === 'error' ? (
+          <p class="muted" data-testid="reports-error">
+            Couldn't load reports. Check your connection.{' '}
+            <button class="link link--inline" onClick={() => setReportsTry((n) => n + 1)} data-testid="retry-reports">
+              Try again
+            </button>
+          </p>
         ) : reports.length === 0 ? (
           <p class="muted">No reports yet.</p>
         ) : (

@@ -42,10 +42,26 @@ export default defineConfig({
         // Charger and city pages are real documents for search engines, not app routes.
         // The admin console is never cached or served offline.
         navigateFallbackDenylist: [/^\/api\//, /^\/charger\//, /^\/ev-charging\//, /^\/admin/],
-        globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
+        // The start-up data (charger index, manifest, cell list) and both map styles are installed with the
+        // app: the first visit fetches them before the service worker is in control, so the runtime cache
+        // never saw them, and a phone that opened the link once then went out of signal had an empty map.
+        // Workbox revisions each file by its hash, so a data build updates them with the next app update.
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}', 'data/{index,manifest,cells}.json', 'map/*.json'],
         // Font subsets for scripts the app never shows still load on demand, just not at install.
         globIgnores: ['charger/**', 'ev-charging/**', 'seo.css', 'admin.html', 'assets/admin-*', '**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        // The server answers /terms.html and /index.html with a redirect to /terms and /. Precache those clean
+        // URLs, so installing doesn't chase a redirect (on an http origin with upgrade-insecure-requests the
+        // redirect went to https and the install never finished, so the app never worked offline).
+        manifestTransforms: [
+          async (entries) => ({
+            manifest: entries.map((e) =>
+              e.url === 'index.html' ? { ...e, url: '/' } : /^[^/]+\.html$/.test(e.url) ? { ...e, url: e.url.slice(0, -'.html'.length) } : e,
+            ),
+            warnings: [],
+          }),
+        ],
+        navigateFallback: '/',
         runtimeCaching: [
           {
             // A charger's details, read when it's opened. Keyed by data version (?v=), so old ones age out.

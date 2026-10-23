@@ -53,6 +53,28 @@ export function speedUnknown(s: Pick<Station, 'speed' | 'maxKw'>): boolean {
   return s.speed === 'unknown' && s.maxKw === null;
 }
 
+const SOURCE_NAME = { osm: 'OpenStreetMap', ocm: 'Open Charge Map' } as const;
+
+const monthYear = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+
+/** A source date within this many days counts as "recently" seen. */
+const RECENT_SOURCE_DAYS = 90;
+
+/** The map sources behind a station, by name. */
+function sourceNames(station: Station): string {
+  const names = new Set<string>(station.sources.map((s) => s.name));
+  for (const r of station.records ?? []) names.add(SOURCE_NAME[r.source]);
+  return [...names].join(' and ') || 'the map sources';
+}
+
+/** The newest date a source saw the station, if any is valid. */
+function lastSeen(station: Station): string | null {
+  const dates = [station.observedAt, ...station.sources.map((s) => s.updated), ...(station.records ?? []).map((r) => r.observedAt)].filter(
+    (d): d is string => Boolean(d) && Number.isFinite(Date.parse(d!)),
+  );
+  return dates.sort((a, b) => Date.parse(a) - Date.parse(b)).at(-1) ?? null;
+}
+
 /** One line on why the badge says what it says. */
 export function trustReason(station: Station, status: StationStatus | undefined, now: Date): string {
   const badge = trustBadge(station, status, now);
@@ -60,14 +82,22 @@ export function trustReason(station: Station, status: StationStatus | undefined,
   if (badge === 'verified') return 'A driver charged here in the last two weeks.';
   const flags = new Set(station.flags ?? []);
   if (flags.has('ocm-status-30') || station.status === 'temporarily_unavailable') return 'A source lists it as temporarily unavailable.';
-  if (badge === 'likely') return 'Recently confirmed by the map sources, but no recent driver report.';
+  // The flags say more than the score: a bulk import or an edit date is no sign anyone checked the charger.
   if (flags.has('bulk-unverified')) return 'Added in a bulk import and never checked since. It may not exist or work.';
+  const seen = lastSeen(station);
+  const by = sourceNames(station);
+  if (flags.has('edit-date-only')) {
+    return `Listed by ${by}${seen ? ` (last edited ${monthYear(seen)})` : ''}; the date is only an edit, and no driver has reported it recently.`;
+  }
+  if (badge === 'likely') {
+    const what = station.operator && station.connectors.length ? 'with operator and plug details ' : '';
+    if (!seen) return `Listed ${what}by ${by} (date not given); no recent driver report.`;
+    const ageDays = (now.getTime() - Date.parse(seen)) / DAY;
+    if (ageDays <= RECENT_SOURCE_DAYS) return `Recently seen by ${by} (${monthYear(seen)}), but no recent driver report.`;
+    return `Listed ${what}by ${by} (last seen ${monthYear(seen)}); no recent driver report.`;
+  }
   return 'No recent check by the map sources or drivers. Confirm before you rely on it.';
 }
-
-const SOURCE_NAME = { osm: 'OpenStreetMap', ocm: 'Open Charge Map' } as const;
-
-const monthYear = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 
 function describe(source: 'osm' | 'ocm', observedAt: string | null, verified: boolean | null, method: FieldClaim['method'] = 'mapped'): string {
   const name = SOURCE_NAME[source];

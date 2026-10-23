@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Station } from '../data/model.ts';
 import type { StationStatus } from '../shared/status.ts';
-import { VEHICLES, myVehicleFromModel } from '../shared/vehicles.ts';
+import { VEHICLES, baseWhPerKm, myVehicleFromModel } from '../shared/vehicles.ts';
 import { RouteIndex, type Coord } from './geometry.ts';
 import { DEFAULT_OPTIONS, chargeMinutes, cumulativeEnergy, navigationUrl, planTrip, type PlanInput } from './planner.ts';
 
@@ -221,5 +221,53 @@ describe('routes without elevation', () => {
     expect(a.every(Number.isFinite)).toBe(true);
     expect(a.at(-1)).toBeGreaterThan(0);
     expect(a.at(-1)).toBeCloseTo(b.at(-1)!, 9);
+  });
+});
+
+describe('stops the planner must not count on', () => {
+  const broken = (id: string): StationStatus => ({
+    stationId: id,
+    lastWorkedAt: null,
+    lastWorkedKw: null,
+    lastWorkedVehicle: null,
+    inUseSince: null,
+    queueAt: null,
+    problemAt: '2026-10-20T08:00:00Z',
+    problemKind: 'broken',
+    problemReports: 2,
+    reports7d: 2,
+  });
+  const loose = { ...DEFAULT_OPTIONS, allowUnverified: true };
+
+  it('never plans a charger reported broken, even with unverified stops allowed or as an extra option', () => {
+    const stations = [dcStation('bad', 190, { confidence: 0.3 }), dcStation('c', 300)];
+    const statuses = new Map([['bad', broken('bad')]]);
+    const strict = plan(400, stations, statuses);
+    expect(strict.stops.map((s) => s.station.id)).not.toContain('bad');
+    expect(strict.extras.map((s) => s.station.id)).not.toContain('bad');
+    const p = planTrip({ route: route(400), stations, statuses, vehicle: nexon, options: loose, now });
+    expect(p.stops.map((s) => s.station.id)).not.toContain('bad');
+    expect(p.feasible).toBe(false);
+  });
+
+  it('treats a customers-only charger as unverified: an extra option, with a note when allowed', () => {
+    const stations = [dcStation('hotel', 190, { access: 'customers' }), dcStation('c', 300)];
+    const strict = plan(400, stations);
+    expect(strict.stops.map((s) => s.station.id)).not.toContain('hotel');
+    expect(strict.extras.map((s) => s.station.id)).toContain('hotel');
+    const p = planTrip({ route: route(400), stations, statuses: new Map(), vehicle: nexon, options: loose, now });
+    const hotel = p.stops.find((s) => s.station.id === 'hotel')!;
+    expect(hotel.trusted).toBe(false);
+    expect(hotel.notes.join(' ')).toMatch(/Customers only/);
+  });
+
+  it('takes the drive back to the route out of the charge you leave a charger with', () => {
+    // The same trip with the only charger beside the road and ~4 km off it; both stops charge to 100%.
+    const near = plan(450, [dcStation('a', 190)]);
+    const far = plan(450, [dcStation('a', 190, { lng: LNG + 0.028 })]);
+    expect(near.stops[0].departSocPct).toBe(far.stops[0].departSocPct);
+    const backPct = ((far.stops[0].detourKm - near.stops[0].detourKm) * baseWhPerKm(nexon)) / 1000 / nexon.batteryKwh * 100;
+    expect(backPct).toBeGreaterThan(1);
+    expect(near.arrivalSocPct - far.arrivalSocPct).toBeCloseTo(backPct, 0);
   });
 });

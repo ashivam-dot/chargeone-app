@@ -168,7 +168,12 @@ export function Car3D(props: Car3DProps) {
         callbacks.current.onError?.();
         return;
       }
-      cleanups.push(() => renderer.dispose());
+      // dispose() alone leaves the WebGL context alive until GC; browsers cap live contexts (~16), so after
+      // enough Car/Explore switches the oldest one, the map's, was lost. Release it now.
+      cleanups.push(() => {
+        renderer.dispose();
+        renderer.forceContextLoss();
+      });
       let pixelRatio = software ? 1 : Math.min(devicePixelRatio, 2);
       renderer.setPixelRatio(pixelRatio);
       renderer.toneMapping = ACESFilmicToneMapping;

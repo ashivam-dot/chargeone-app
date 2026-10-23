@@ -192,10 +192,18 @@ export function chargeOption(
 
 /**
  * A charger we'd plan a stop at: trusted (PLAN_MIN_CONFIDENCE), the car's plug confirmed, no recent
- * problem, and DC, unless the car can only charge on AC.
+ * problem, open to the public (a hotel's or showroom's own charger may turn a passing driver away),
+ * and DC, unless the car can only charge on AC.
  */
-function isTrusted(mode: ChargeMode, verified: boolean, live: LiveState, trust: number, vehicle: MyVehicle): boolean {
-  if (live === 'problem' || !verified || trust < PLAN_MIN_CONFIDENCE) return false;
+export function isTrusted(
+  mode: ChargeMode,
+  verified: boolean,
+  live: LiveState,
+  trust: number,
+  vehicle: MyVehicle,
+  access: Station['access'] = 'unknown',
+): boolean {
+  if (live === 'problem' || !verified || trust < PLAN_MIN_CONFIDENCE || access === 'customers') return false;
   return mode === 'dc' || !(vehicle.dcConnector && vehicle.maxDcKw);
 }
 
@@ -227,7 +235,7 @@ export function findCandidates(index: RouteIndex, input: PlanInput, maxOffKm: nu
       live,
       tier: tierFor(option.mode, option.verified, live),
       trust,
-      trusted: isTrusted(option.mode, option.verified, live, trust, input.vehicle),
+      trusted: isTrusted(option.mode, option.verified, live, trust, input.vehicle, station.access),
     });
   }
   return out.sort((a, b) => a.alongKm - b.alongKm);
@@ -291,11 +299,14 @@ export function planTrip(input: PlanInput): TripPlan {
 
   // Backups come from every compatible charger without a recent problem, ours-to-trust first.
   const backupPool = candidates.filter((c) => c.live !== 'problem' && (c.trusted || c.tier <= 2));
-  const main = greedy(strict ? candidates.filter((c) => c.trusted) : candidates);
+  // A charger a driver just reported broken is never a stop, even among the extra options: it is
+  // only ever shown as a warning on the map.
+  const plannable = candidates.filter((c) => c.live !== 'problem');
+  const main = greedy(strict ? plannable.filter((c) => c.trusted) : plannable);
   let extras: Stop[] = [];
   let extrasFeasible = false;
   if (strict && main.gapAtKm !== null) {
-    const loose = greedy(candidates);
+    const loose = greedy(plannable);
     extras = loose.stops.filter((s) => !s.trusted);
     extrasFeasible = loose.gapAtKm === null && loose.socKwh - (destEnergy - loose.posEnergy) >= kwhOf(Math.min(options.arriveReservePct, 5));
   }
@@ -337,13 +348,15 @@ export function planTrip(input: PlanInput): TripPlan {
       const remaining = destEnergy - stopEnergy + (choice.detourKm * baseWhPerKm(vehicle)) / 1000;
       const needForDest = remaining + kwhOf(options.arriveReservePct) + kwhOf(5);
 
+      // Getting back to the route from a charger off it uses charge too.
+      const returnKwh = (choice.detourKm * baseWhPerKm(vehicle)) / 1000;
       let departPct: number;
       if (needForDest <= kwhOf(options.chargeToPct)) {
         departPct = Math.max(pct(needForDest), pct(arriveKwh) + 10, 40);
       } else {
         departPct = options.chargeToPct;
         const nextReachable = pool.some(
-          (c) => c.alongKm > choice.alongKm + 1 && arrival(c, stopEnergy, kwhOf(departPct)) >= kwhOf(options.stopReservePct),
+          (c) => c.alongKm > choice.alongKm + 1 && arrival(c, stopEnergy, kwhOf(departPct) - returnKwh) >= kwhOf(options.stopReservePct),
         );
         if (!nextReachable) departPct = 100;
       }
@@ -363,6 +376,7 @@ export function planTrip(input: PlanInput): TripPlan {
       if (choice.live === 'in_use') notes.push('Reported in use recently, so you may have to wait');
       if (departPct > options.chargeToPct) notes.push(`Charge to ${departPct}% to reach the next charger`);
       if (choice.detourKm >= 1) notes.push(`${round1(choice.detourKm)} km off the route`);
+      if (choice.station.access === 'customers') notes.push('Customers only: the site may charge only its own guests or buyers, so call ahead');
 
       const confidence: Confidence = !choice.trusted
         ? 'low'
@@ -414,7 +428,7 @@ export function planTrip(input: PlanInput): TripPlan {
       used.add(choice.station.id);
       posKm = choice.alongKm;
       posEnergy = stopEnergy;
-      socKwh = kwhOf(departPct);
+      socKwh = kwhOf(departPct) - returnKwh;
     }
     return { stops, gapAtKm, posKm, posEnergy, socKwh };
   }

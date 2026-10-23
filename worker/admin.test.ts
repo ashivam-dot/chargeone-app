@@ -322,7 +322,9 @@ describe('test sessions', () => {
     expect(out.headers.get('Set-Cookie')).toContain('Max-Age=0');
     expect((await browser('GET', '/api/me')).body).toMatchObject({ user: null, tier: 'basic' });
     expect((await browser('POST', '/api/route', trip)).status).toBe(200);
-    expect((await browser('POST', '/api/route', trip)).status).toBe(402);
+    // A retry of the same trip is answered; a second, different trip needs a plan.
+    expect((await browser('POST', '/api/route', trip)).status).toBe(200);
+    expect((await browser('POST', '/api/route', { ...trip, to: { lat: 12.9, lng: 77.7 } })).status).toBe(402);
     const again = await browser('POST', '/api/admin/test-session', { plan: 'basic' });
     expect(again.body.basicReset).toBe(true);
     expect((await browser('POST', '/api/route', trip)).status).toBe(200);

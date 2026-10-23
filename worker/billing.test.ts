@@ -619,9 +619,10 @@ describe('quota enforcement is on the server', () => {
       Response.json({ code: 'Ok', routes: [{ distance: 20000, duration: 1800, geometry: { coordinates: [[77.6, 12.97], [77.66, 12.84]] } }] }),
     );
     await api('POST', '/api/auth/dev', { email: 'free@local.test' });
-    const trip = { from: { lat: 12.9756, lng: 77.6066 }, to: { lat: 12.8452, lng: 77.6602 } };
-    for (let i = 0; i < 3; i++) expect((await api('POST', '/api/route', trip)).status).toBe(200);
-    const fourth = await api('POST', '/api/route', trip);
+    // Different destinations: asking for the same trip again within minutes is a retry, not a new trip.
+    const trip = (i: number) => ({ from: { lat: 12.9756, lng: 77.6066 }, to: { lat: 12.8452 - i * 0.05, lng: 77.6602 } });
+    for (let i = 0; i < 3; i++) expect((await api('POST', '/api/route', trip(i))).status).toBe(200);
+    const fourth = await api('POST', '/api/route', trip(3));
     expect(fourth.status).toBe(402);
     expect(fourth.body.error).toBe('daily_limit');
   });
@@ -632,8 +633,8 @@ describe('quota enforcement is on the server', () => {
       Response.json({ code: 'Ok', routes: [{ distance: 20000, duration: 1800, geometry: { coordinates: [[77.6, 12.97], [77.66, 12.84]] } }] }),
     );
     await api('POST', '/api/auth/dev', { email: 'burst@local.test' });
-    const trip = { from: { lat: 12.9756, lng: 77.6066 }, to: { lat: 12.8452, lng: 77.6602 } };
-    const results = await Promise.all(Array.from({ length: 6 }, () => api('POST', '/api/route', trip)));
+    const trip = (i: number) => ({ from: { lat: 12.9756, lng: 77.6066 }, to: { lat: 12.8452 - i * 0.05, lng: 77.6602 } });
+    const results = await Promise.all(Array.from({ length: 6 }, (_, i) => api('POST', '/api/route', trip(i))));
     expect(results.filter((r) => r.status === 200)).toHaveLength(3);
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM trips').get()).toMatchObject({ n: 3 });
   });
@@ -674,6 +675,23 @@ describe('quota enforcement is on the server', () => {
     km = 290;
     const again = await api('POST', '/api/route', { from: { lat: 12.9, lng: 77.5 }, to, tripId: first.body.tripId });
     expect(again.body.counted).toBe('replan');
+  });
+
+  it('answers a retry of the same trip without counting it again, even at the limit', async () => {
+    const { api, sqlite } = setup();
+    vi.stubGlobal('fetch', async () =>
+      Response.json({ code: 'Ok', routes: [{ distance: 20000, duration: 1800, geometry: { coordinates: [[77.6, 12.97], [77.66, 12.84]] } }] }),
+    );
+    await api('POST', '/api/auth/dev', { email: 'retry@local.test' });
+    const trip = (i: number) => ({ from: { lat: 12.9756, lng: 77.6066 }, to: { lat: 12.8452 - i * 0.05, lng: 77.6602 } });
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) ids.push((await api('POST', '/api/route', trip(i))).body.tripId);
+    // The answer to the third was lost on a weak signal; the phone asks again.
+    const retry = await api('POST', '/api/route', trip(2));
+    expect(retry.status).toBe(200);
+    expect(retry.body).toMatchObject({ tripId: ids[2], counted: 'short', usage: { shortToday: 3 } });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM trips').get()).toMatchObject({ n: 3 });
+    expect((await api('POST', '/api/route', trip(3))).status).toBe(402);
   });
 });
 

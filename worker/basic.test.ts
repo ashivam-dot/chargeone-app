@@ -44,11 +44,25 @@ describe('Basic trips without signing in', () => {
     expect(first.body.route.coords.length).toBeGreaterThan(10);
     expect((await api('GET', '/api/me')).body.basicToday).toBe(1);
 
-    const second = await api('POST', '/api/route', short);
+    const second = await api('POST', '/api/route', { from: MG_ROAD, to: { lat: 12.91, lng: 77.64 } });
     expect(second.status).toBe(402);
     expect(second.body).toMatchObject({ error: 'daily_limit', usage: { shortToday: 1, longInWindow: 0 } });
     expect(second.body).toMatchObject({ scope: 'device', tier: 'basic' });
     expect(second.body.message).toBe("Basic covers 1 trip up to 100 km a day, and this phone has used today's trip. It resets at midnight, India time.");
+  });
+
+  it('answers a retry of the same trip without using another one', async () => {
+    const { guest, stub } = setup();
+    const api = guest();
+    expect((await api('POST', '/api/route', short)).status).toBe(200);
+    // The answer was lost on a weak signal and the phone asks again: same trip, nothing more counted.
+    const retry = await api('POST', '/api/route', short);
+    expect(retry.status).toBe(200);
+    expect(retry.body).toMatchObject({ counted: 'short', usage: { shortToday: 1 } });
+    expect(stub.calls).toHaveLength(2);
+    expect((await api('GET', '/api/me')).body.basicToday).toBe(1);
+    // Another phone on the network still has its own trip.
+    expect((await guest(OTHER_DEVICE)('POST', '/api/route', short)).status).toBe(200);
   });
 
   it('refuses long trips before routing, and trips whose road is too long without counting them', async () => {
@@ -107,7 +121,7 @@ describe('Basic trips without signing in', () => {
   it('holds the limit when requests arrive together', async () => {
     const { guest } = setup();
     const api = guest();
-    const results = await Promise.all(Array.from({ length: 4 }, () => api('POST', '/api/route', short)));
+    const results = await Promise.all(Array.from({ length: 4 }, (_, i) => api('POST', '/api/route', { from: MG_ROAD, to: { lat: 12.8452 + i * 0.01, lng: 77.6602 } })));
     expect(results.filter((r) => r.status === 200)).toHaveLength(1);
   });
 

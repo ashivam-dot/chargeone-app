@@ -1,4 +1,5 @@
 import type { Station } from '../data/model.ts';
+import { PLAN_MIN_CONFIDENCE, speedUnknown, trustScore } from '../data/trust.ts';
 import type { Place, PlacesData } from '../data/places.ts';
 import { liveState } from '../shared/status.ts';
 import { RouteIndex, type Coord, type RouteGeometry } from './geometry.ts';
@@ -19,6 +20,10 @@ export interface Overnight {
   hoursToFull: number;
   /** Battery after a night on this charger; below 100 on slow AC. */
   morningSocPct: number;
+  /** A charger we're fairly sure of; false only when the driver allowed unverified stops. */
+  trusted: boolean;
+  /** No source gives this charger's speed, so powerKw, hoursToFull and morningSocPct are guesses. */
+  speedUnknown: boolean;
   stays: NearbyPlace[];
   food: NearbyPlace[];
 }
@@ -90,6 +95,7 @@ interface OvernightCandidate {
   detourKm: number;
   mode: ChargeMode;
   powerKw: number;
+  trusted: boolean;
   stays: NearbyPlace[];
 }
 
@@ -98,7 +104,13 @@ function overnightCandidates(index: RouteIndex, input: JourneyInput): OvernightC
   for (const station of input.stations) {
     const option = chargeOption(station, input.vehicle);
     if (!option) continue;
-    if (liveState(input.statuses.get(station.id), input.now) === 'problem') continue;
+    const status = input.statuses.get(station.id);
+    const live = liveState(status, input.now);
+    if (live === 'problem') continue;
+    // A night's charge is the whole next day's range: the same bar as a charging stop (AC is fine overnight),
+    // unless the driver allowed unverified chargers.
+    const trusted = option.verified && trustScore(station, status, input.now) >= PLAN_MIN_CONFIDENCE && station.access !== 'customers';
+    if (!trusted && !input.options.allowUnverified) continue;
     const p = index.project(station.lng, station.lat, OVERNIGHT_CORRIDOR_KM);
     if (!p) continue;
     out.push({
@@ -107,6 +119,7 @@ function overnightCandidates(index: RouteIndex, input: JourneyInput): OvernightC
       detourKm: p.offKm * 1.4,
       mode: option.mode,
       powerKw: option.powerKw,
+      trusted,
       stays: sortStays(nearbyPlaces(input.places, station.id, 's')),
     });
   }
@@ -202,6 +215,8 @@ export function planJourney(input: JourneyInput): Journey {
         powerKw: Math.round(overnight.powerKw * 10) / 10,
         hoursToFull: hoursToFull(plan.arrivalSocPct, input.vehicle.batteryKwh, overnight.mode, overnight.powerKw),
         morningSocPct: morning,
+        trusted: overnight.trusted,
+        speedUnknown: speedUnknown(overnight.station),
         stays: overnight.stays,
         food: nearbyPlaces(input.places, overnight.station.id, 'f'),
       },

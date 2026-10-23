@@ -11,8 +11,9 @@ import {
   releaseSlot,
   requireDevice,
   slotCount,
+  type LatLng,
 } from './http.ts';
-import { compactCoords, router } from './routing.ts';
+import { compactCoords, router, type RouteResult } from './routing.ts';
 import { distanceMetres } from './stations.ts';
 
 /** Phones on one Wi-Fi or carrier IP share this many Basic trips a day. */
@@ -79,10 +80,35 @@ export async function planBasicRoute(req: Request, env: Env) {
   if (straightKm > MAX_KM) throw tooLong(straightKm, true);
 
   const day = indianDayStart();
+  // The same trip again today (a retry after the answer was lost on a weak signal, or the planner
+  // reopened) is the trip already counted, so it is routed again without using another one.
+  const sameTrip = tripSlot(device, from, to);
+  if ((await slotCount(env.DB, sameTrip, day)) > 0) {
+    const route = await routeOnce(req, env, ip, day, from, to);
+    return answer(route, await slotCount(env.DB, deviceSlot(device), day));
+  }
   const [used, ipUsed] = await Promise.all([slotCount(env.DB, deviceSlot(device), day), slotCount(env.DB, ipSlot(ip), day)]);
   if (used >= BASIC.shortTripsPerDay) throw dailyLimit(used, 'device');
   if (ipUsed >= BASIC_TRIPS_PER_IP) throw dailyLimit(used, 'network');
 
+  const route = await routeOnce(req, env, ip, day, from, to);
+
+  const count = await claimSlot(env.DB, deviceSlot(device), BASIC.shortTripsPerDay, day);
+  if (count === null) throw dailyLimit(BASIC.shortTripsPerDay, 'device');
+  if ((await claimSlot(env.DB, ipSlot(ip), BASIC_TRIPS_PER_IP, day)) === null) {
+    await releaseSlot(env.DB, deviceSlot(device), day);
+    throw dailyLimit(count - 1, 'network');
+  }
+  await claimSlot(env.DB, sameTrip, 1, day);
+  return answer(route, count);
+}
+
+/** The trip's two ends to ~10 m, so a retry of the same request matches and a different trip doesn't. */
+const tripSlot = (device: string, from: LatLng, to: LatLng) =>
+  `basic-trip:${device}:${[from, to].map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join(';')}`;
+
+/** One routing call for Basic, held against the network's daily share unless no answer came back. */
+async function routeOnce(req: Request, env: Env, ip: string, day: number, from: LatLng, to: LatLng): Promise<RouteResult> {
   if ((await claimSlot(env.DB, routingSlot(ip), BASIC_ROUTINGS_PER_IP, day)) === null) {
     throw new HttpError(429, 'rate_limited', "This network has tried a lot of routes today that Basic doesn't cover. Please try again tomorrow.");
   }
@@ -91,22 +117,17 @@ export async function planBasicRoute(req: Request, env: Env) {
     route = await router(env, { ip, origin: new URL(req.url).origin })([from, to]);
   } catch (err) {
     // Busy or out of capacity: no answer came back, so the attempt isn't held against the network.
-    if (err instanceof HttpError && (err.status === 429 || err.status >= 500)) await releaseSlot(env.DB, routingSlot(ip), day);
+    if (!(err instanceof HttpError) || err.status === 429 || err.status >= 500) await releaseSlot(env.DB, routingSlot(ip), day);
     throw err;
   }
   if (route.distanceKm > MAX_KM) throw tooLong(route.distanceKm, false);
-
-  const count = await claimSlot(env.DB, deviceSlot(device), BASIC.shortTripsPerDay, day);
-  if (count === null) throw dailyLimit(BASIC.shortTripsPerDay, 'device');
-  if ((await claimSlot(env.DB, ipSlot(ip), BASIC_TRIPS_PER_IP, day)) === null) {
-    await releaseSlot(env.DB, deviceSlot(device), day);
-    throw dailyLimit(count - 1, 'network');
-  }
-  return {
-    tripId: crypto.randomUUID(),
-    counted: 'short' as const,
-    route: { ...route, coords: compactCoords(route.coords) },
-    plan: 'free' as const,
-    usage: usage(count),
-  };
+  return route;
 }
+
+const answer = (route: RouteResult, count: number) => ({
+  tripId: crypto.randomUUID(),
+  counted: 'short' as const,
+  route: { ...route, coords: compactCoords(route.coords) },
+  plan: 'free' as const,
+  usage: usage(count),
+});

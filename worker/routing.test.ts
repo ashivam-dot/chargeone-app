@@ -145,6 +145,61 @@ describe('router without an openrouteservice key', () => {
   });
 });
 
+describe('public router outages', () => {
+  const count = (sqlite: ReturnType<typeof production>['sqlite'], key: string) =>
+    (sqlite.prepare('SELECT count FROM rate_limits WHERE key = ?1').get(key) as { count: number } | undefined)?.count ?? 0;
+
+  const replies: Array<[string, () => Promise<Response>]> = [
+    [
+      'a network error',
+      async () => {
+        throw new TypeError('fetch failed');
+      },
+    ],
+    ['a 503', async () => new Response('down', { status: 503 })],
+    ['a 429', async () => new Response('slow down', { status: 429 })],
+  ];
+  for (const [what, reply] of replies) {
+    it(`gives the day's public calls back after ${what}`, async () => {
+      vi.stubGlobal('fetch', reply);
+      const { env, sqlite } = production();
+      expect(await refusal(router(env, CALLER)([MG_ROAD, ELECTRONIC_CITY]))).toMatchObject({ status: 502, code: 'routing_unavailable' });
+      expect(count(sqlite, 'public-route:day')).toBe(0);
+      expect(count(sqlite, `public-route-ip:${CALLER.ip}`)).toBe(0);
+    });
+  }
+
+  it('keeps counting calls that got an answer, even "no route"', async () => {
+    vi.stubGlobal('fetch', valhallaStub(NO_ROUTE).fetch);
+    const { env, sqlite } = production();
+    expect((await refusal(router(env, CALLER)([MG_ROAD, ELECTRONIC_CITY]))).code).toBe('no_route');
+    expect(count(sqlite, 'public-route:day')).toBe(1);
+    expect(count(sqlite, `public-route-ip:${CALLER.ip}`)).toBe(1);
+  });
+
+  it('gives the day slots back when no second comes free', async () => {
+    const stub = valhallaStub();
+    vi.stubGlobal('fetch', stub.fetch);
+    const { env, sqlite } = production();
+    // The clock stands still and someone else holds that second, so all four waits fail.
+    const frozen = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(frozen);
+    sqlite.prepare('INSERT OR REPLACE INTO rate_limits (key, window_start, count) VALUES (?1, ?2, 1)').run('public-route:second', Math.floor(frozen / 1000));
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      const p = refusal(router(env, CALLER)([MG_ROAD, ELECTRONIC_CITY]));
+      for (let i = 0; i < 6; i++) await vi.advanceTimersByTimeAsync(1100);
+      expect(await p).toMatchObject({ code: 'routing_unavailable' });
+    } finally {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
+    expect(stub.calls).toHaveLength(0);
+    expect(count(sqlite, 'public-route:day')).toBe(0);
+    expect(count(sqlite, `public-route-ip:${CALLER.ip}`)).toBe(0);
+  });
+});
+
 describe('router with an openrouteservice key', () => {
   it('falls back to the public router when openrouteservice is busy', async () => {
     const valhalla = valhallaStub();
@@ -172,4 +227,31 @@ describe('router with an openrouteservice key', () => {
     const { env } = production({ ORS_API_KEY: 'test-key' });
     expect((await refusal(router(env, CALLER, false)([MG_ROAD, ELECTRONIC_CITY]))).code).toBe('routing_unavailable');
   });
+
+  const failures: Array<[string, () => Promise<Response>]> = [
+    [
+      'cannot be reached',
+      async () => {
+        throw new TypeError('fetch failed');
+      },
+    ],
+    ['answers with something that is not JSON', async () => new Response('<html>gateway</html>', { status: 200 })],
+  ];
+  for (const [what, ors] of failures) {
+    it(`falls back to the public router when openrouteservice ${what}, with a deadline on the call`, async () => {
+      const valhalla = valhallaStub();
+      const signals: Array<AbortSignal | null | undefined> = [];
+      vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input instanceof Request ? input.url : input);
+        if (url.startsWith('https://api.heigit.org/')) {
+          signals.push(init?.signal);
+          return ors();
+        }
+        return valhalla.fetch(input, init);
+      });
+      const { env } = production({ ORS_API_KEY: 'test-key' });
+      expect((await router(env, CALLER)([MG_ROAD, ELECTRONIC_CITY])).source).toBe('valhalla');
+      expect(signals[0]).toBeInstanceOf(AbortSignal);
+    });
+  }
 });

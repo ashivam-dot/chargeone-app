@@ -68,7 +68,7 @@ const day = (startKm: number, endKm: number, p: TripPlan, overnightName: string 
   plan: p,
   startSocPct: 80,
   overnight: overnightName
-    ? { station: station(overnightName), alongKm: endKm, mode: 'ac', powerKw: 7.4, hoursToFull: 6, morningSocPct: 95, stays: [], food: [] }
+    ? { station: station(overnightName), alongKm: endKm, mode: 'ac', powerKw: 7.4, hoursToFull: 6, morningSocPct: 95, trusted: true, speedUnknown: false, stays: [], food: [] }
     : null,
 });
 

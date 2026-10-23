@@ -529,6 +529,8 @@ export async function testSession(req: Request, env: Env, secure: boolean): Prom
     const ip = await clientKey(req);
     const keys = [`basic-ip:${ip}`, `basic-route-ip:${ip}`, ...(device ? [`basic-dev:${device}`] : [])];
     const res = await env.DB.prepare(`DELETE FROM rate_limits WHERE key IN (${keys.map((_, i) => `?${i + 1}`).join(', ')})`).bind(...keys).run();
+    // Today's remembered Basic trip too, or the same trip would still be answered as already counted.
+    if (device) await env.DB.prepare('DELETE FROM rate_limits WHERE substr(key, 1, length(?1)) = ?1').bind(`basic-trip:${device}:`).run();
     await audit(req, env, 'test_session', 'basic', { car, basicReset: res.meta.changes ?? 0 });
     return { body: { plan, user: null, car, basicReset: (res.meta.changes ?? 0) > 0 }, cookie: clearSessionCookie(secure) };
   }

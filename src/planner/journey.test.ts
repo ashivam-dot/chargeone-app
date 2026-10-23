@@ -119,6 +119,27 @@ describe('planJourney', () => {
     expect(journey(1000, 8).tooLong).toBe(false);
   });
 
+  it('never ends a day at an unverified or customers-only charger unless the driver allows it', () => {
+    const shaky = stations.map((s) => (s.id === 'c380' ? { ...s, confidence: 0.3 } : s.id === 'c420' ? { ...s, access: 'customers' as const } : s));
+    const run = (allowUnverified: boolean) =>
+      planJourney({ route: route(1000), stations: shaky, statuses: new Map(), vehicle: nexon, options: { ...DEFAULT_OPTIONS, allowUnverified }, now, dailyHours: 8, places });
+    const strict = run(false).days.map((d) => d.overnight).filter((o) => o !== null);
+    expect(strict.length).toBeGreaterThan(0);
+    expect(strict.map((o) => o.station.id)).not.toContain('c380');
+    expect(strict.map((o) => o.station.id)).not.toContain('c420');
+    expect(strict.every((o) => o.trusted)).toBe(true);
+    const first = run(true).days[0].overnight!;
+    expect(['c380', 'c420']).toContain(first.station.id);
+    expect(first.trusted).toBe(false);
+  });
+
+  it('marks a night on a charger of unknown speed', () => {
+    const unknown = stations.map((s) => (s.id === 'c380' ? { ...s, connectors: [], speed: 'unknown' as const, maxKw: null } : s));
+    const j = planJourney({ route: route(1000), stations: unknown, statuses: new Map(), vehicle: nexon, options: { ...DEFAULT_OPTIONS, allowUnverified: true }, now, dailyHours: 8, places });
+    const night = j.days.map((d) => d.overnight).find((o) => o?.station.id === 'c380');
+    expect(night?.speedUnknown).toBe(true);
+  });
+
   it('still splits the trip without any stay data', () => {
     const j = journey(1000, 8, null);
     expect(j.days.length).toBeGreaterThan(1);
@@ -133,6 +154,7 @@ describe('chooseOvernight', () => {
     detourKm: 0,
     mode: 'dc' as const,
     powerKw: 50,
+    trusted: true,
     stays: stays.map((place) => ({ place, metres: 100 })),
   });
 
