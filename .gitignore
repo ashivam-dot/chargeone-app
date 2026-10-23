@@ -20,3 +20,4 @@ playwright-report/
 *.jks
 *.keystore
 *.tsbuildinfo
+test-results-live/
