@@ -28,9 +28,13 @@ Environment: `PIPELINE_CACHE_DIR` (default `data-cache/`, gitignored, never comm
    - `ocm-export`: a `git clone --depth 1` sparse checkout of `openchargemap/ocm-export`, India only.
    - `ocm-api`: used when `OCM_API_KEY` is set. It pages with `greaterthanid` + `sortby=id_asc` and
      sends the User-Agent and `X-API-Key` headers.
-   - OCM rules: records whose comments carry a Google Place ID are **quarantined**
-     (`data-cache/quarantine.json`, never published). StatusType 100/150/200/210 are dropped and
-     30/75 are flagged. `DateLastVerified == DateCreated` counts as an unverified bulk import.
+   - OCM rules: records whose text fields (title, address, comments, URLs, media comments) carry a
+     Google Place ID or any Google Maps link (`maps.google.*`, `google.*/maps`, `goo.gl/maps`,
+     `maps.app.goo.gl`, `g.page`) are **quarantined** (`data-cache/quarantine.json`, never published).
+     StatusType 100/150/200/210 are dropped and 30/75 are flagged. Connection statuses count too: all
+     connections down or removed drops the POI, all temporarily unavailable marks it so, and some down
+     marks it `partly_operational`. A title naming another network (`ChargeZone - Forum Mall` under
+     Statiq) flags `operator-conflict` and carries `titleOperator` into resolution. `DateLastVerified == DateCreated` counts as an unverified bulk import.
      Duplicate ids are removed.
 2. **Canonical model** (`types.ts`, OCPI-aligned): Site > Station > EVSE > Connector. It carries
    vehicle flags (car / 2W / 3W / bus, each true, false or null) and battery swap. Rules for
@@ -55,9 +59,14 @@ Environment: `PIPELINE_CACHE_DIR` (default `data-cache/`, gitignored, never comm
    - Positions prefer OSM.
    - Other fields prefer verified records, then OCM, then the newest.
    - Connectors are the union.
-5. **Confidence** (`confidence.ts`): existence is a noisy-OR of the best record per source. Each
-   record decays with a 182-day half-life (floor 0.25) and is reduced by a negative status. Each
-   field has its own confidence.
+5. **Confidence** (`confidence.ts`): existence is a noisy-OR of the best record per source.
+   - Each record starts from `[base, floor]` by kind: verified 0.8/0.3, unverified OSM 0.65/0.35,
+     bulk-imported 0.5/0.25. It decays with a 182-day half-life to its floor.
+   - A specific record (a named operator plus connectors with a kW, or a verification date) adds
+     `SPECIFICITY` 0.35 by noisy-OR, so a specific verified record stays plannable (>= 0.6) for about a
+     year and a specific bulk one for about three months; vague records never are.
+   - Age counts to `min(now, snapshotAt)`, so an old export snapshot doesn't age faster than its data.
+   - A negative status reduces it. Each field has its own confidence.
 6. **Stable ids** (`ids.ts`):
    - Each station gets `c1_` plus 12 base32 characters of the SHA-256 of its anchor record.
    - `pipeline/registry.json` is committed and maps each id to its anchor, creation date and
@@ -71,20 +80,28 @@ Environment: `PIPELINE_CACHE_DIR` (default `data-cache/`, gitignored, never comm
    - more than 5% of matched stations move more than 200 m (matched by id or alias);
    - the DC count drops more than 10%;
    - any station fails the schema (`schema.ts`);
-   - any shard is over 1 MB.
+   - any shard is over 1 MB;
+   - fewer than 25% of DC stations reach the planner's 0.6 line (`minPlannableDcShare`);
+   - an operational station lists no connectors;
+   - an alias is also a live station id (`aliasCollisions`; such aliases are also left out of the
+     alias files);
+   - any file is over 24 MiB (`assetBytes`, the Workers static-asset limit) or `public/data/` holds
+     more than 3,000 files (`maxDataFiles`).
 
 ## Outputs (`public/data/`)
 
 | File | Contents |
 |---|---|
-| `stations.json` | Backward-compatible `Dataset` (`src/data/model.ts`), with `version` and `sources[].snapshotAt` added. |
-| `shards/<geohash>.json` | `{cell, version, stations}`: adaptive geohash cells (precision 2-6), at most 400 stations and under 0.9 MB each. Each station is the app shape plus `vehicleFlags`, `batterySwapKnown`, `membershipRequired` and `fields` (the full claims and confidence for each field). |
-| `index.json` | Compact rows `[id, c1Id, lat, lng, speed, maxKw, operatorIndex, vehicleClass, confidence, shard]` plus an `operators` table. |
+| `stations.json` | Backward-compatible `Dataset` (`src/data/model.ts`), with `version` and `sources[].snapshotAt` added. Written only while under 8 MiB (`legacyStationsBytes`, about 10k stations); past that the manifest says so and every reader uses the index, shards and alias buckets. |
+| `shards/<geohash>.json` | `{cell, version, stations}`: adaptive geohash cells (precision 2-6), at most 400 stations and under 0.9 MB each. Sparse child cells are pooled back into their parent prefix, so cells can nest (`tdr` next to `tdr1`); readers pick cells by bounds, never by prefix. Each station is the app shape plus `vehicleFlags`, `batterySwapKnown`, `membershipRequired` and `fields` (the full claims and confidence for each field). |
+| `cells/<geohash>.json` | The same cells, slim station rows, for the worker's `stationsNear`. |
+| `index.json` | Columnar schema 3 (`src/data/compact.ts`): one array per field (`id`, `c1`, `lat`, `lng`, `speed`, `maxKw`, `operator`, `vehicleClass`, `confidence`, `shard`, `name`, `connectors`, `points`, `vehicles`, `batterySwap`, `is24x7`, `access`, `status`, `state`, `flags`), enumerations as positions in lookup tables (`operators`, `speeds`, `cells`, `flags`, ...). Ids lose their common prefixes (`n123` = `osm-n123`, digits = `ocm-<n>`, `c1` without `c1_`). About half the bytes of schema 2. |
+| `cells.json` | `{version, schema, aliasBuckets, cells}`: a few KB, the first file the worker reads. |
+| `aliases/<bucket>.json` | FNV-1a hash buckets of every id (`src/data/lookup.ts`, about 4,000 keys each): `aliases` (old id to c1), `legacy` (c1 to app id), `cells` (c1 to cell). Any lookup reads at most two buckets. Replaces `aliases.json`. |
 | `manifest.json` | `version`, `generatedAt`, `schema`, `counts`, per-source `{raw, records, rejected, quarantined, snapshotAt, licence}`, the sha256 and size of every file, `shards`, `thresholds` and `attribution`. |
 | `coverage.json` | National and per-state counts, given against the government count as "ChargeOne lists N of at least M installed charging stations (government count as of DATE)", with the source and URL. |
 | `review-queue.json` | Possible duplicates and operator conflicts, with score, distance and reasons. |
-| `aliases.json` | `{aliases: {oldId: c1Id}, legacy: {c1Id: legacyId}}`, so old links keep resolving. |
-| `chargeone-stations-odbl.zip` | ODbL dump: `LICENSE.txt` and `chargeone-stations.geojson` (stations with sites). |
+| `chargeone-stations-odbl.zip` | ODbL dump: `LICENSE.txt` and `chargeone-stations.geojson` (stations with sites). Past 24 MiB it is split into `chargeone-stations-odbl-<n>.zip` parts, each with the licence and a "Part N of M" readme. |
 | `LICENSE-data.txt` | ODbL 1.0 for the database, plus CC BY 4.0 attribution for Open Charge Map. |
 
 New optional fields on each station in `stations.json`:
@@ -97,7 +114,7 @@ New optional fields on each station in `stations.json`:
 | `vehicleClass` | `car`, `2w`, `3w`, `mixed` or `unknown`. |
 | `state` | From boundary polygons, not address text. |
 | `siteId` | Present only when the site is shared with another station. |
-| `status` | `operational`, `temporarily_unavailable` or `unknown`. |
+| `status` | `operational`, `temporarily_unavailable`, `partly_operational` (some OCM connections down or removed) or `unknown` (including OCM "operational" with no equipment listed). |
 | `observedAt` | When a source last saw the station. |
 | `provenance` | Field to sourceId, present only on multi-source stations. |
 | `flags` | For example `ocm-status-75` or `bulk-unverified`. |
@@ -114,4 +131,11 @@ New optional fields on each station in `stations.json`:
 - entity resolution, including Mahindra vs EESL and an Ather 2W point vs a car charger;
 - gate fault injection (a truncated source, a DC drop, moved stations, the shard size, the schema);
 - id stability and merges;
-- output determinism, the ODbL zip and the shard limits.
+- output determinism, the ODbL zip and the shard limits;
+- `regressions.test.ts`: connector counting (per-source sums, never OSM + OCM), DC current on AC
+  plugs, 2W names and tethered Type 2 leads, OCM connection statuses, every Google Maps link shape in
+  every text field, networks named in OCM titles, OSM battery-swap tags, numbered and chained
+  same-source listings, id reissue on a split;
+- `confidence.test.ts`: the calibration above;
+- scale: 100k synthetic stations stay under the file-count and size limits. The full 100k build is
+  slow, so it only runs with `PIPELINE_SCALE=1 npx vitest run pipeline/test/gates.test.ts`.
