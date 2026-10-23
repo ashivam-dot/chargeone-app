@@ -65,6 +65,79 @@ export const LIVE_LABEL: Record<LiveState, string> = {
   unknown: 'Status unknown',
 };
 
+/**
+ * What a charger's map pin shows. A driver report inside its window wins when it is newer than the source
+ * data; without one, the source's own status: listed operational (or partly) is "working", temporarily
+ * unavailable is "unavailable", and anything else is "unknown". Never live from the operator.
+ */
+export type ChargerState = 'working' | 'in_use' | 'unavailable' | 'unknown';
+
+export const CHARGER_STATES: ChargerState[] = ['working', 'in_use', 'unavailable', 'unknown'];
+
+export interface ChargerStateInfo {
+  state: ChargerState;
+  /** 'report' when a recent driver report decided it, 'data' when the map sources' status did. */
+  from: 'report' | 'data' | 'none';
+}
+
+/** The time of the report that put a station in its live state. */
+function liveAt(s: StationStatus, live: LiveState): string | null {
+  if (live === 'problem') return s.problemAt;
+  if (live === 'in_use') return [s.inUseSince, s.queueAt].filter((t): t is string => Boolean(t)).sort().at(-1) ?? null;
+  return s.lastWorkedAt;
+}
+
+export function chargerState(
+  station: { status?: 'operational' | 'temporarily_unavailable' | 'partly_operational' | 'unknown'; observedAt?: string | null },
+  s: StationStatus | undefined,
+  now: Date,
+): ChargerStateInfo {
+  const live = liveState(s, now);
+  if (s && live !== 'unknown') {
+    const at = Date.parse(liveAt(s, live) ?? '');
+    const seen = Date.parse(station.observedAt ?? '');
+    if (!Number.isFinite(seen) || !Number.isFinite(at) || at > seen) {
+      return { state: live === 'problem' ? 'unavailable' : live, from: 'report' };
+    }
+  }
+  switch (station.status) {
+    case 'operational':
+    case 'partly_operational':
+      return { state: 'working', from: 'data' };
+    case 'temporarily_unavailable':
+      return { state: 'unavailable', from: 'data' };
+    default:
+      return { state: 'unknown', from: 'none' };
+  }
+}
+
+/** Pin and badge colours: dark enough for a white glyph on top (3:1 or more) and distinct from each other. */
+export const STATE_COLOUR: Record<ChargerState, string> = {
+  working: '#16a34a',
+  in_use: '#d97706',
+  unavailable: '#dc2626',
+  unknown: '#6b7280',
+};
+
+export const STATE_LABEL: Record<ChargerState, string> = {
+  working: 'Working',
+  in_use: 'In use',
+  unavailable: 'Unavailable',
+  unknown: 'Status unknown',
+};
+
+/** One line for the legend and the station sheet: what the state is based on. */
+export function stateReason(info: ChargerStateInfo, station: { status?: string }): string {
+  if (info.from === 'report') {
+    if (info.state === 'working') return 'A driver charged here recently.';
+    if (info.state === 'in_use') return 'A driver reported charging or a queue in the last hour.';
+    return 'A driver reported a problem in the last 24 hours.';
+  }
+  if (info.state === 'working') return station.status === 'partly_operational' ? 'Listed as partly working by the map sources; not live.' : 'Listed as operational by the map sources; not live.';
+  if (info.state === 'unavailable') return 'Listed as temporarily unavailable by the map sources.';
+  return 'No source says whether it works, and no driver has reported it recently.';
+}
+
 export function timeAgo(iso: string | null, now: Date): string | null {
   if (!iso) return null;
   const mins = Math.max(0, Math.round(ageMs(iso, now) / MIN));
