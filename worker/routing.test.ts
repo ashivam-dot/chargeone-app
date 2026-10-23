@@ -97,7 +97,7 @@ describe('router without an openrouteservice key', () => {
     const [call] = stub.calls;
     expect(call.headers.get('User-Agent')).toMatch(/^ChargeOne\/[\d.]+ \(\+https:\/\//);
     expect(call.headers.get('Referer')).toBe('https://chargeone.test/');
-    expect(call.body).toMatchObject({ costing: 'auto', shape_format: 'polyline6', directions_type: 'none' });
+    expect(call.body).toMatchObject({ costing: 'auto', shape_format: 'polyline6', directions_type: 'maneuvers' });
     expect(call.body.locations).toEqual([
       { lat: MG_ROAD.lat, lon: MG_ROAD.lng, type: 'break' },
       { lat: ELECTRONIC_CITY.lat, lon: ELECTRONIC_CITY.lng, type: 'break' },

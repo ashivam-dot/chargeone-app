@@ -13,7 +13,7 @@
     "build": "npm run typecheck && vite build && vite build -c vite.admin.config.ts && node scripts/prerender.ts && node scripts/bundle-budget.ts",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p worker && tsc --noEmit -p scripts/tsconfig.worker.json",
     "data:build": "node pipeline/build.ts",
     "import:data": "node scripts/import-data.ts",
     "import:places": "node scripts/import-places.ts",

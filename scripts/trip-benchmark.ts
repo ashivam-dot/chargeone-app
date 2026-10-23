@@ -4,8 +4,10 @@
  * Read-only against app code: it imports the planner, the station index and places.json and
  * writes only results under research/ and cached routes under scripts/trip-benchmark-routes/.
  *
- * Routes come from FOSSGIS Valhalla (same request shape as worker/routing.ts) and are cached to
- * scripts/trip-benchmark-routes/<id>.json. A cached route is never refetched. Fetching is opt-in:
+ * Routes come from FOSSGIS Valhalla (same request shape as worker/routing.ts, with maneuvers for the
+ * drive-time correction) and are cached to scripts/trip-benchmark-routes/maneuvers/<id>.json. Older
+ * caches without maneuvers (scripts/trip-benchmark-routes/<id>.json) are used when that is all there
+ * is, with Valhalla's uncorrected time. A cached route is never refetched. Fetching is opt-in:
  *
  *   npx esbuild scripts/trip-benchmark.ts --bundle --platform=node --format=esm --outfile=/tmp/trip-benchmark.mjs
  *   node /tmp/trip-benchmark.mjs            # offline: uses cached routes only, skips missing ones
@@ -102,7 +104,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
 async function loadRoute(r: BenchRoute, allowFetch: boolean, budget: { left: number }) {
-  const file = join(ROUTES_DIR, `${r.id}.json`);
+  const legacy = join(ROUTES_DIR, `${r.id}.json`);
+  const withManeuvers = join(ROUTES_DIR, 'maneuvers', `${r.id}.json`);
+  const file = existsSync(withManeuvers) || !existsSync(legacy) ? withManeuvers : legacy;
   if (!existsSync(file)) {
     if (!allowFetch) return { missing: true as const, file };
     if (budget.left <= 0) return { missing: true as const, file };
@@ -115,12 +119,12 @@ async function loadRoute(r: BenchRoute, allowFetch: boolean, budget: { left: num
         locations: r.points.map((p) => ({ lat: p.lat, lon: p.lng, type: 'break' })),
         costing: 'auto',
         units: 'kilometers',
-        directions_type: 'none',
+        directions_type: 'maneuvers',
         shape_format: 'polyline6',
       }),
     });
     const body = await res.json();
-    mkdirSync(ROUTES_DIR, { recursive: true });
+    mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, JSON.stringify({ status: res.status, fetchedAt: new Date().toISOString(), points: r.points, body }));
     console.error(`fetched ${r.id}: HTTP ${res.status}`);
   }

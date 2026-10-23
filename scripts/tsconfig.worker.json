@@ -1,0 +1,8 @@
+{
+  // Build scripts that import Worker code (the trip benchmark and drive-time check) need the
+  // Workers types as well as Node's, so they are checked here and not by the app's tsconfig.
+  "extends": "../worker/tsconfig.json",
+  "compilerOptions": { "types": ["@cloudflare/workers-types", "node"] },
+  "include": ["./trip-benchmark.ts", "./drive-time-check.ts"],
+  "exclude": []
+}

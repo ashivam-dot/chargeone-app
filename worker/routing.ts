@@ -3,6 +3,7 @@ import type { RouteAlternativeWire } from '../src/shared/contracts.ts';
 import type { Coord } from '../src/planner/geometry.ts';
 import { alternativeRoutes } from './alternatives.ts';
 import type { User } from './auth.ts';
+import { realisticMinutes, type ValhallaManeuver } from './driveTime.ts';
 import { currentPlan, quotaWindows, usageCounts } from './entitlements.ts';
 import { isDev, type Env } from './env.ts';
 import { HttpError, claimSlot, clientKey, enforceRateLimit, indianDayStart, latLngInIndia, readJson, releaseSlot, str, type LatLng } from './http.ts';
@@ -136,32 +137,46 @@ export function decodePolyline(encoded: string, precision = 6): Coord[] {
   return out;
 }
 
+export interface ValhallaLeg {
+  shape?: string;
+  summary?: { length?: number; time?: number };
+  maneuvers?: ValhallaManeuver[];
+}
+
 interface ValhallaReply {
-  trip?: { status?: number; summary?: { length?: number; time?: number }; legs?: Array<{ shape?: string }> };
+  trip?: { status?: number; summary?: { length?: number; time?: number }; legs?: ValhallaLeg[] };
   error_code?: number;
 }
 
-/** Turns a Valhalla /route reply into a route. Valhalla has no elevation on /route, so plans assume flat roads. */
+/**
+ * Turns a Valhalla /route reply into a route. Valhalla has no elevation on /route, so plans assume flat roads.
+ * Its highway times are far too slow for India, so the duration is corrected stretch by stretch
+ * from the maneuvers (see driveTime.ts); a reply without maneuvers keeps Valhalla's own time.
+ */
 export function parseValhalla(status: number, body: unknown): RouteResult {
   const data = (body ?? {}) as ValhallaReply;
   // 4xx carries an error_code: 442 no path, 171 no road near a point, 154 too long for the server.
   if (status === 400 || status === 404) throw NO_ROUTE();
   if (status !== 200 || !data.trip || data.trip.status !== 0) throw BUSY();
   const coords: Coord[] = [];
-  for (const leg of data.trip.legs ?? []) {
-    const pts = decodePolyline(leg.shape ?? '');
+  const legs = data.trip.legs ?? [];
+  const shapes = legs.map((leg) => decodePolyline(leg.shape ?? ''));
+  for (const pts of shapes) {
     // Each leg starts where the last one ended.
     coords.push(...(coords.length ? pts.slice(1) : pts));
   }
   const km = data.trip.summary?.length;
   if (coords.length < 2 || typeof km !== 'number') throw NO_ROUTE();
-  return { coords, distanceKm: km, durationMin: (data.trip.summary?.time ?? 0) / 60, hasElevation: false, source: 'valhalla' };
+  const withManeuvers = legs.length > 0 && legs.every((leg) => leg.maneuvers?.length);
+  const durationMin = withManeuvers ? realisticMinutes(legs, shapes) : (data.trip.summary?.time ?? 0) / 60;
+  return { coords, distanceKm: km, durationMin, hasElevation: false, source: 'valhalla' };
 }
 
 /** The edge cache exists only on Cloudflare; tests and Node run without it. */
 const edgeCache = (): Cache | null => (typeof caches === 'undefined' ? null : caches.default);
+// v2: durations are corrected from maneuvers, so routes cached before that are not reused.
 const cacheKey = (points: LatLng[]) =>
-  `https://chargeone.internal/route/valhalla/${points.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join(';')}`;
+  `https://chargeone.internal/route/valhalla/v2/${points.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join(';')}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -213,7 +228,8 @@ async function routeWithValhalla(env: Env, points: LatLng[], caller: RouteCaller
         locations: points.map((p) => ({ lat: p.lat, lon: p.lng, type: 'break' })),
         costing: 'auto',
         units: 'kilometers',
-        directions_type: 'none',
+        // Maneuvers (no text) carry each stretch's road name and length for the drive-time correction.
+        directions_type: 'maneuvers',
         shape_format: 'polyline6',
       }),
       signal: deadline(signal),

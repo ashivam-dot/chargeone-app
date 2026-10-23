@@ -16,5 +16,6 @@
     "jsxImportSource": "preact",
     "types": ["node", "vite/client", "vite-plugin-pwa/client"]
   },
-  "include": ["src", "scripts", "pipeline", "vite.config.ts", "vite.admin.config.ts"]
+  "include": ["src", "scripts", "pipeline", "vite.config.ts", "vite.admin.config.ts"],
+  "exclude": ["scripts/trip-benchmark.ts", "scripts/drive-time-check.ts"]
 }
