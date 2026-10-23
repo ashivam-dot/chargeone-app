@@ -1,7 +1,36 @@
 {
-  "version": "6fcfc49dc91e",
-  "generatedAt": "2026-10-23T00:00:00.000Z",
+  "version": "4a8abca473e1",
+  "generatedAt": "2026-10-23T13:53:33.463Z",
   "items": [
+    {
+      "kind": "possible-duplicate",
+      "score": 0.988,
+      "distanceM": 7,
+      "a": {
+        "id": "c1_dltyc2cslayp",
+        "legacyId": "ocm-308971",
+        "name": "Hotel Aroma Natural Veg",
+        "operator": "ChargeZone",
+        "sources": [
+          "ocm-308970",
+          "ocm-308971"
+        ]
+      },
+      "b": {
+        "id": "c1_qylqazeklnkr",
+        "legacyId": "c1_qylqazeklnkr",
+        "name": "ChargeZone EV Charging Station",
+        "operator": "ChargeZone",
+        "sources": [
+          "ovt-906059ec-7f64-4178-89e3-dac125cd8b26"
+        ]
+      },
+      "reasons": [
+        "7 m apart",
+        "same operator (ChargeZone)",
+        "not merged: different operators (Statiq / ChargeZone)"
+      ]
+    },
     {
       "kind": "possible-duplicate",
       "score": 0.873,
@@ -345,6 +374,34 @@
         "30 m apart",
         "same operator (Tata Power EZ Charge)",
         "connectors differ"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.818,
+      "distanceM": 149,
+      "a": {
+        "id": "c1_mpyvs6t4vfuc",
+        "legacyId": "c1_mpyvs6t4vfuc",
+        "name": "Begumpet",
+        "operator": "Glida",
+        "sources": [
+          "tg-290"
+        ]
+      },
+      "b": {
+        "id": "c1_e5z6q5j3xusd",
+        "legacyId": "c1_e5z6q5j3xusd",
+        "name": "IOC Begumpet",
+        "operator": "Glida",
+        "sources": [
+          "tg-312"
+        ]
+      },
+      "reasons": [
+        "149 m apart",
+        "same operator (Glida)",
+        "name similarity 0.50"
       ]
     },
     {
@@ -695,7 +752,8 @@
         "name": "Hotel Aishwarya Bhavan",
         "operator": "Relux Electric",
         "sources": [
-          "ocm-301155"
+          "ocm-301155",
+          "ovt-0702c60d-4faf-4305-a817-78a28f2f582f"
         ]
       },
       "reasons": [
@@ -952,6 +1010,34 @@
     },
     {
       "kind": "possible-duplicate",
+      "score": 0.789,
+      "distanceM": 12,
+      "a": {
+        "id": "c1_r7m6jjuh52an",
+        "legacyId": "osm-n12470580711",
+        "name": "Super Hub EV Charging Hub",
+        "operator": null,
+        "sources": [
+          "osm-n12470580711"
+        ]
+      },
+      "b": {
+        "id": "c1_gljvwjhdd6ts",
+        "legacyId": "ocm-301155",
+        "name": "Hotel Aishwarya Bhavan",
+        "operator": "Relux Electric",
+        "sources": [
+          "ocm-301155",
+          "ovt-0702c60d-4faf-4305-a817-78a28f2f582f"
+        ]
+      },
+      "reasons": [
+        "12 m apart",
+        "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
       "score": 0.788,
       "distanceM": 12,
       "a": {
@@ -1088,6 +1174,35 @@
         "146 m apart",
         "same operator (Volttic)",
         "connectors overlap"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.766,
+      "distanceM": 16,
+      "a": {
+        "id": "c1_nihei6jrxrpb",
+        "legacyId": "osm-n10908485585",
+        "name": "EV charging station",
+        "operator": null,
+        "sources": [
+          "osm-n10908485585",
+          "osm-n10908485595"
+        ]
+      },
+      "b": {
+        "id": "c1_cekmv4n4yajj",
+        "legacyId": "ocm-306980",
+        "name": "GTB Nagar Metro Station Parking",
+        "operator": "Jio-bp pulse",
+        "sources": [
+          "ocm-306980",
+          "ovt-f8d92209-a7be-4da8-9b93-5059015f1202"
+        ]
+      },
+      "reasons": [
+        "16 m apart",
+        "one operator unknown"
       ]
     },
     {
@@ -1338,24 +1453,25 @@
     },
     {
       "kind": "possible-duplicate",
-      "score": 0.694,
+      "score": 0.7,
       "distanceM": 24,
       "a": {
-        "id": "c1_hqo2liwoxooq",
-        "legacyId": "osm-n13688377501",
-        "name": "Tesla Supercharger",
-        "operator": "Tesla",
-        "sources": [
-          "osm-n13688377501"
-        ]
-      },
-      "b": {
         "id": "c1_gqnl7sdbgwm4",
         "legacyId": "osm-n13688398203",
         "name": "EV charging station",
         "operator": null,
         "sources": [
           "osm-n13688398203"
+        ]
+      },
+      "b": {
+        "id": "c1_hqo2liwoxooq",
+        "legacyId": "osm-n13688377501",
+        "name": "Tesla Supercharger",
+        "operator": "Tesla",
+        "sources": [
+          "osm-n13688377501",
+          "ovt-f3ba032c-83a3-4cf7-bfdb-1443d79f9fbf"
         ]
       },
       "reasons": [
@@ -1420,7 +1536,7 @@
     },
     {
       "kind": "possible-duplicate",
-      "score": 0.664,
+      "score": 0.666,
       "distanceM": 99,
       "a": {
         "id": "c1_klghqnk555ny",
@@ -1437,7 +1553,8 @@
         "name": "Shell Recharge Bagmane Solarium",
         "operator": "Shell Recharge",
         "sources": [
-          "ocm-308898"
+          "ocm-308898",
+          "ovt-8a3935df-d0aa-452d-8291-8ab1d60af036"
         ]
       },
       "reasons": [
@@ -1504,34 +1621,6 @@
     },
     {
       "kind": "possible-duplicate",
-      "score": 0.655,
-      "distanceM": 28,
-      "a": {
-        "id": "c1_nihei6jrxrpb",
-        "legacyId": "osm-n10908485585",
-        "name": "EV charging station",
-        "operator": null,
-        "sources": [
-          "osm-n10908485585",
-          "osm-n10908485595"
-        ]
-      },
-      "b": {
-        "id": "c1_cekmv4n4yajj",
-        "legacyId": "ocm-306980",
-        "name": "GTB Nagar Metro Station Parking",
-        "operator": "Jio-bp pulse",
-        "sources": [
-          "ocm-306980"
-        ]
-      },
-      "reasons": [
-        "28 m apart",
-        "one operator unknown"
-      ]
-    },
-    {
-      "kind": "possible-duplicate",
       "score": 0.647,
       "distanceM": 28,
       "a": {
@@ -1540,7 +1629,8 @@
         "name": "Tesla Supercharger",
         "operator": "Tesla",
         "sources": [
-          "osm-n13688377301"
+          "osm-n13688377301",
+          "ovt-58c58e2f-76bf-407d-ae83-3fa4f4e78705"
         ]
       },
       "b": {
@@ -1555,6 +1645,61 @@
       "reasons": [
         "28 m apart",
         "one operator unknown"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.632,
+      "distanceM": 121,
+      "a": {
+        "id": "c1_gtazkmgchfoy",
+        "legacyId": "ocm-469487",
+        "name": "Hyundai EV Chg Stn Manor",
+        "operator": "ChargeZone",
+        "sources": [
+          "ocm-469487"
+        ]
+      },
+      "b": {
+        "id": "c1_ggkqikiwxzik",
+        "legacyId": "c1_ggkqikiwxzik",
+        "name": "CHARGEZONE - EV Charging Station",
+        "operator": "ChargeZone",
+        "sources": [
+          "ovt-46643fbe-d713-418d-be17-d3dbca8baaee"
+        ]
+      },
+      "reasons": [
+        "121 m apart",
+        "same operator (ChargeZone)"
+      ]
+    },
+    {
+      "kind": "possible-duplicate",
+      "score": 0.623,
+      "distanceM": 148,
+      "a": {
+        "id": "c1_olc3ezqbfq6o",
+        "legacyId": "osm-w1334165085",
+        "name": "Jio-BP Pulse Hub, Marathalli",
+        "operator": "Jio-bp pulse",
+        "sources": [
+          "ocm-309317",
+          "osm-w1334165085"
+        ]
+      },
+      "b": {
+        "id": "c1_doe42lqesjen",
+        "legacyId": "c1_doe42lqesjen",
+        "name": "Jio-bp pulse",
+        "operator": "Jio-bp pulse",
+        "sources": [
+          "ovt-05c6dfe0-f87c-470b-88cd-7e76c096e435"
+        ]
+      },
+      "reasons": [
+        "148 m apart",
+        "same operator (Jio-bp pulse)"
       ]
     },
     {
@@ -2927,7 +3072,8 @@
         "name": "Garve Hyundai",
         "operator": "ChargeZone",
         "sources": [
-          "ocm-481488"
+          "ocm-481488",
+          "ovt-e0fea0df-50d4-44bb-a2ff-46a420222d6d"
         ]
       },
       "b": {
@@ -2936,7 +3082,8 @@
         "name": "Garve Hyundai",
         "operator": "ChargeZone",
         "sources": [
-          "ocm-481488"
+          "ocm-481488",
+          "ovt-e0fea0df-50d4-44bb-a2ff-46a420222d6d"
         ]
       },
       "reasons": [
@@ -3235,6 +3382,60 @@
       "reasons": [
         "4 m apart",
         "different operators (Zeon Charging / Ather Grid)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 4,
+      "a": {
+        "id": "c1_knucmnvfeqts",
+        "legacyId": "ocm-309019",
+        "name": "Fiza by Nexus Mall",
+        "operator": "Jio-bp pulse",
+        "sources": [
+          "ocm-309019"
+        ]
+      },
+      "b": {
+        "id": "c1_f3htfrv46nmv",
+        "legacyId": "c1_f3htfrv46nmv",
+        "name": "Statiq Charging Station",
+        "operator": "Statiq",
+        "sources": [
+          "ovt-dc5346dd-fafb-4c69-9b5e-588e0da82f0b"
+        ]
+      },
+      "reasons": [
+        "4 m apart",
+        "different operators (Jio-bp pulse / Statiq)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 4,
+      "a": {
+        "id": "c1_cmw43omawczj",
+        "legacyId": "c1_cmw43omawczj",
+        "name": "IOE(TGREDCO)",
+        "operator": "TGREDCO",
+        "sources": [
+          "tg-250"
+        ]
+      },
+      "b": {
+        "id": "c1_37e6x7l3fqbu",
+        "legacyId": "c1_37e6x7l3fqbu",
+        "name": "TGREDCO(C1), Hyderabad",
+        "operator": "Joulepoint",
+        "sources": [
+          "tg-411"
+        ]
+      },
+      "reasons": [
+        "4 m apart",
+        "different operators (TGREDCO / Joulepoint)"
       ]
     },
     {
@@ -3777,6 +3978,33 @@
       "reasons": [
         "22 m apart",
         "different operators (Jio-bp pulse / Statiq)"
+      ]
+    },
+    {
+      "kind": "operator-conflict",
+      "score": 0,
+      "distanceM": 24,
+      "a": {
+        "id": "c1_kaicbjvlczxj",
+        "legacyId": "osm-n10049044828",
+        "name": "Car Mall charging station",
+        "operator": "Car Mall",
+        "sources": [
+          "osm-n10049044828"
+        ]
+      },
+      "b": {
+        "id": "c1_z7a6pdqswaxk",
+        "legacyId": "c1_z7a6pdqswaxk",
+        "name": "ChargeZone EV Charging Station",
+        "operator": "ChargeZone",
+        "sources": [
+          "ovt-e8dbe380-671d-4adb-b978-b7ea6e6f0b84"
+        ]
+      },
+      "reasons": [
+        "24 m apart",
+        "different operators (Car Mall / ChargeZone)"
       ]
     },
     {

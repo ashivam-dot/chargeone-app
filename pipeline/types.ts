@@ -127,6 +127,8 @@ export interface Rejection {
     | 'removed'
     | 'not-live'
     | 'google-derived'
+    /** Tags or text naming PlugShare or a Google Maps link (e.g. OSM `operator=Plug Share`): possibly copied, kept out. */
+    | 'denylisted-text'
     | 'other-licence'
     /** Listed sources: points only two- or three-wheelers can use. */
     | 'not-car'

@@ -63,6 +63,10 @@ Environment: `PIPELINE_CACHE_DIR` (default `data-cache/`, gitignored, never comm
      station that OSM or OCM also describe. A location-only cluster within 100 m of an OSM/OCM record
      (no operator clash, no vehicle conflict) is dropped as a duplicate before ids are issued
      (`listedDuplicates` in `resolve.ts`); a station from listings alone uses its `c1_` id as the app id.
+     Resolution merges OSM/OCM pairs before any pair with a listing, so a listing never changes how the
+     mapped records cluster.
+   - OSM rule: a node whose tags name PlugShare or carry a Google Maps link (two nodes tagged
+     `operator=Plug Share` in Oct 2026) is quarantined as `denylisted-text`, like OCM's Google records.
 2. **Canonical model** (`types.ts`, OCPI-aligned): Site > Station > EVSE > Connector. It carries
    vehicle flags (car / 2W / 3W / bus, each true, false or null) and battery swap. Rules for
    vehicle class (`lib/vehicle.ts`):

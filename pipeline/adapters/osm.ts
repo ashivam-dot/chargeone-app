@@ -5,6 +5,7 @@ import type { ConnectorType } from '../../src/data/model.ts';
 import { osmSocketType, parsePowerKw, safeUrl } from '../../src/data/normalize.ts';
 import { cachedJson, USER_AGENT } from '../config.ts';
 import { impliedPowerType } from '../lib/connectors.ts';
+import { denied } from '../lib/denylist.ts';
 import { inIndia, round6 } from '../lib/geo.ts';
 import { canonicalOperator, knownOperator } from '../lib/operators.ts';
 import { canonicalState } from '../lib/states.ts';
@@ -174,6 +175,9 @@ export function osmRecord(el: OsmElement): SourceRecord | Rejection {
   if (!inIndia(lat, lng)) return { sourceId, reason: 'outside-india', quarantine: false };
   const access = (tags.access ?? '').toLowerCase();
   if (access === 'private' || access === 'no') return { sourceId, reason: 'private', quarantine: false };
+  // A node tagged from PlugShare or Google Maps (`operator=Plug Share`) may be copied from a closed
+  // database: quarantined like OCM's Google-derived records (lib/denylist.ts; the build gate checks again).
+  if (Object.values(tags).some((v) => denied(v))) return { sourceId, reason: 'denylisted-text', quarantine: true };
 
   const name = tags.name?.trim() || null;
   const mapped = canonicalOperator(tags.operator ?? tags.brand ?? tags.network);

@@ -15,6 +15,7 @@ import { distanceMetres, geohash, geohashBlock } from './lib/geo.ts';
 import { differentOperators, sameOperator } from './lib/operators.ts';
 import { nameSimilarity, nameTokens } from './lib/text.ts';
 import { vehicleClass, vehicleConflict } from './lib/vehicle.ts';
+import { LISTED_SOURCES } from './types.ts';
 import type { CanonicalConnector, ReviewItem, SourceRecord, VehicleClass } from './types.ts';
 
 const BLOCK_PRECISION = 7;
@@ -235,8 +236,11 @@ export interface Resolution {
 
 export function resolve(records: SourceRecord[]): Resolution {
   const prepared = records.map(prepare);
+  // Pairs of mapped records (OSM, OCM) merge first, so a location-only listing can never change how the
+  // mapped records cluster: a listing joining one record first used to block that record's own merge.
+  const listed = (c: Candidate) => (LISTED_SOURCES.has(records[c.i].source) || LISTED_SOURCES.has(records[c.j].source) ? 1 : 0);
   const pairs = candidatePairs(records, prepared).sort(
-    (x, y) => y.pair.score - x.pair.score || records[x.i].sourceId.localeCompare(records[y.i].sourceId) || records[x.j].sourceId.localeCompare(records[y.j].sourceId),
+    (x, y) => listed(x) - listed(y) || y.pair.score - x.pair.score || records[x.i].sourceId.localeCompare(records[y.i].sourceId) || records[x.j].sourceId.localeCompare(records[y.j].sourceId),
   );
   const uf = new Clusters(records.length);
   const blocked: Resolution['blocked'] = [];

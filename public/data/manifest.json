@@ -1,22 +1,22 @@
 {
-  "version": "6fcfc49dc91e",
-  "generatedAt": "2026-10-23T00:00:00.000Z",
+  "version": "4a8abca473e1",
+  "generatedAt": "2026-10-23T13:53:33.463Z",
   "schema": 1,
   "counts": {
-    "stations": 2000,
-    "dc": 1381,
+    "stations": 2566,
+    "dc": 1383,
     "ac": 125,
-    "unknownSpeed": 494,
-    "withKw": 1479,
+    "unknownSpeed": 1058,
+    "withKw": 1481,
     "withConnectors": 1511,
-    "withOperator": 1643,
+    "withOperator": 2190,
     "twoWheeler": 116,
-    "multiSource": 31,
-    "sites": 1898,
-    "merged": 78,
-    "blockedPairs": 92,
-    "review": 141,
-    "quarantined": 371
+    "multiSource": 69,
+    "sites": 2455,
+    "merged": 117,
+    "blockedPairs": 117,
+    "review": 149,
+    "quarantined": 373
   },
   "sources": [
     {
@@ -26,13 +26,14 @@
       "licence": "ODbL-1.0",
       "attribution": "© OpenStreetMap contributors",
       "url": "https://www.openstreetmap.org/copyright",
-      "snapshotAt": "2026-10-23T09:06:06Z",
+      "snapshotAt": "2026-10-22T19:55:06Z",
       "raw": 608,
-      "records": 595,
+      "records": 593,
       "rejected": {
+        "denylisted-text": 2,
         "private": 13
       },
-      "quarantined": 0
+      "quarantined": 2
     },
     {
       "key": "ocm",
@@ -52,211 +53,270 @@
         "google-derived": 371
       },
       "quarantined": 371
+    },
+    {
+      "key": "tgredco",
+      "name": "Telangana Open Data Portal (TGREDCO)",
+      "origin": "data.telangana.gov.in",
+      "licence": "GODL-India",
+      "attribution": "Contains data from Telangana Renewable Energy Development Corporation (TGREDCO), \"EV charging stations - details of location & ownership\" (data as of April 2024), Telangana Open Data Portal, under the Government Open Data License - India (https://data.telangana.gov.in/dataset/ev-charging-stations-details-location-ownership). Not endorsed by the data provider.",
+      "url": "https://data.gov.in/government-open-data-license-india",
+      "snapshotAt": "2024-04-01T00:00:00Z",
+      "raw": 551,
+      "records": 396,
+      "rejected": {
+        "outside-state": 1,
+        "no-coordinates": 16,
+        "bus": 17,
+        "not-car": 30,
+        "battery-swap": 16,
+        "private-individual": 4,
+        "metro": 2,
+        "duplicate-listing": 69
+      },
+      "quarantined": 0
+    },
+    {
+      "key": "overture",
+      "name": "Overture Maps Places",
+      "origin": "overturemaps-us-west-2 (anonymous S3)",
+      "licence": "CDLA-Permissive-2.0",
+      "attribution": "Contains data from Overture Maps Foundation Places (https://docs.overturemaps.org/attribution/), under the Community Data License Agreement - Permissive 2.0 (https://cdla.dev/permissive-2-0/), with data from Meta, Microsoft, PinMeTo, Krick, RenderSEO, DAC, BrightQuery, Birdeye, Uberall, OpenTravel Alliance. Data from Foursquare. Copyright 2024 Foursquare Labs, Inc. All rights reserved. Available under Apache 2.0. Foursquare data was transformed to the Overture schema. Data from AllThePlaces. Available under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/).",
+      "url": "https://cdla.dev/permissive-2-0/",
+      "snapshotAt": "2026-10-21T00:00:00.000Z",
+      "raw": 388,
+      "records": 222,
+      "rejected": {
+        "ac-only": 156,
+        "car-unknown": 7,
+        "not-car": 3
+      },
+      "quarantined": 0
     }
   ],
   "files": {
     "aliases/0.json": {
-      "bytes": 91937,
-      "sha256": "f6471f993689cedabec9c29378e648f7a53459131bff1fa69e5af84f5a391acc"
+      "bytes": 118533,
+      "sha256": "80f0d238ba970de368d3213a2fddd531624b6cea078ecf935980e277bd0c2b2b"
     },
     "aliases/1.json": {
-      "bytes": 88455,
-      "sha256": "c719208724f23a798886724938a7c5a576bdfced328ce44f6692e46c37ef965d"
+      "bytes": 118940,
+      "sha256": "893739fd9a7ae65852d3f5be14e3bc71ae82d711bec1c136e2cc69a60d4cfe83"
     },
     "cells.json": {
-      "bytes": 173,
-      "sha256": "01252258319bc01b3a372d0373f0e877f7a5eec833eb6e194342f03de5abce37"
+      "bytes": 179,
+      "sha256": "cf9099f1d8c4030c9bef33f9513e72ef714f769d529a807b75da0b929e2c72d9"
     },
     "cells/t9.json": {
-      "bytes": 9623,
-      "sha256": "7a53357aa87c712646f3b4ae5816a9ff9565e23aaaa5d25163c707c9bf7d49b6"
+      "bytes": 9733,
+      "sha256": "3fcb97b7ecc9258b1da14777a418d612e748cdef85e465d2d41537f2b5c8b0b3"
     },
     "cells/t9w.json": {
       "bytes": 24065,
-      "sha256": "48c38c2ff6fa0a7941b873c5bd65c743501091bc7e4e30c49c19e2dbf5a0f75e"
+      "sha256": "59c0471323caec4729b8a7b459b5c9379c6b9aced4c9a7e8b3be9e72c6312488"
     },
     "cells/t9y.json": {
-      "bytes": 28710,
-      "sha256": "0030e08134bcba7b90680d79e89ef1dc9eb9831802869190b58542ae40892331"
+      "bytes": 28920,
+      "sha256": "f62ffad86185f021625a953750ab71748261a5013a1ecbd966d47309251e21ef"
     },
     "cells/t9y2.json": {
       "bytes": 7227,
-      "sha256": "569257f41ecd29746fd0f9c1afec407de0b0f66f82b363088a4eab14e117ccda"
+      "sha256": "800d76cd458caca11a5834e92cb539a136a14e5c9f671f58c660005a4bc3ae29"
     },
     "cells/t9y3.json": {
-      "bytes": 6262,
-      "sha256": "b506d9054b9b8a074e89eecff96795be20164510321168402357f5bcc7b9899b"
+      "bytes": 6372,
+      "sha256": "36e3611d30b05ad068235c6ae6968f3f8a583e8c5c19baad4b3a699e096fa79b"
     },
     "cells/tc.json": {
-      "bytes": 1828,
-      "sha256": "1c1309629a3bd14c630a23800dd9ff87f96b253a0b7c0a9a30c71e743c2ce219"
+      "bytes": 1938,
+      "sha256": "cf87cfb38100926057d05bdea12c5f05280c9637d5c50193c5559e2b99684229"
     },
     "cells/td.json": {
-      "bytes": 25929,
-      "sha256": "bef5be064070bf5323988b6ecf234e60d555bd8a9ac30d5a0f1150947a0c4841"
+      "bytes": 29942,
+      "sha256": "b7ed718aab4116645116ff6266e794b3817821e3772db0f8b219a723a901b36d"
     },
     "cells/tdj.json": {
       "bytes": 8999,
-      "sha256": "7d273725771ef88dea6066378720124accc7b3f9c35a0e9f5b8f2bb2217b5b41"
+      "sha256": "204b0411e3d535303febc4615fc414251c533b79d7c88cdd134aa73ed1abd33d"
     },
     "cells/tdn.json": {
-      "bytes": 9557,
-      "sha256": "b40501185e5448f5e9712be1bd42c534b541045a835693c918253766baf71573"
+      "bytes": 9655,
+      "sha256": "ecf7f68d8d56bd488a22856a679f87b21f63765c446f336dd12b3393dfe6c62b"
     },
     "cells/tdr.json": {
-      "bytes": 24564,
-      "sha256": "f35a7d541c77283e8d3a0fb8c73c08be06633df85164fe41f6e8b9a4b696f35d"
+      "bytes": 25787,
+      "sha256": "fc94bd46654b8006fa0370a611cf74ad6ef4fbd8ad5715432fcc775e28dc665c"
     },
     "cells/te.json": {
-      "bytes": 15900,
-      "sha256": "ba24c909815f306e2024dc9ebd34f6b3e012ce6c973d08b335ae46992c22ae4f"
+      "bytes": 24380,
+      "sha256": "54f514c4b7bb9878dc5637375bc0ec03dd5420e52f5467d36618efc275af3671"
+    },
+    "cells/tep.json": {
+      "bytes": 30763,
+      "sha256": "95c3c89e5a06ebd3352c5ed3f49c45dad3c6fad1edef4e962818bc11987781d2"
     },
     "cells/tf.json": {
-      "bytes": 6809,
-      "sha256": "da6451be6727813050c1d3da6738b190119a1ed7050cd6aa37f3ff00b96f2e82"
+      "bytes": 8415,
+      "sha256": "5bd99e981f7d03b4873629564a5d810e86800cc6454a97e7241a043ca818dd92"
     },
     "cells/tg.json": {
-      "bytes": 4147,
-      "sha256": "185ce841a7be0ad94347fc4497b7dc00ce7b905de10472590e5a1e9e84ce6340"
+      "bytes": 14685,
+      "sha256": "f8e4a517484bfbbb4444ef3a69b2d0cd016862526fe9a4c949b31f2da6fb3f90"
     },
     "cells/ts.json": {
-      "bytes": 10371,
-      "sha256": "07f80e22ea9f51fbc52fb167f50e60cec0033d89e9e874839f415fcd184d1b82"
+      "bytes": 12207,
+      "sha256": "349f9ecfb399e54f41d3fdbcb1270e80dbc1d870d351f869eb15b67ac78ff736"
     },
     "cells/tt.json": {
-      "bytes": 24887,
-      "sha256": "53b4cdd5c9a14764651e579f365838f47079ed813dc22bb9dd9729962bebc94e"
+      "bytes": 28530,
+      "sha256": "96bc4dadbd4ce67a02f56d3140db8aebcf5e2024842fdbc2c37b3f61a31aa5ba"
     },
     "cells/tu.json": {
-      "bytes": 5672,
-      "sha256": "4cda683fb1879090f19140841e07864832a0d7d1062ac141762c86192828a8b5"
+      "bytes": 5536,
+      "sha256": "cc302953e5dced14ac341a4f13b7531e13868d19cc994f973382df46d2a531da"
     },
     "cells/tv.json": {
       "bytes": 1436,
-      "sha256": "7f05e5224bfe5b74d519bdaca7384c57bcfcbbf080a3828371c6e4bc48bbfd99"
+      "sha256": "f52c2254d67eab1a3bf0cf04de492374e4f207b4b343de9d4db33ca15051b736"
     },
     "cells/tw.json": {
       "bytes": 149,
-      "sha256": "1a7c408f2ee16eed91c05532ca086ca5a08e7ada54b5d1c14e37f93d35c7f3cc"
+      "sha256": "5298446eb156cb99feca206f7579b675048a505cf1172c64612f0c9cc64e54e8"
     },
     "cells/w4.json": {
       "bytes": 143,
-      "sha256": "1920380391f8c2010e3f6983cc6178252d0115eea29a4a46c4ec170110802b4a"
+      "sha256": "83a62efd5b54eaa6d314e48f841f2650d92eb2d01e1afc0e14e79760d75d3a89"
     },
     "cells/wh.json": {
       "bytes": 224,
-      "sha256": "c4c4387b0da9e7d1685ea8f47570114eb85adf34c80a135cfaf514ca4f42f930"
+      "sha256": "e3a4363945fc57c64e4f506f89cc9cf264ae3a417ae1aa392f6ec35ee99fbfb1"
     },
     "chargeone-stations-odbl.zip": {
-      "bytes": 432780,
-      "sha256": "070f139eebe675446233e4163ea725ca1e9eabb509dcd98dbae1e48558ec0b79"
+      "bytes": 559921,
+      "sha256": "32afb28e849bc85fca7b595c8e0dadb35579ca5b55cf263d79b8141f75cb75f4"
     },
     "coverage.json": {
-      "bytes": 12537,
-      "sha256": "3de715567f130dec7ca0f8ed7fbaecdc7ddaa3984081118862a22f5e62fccdd6"
+      "bytes": 12548,
+      "sha256": "cd86dee22856c5acb08d744c33cc0c4b735dfb0f82759c5ab9738073a400dfb2"
     },
     "index.json": {
-      "bytes": 243069,
-      "sha256": "4b31a5bba2097a51d4cd399db9b47f899b2df1c5d5d527228fca34cae1f13594"
+      "bytes": 317660,
+      "sha256": "b1efd456eff3030ef050d17fea461ba16804e3c8d220fb852a4d70024282d852"
+    },
+    "LICENSE-Apache-2.0.txt": {
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "LICENSE-CDLA-Permissive-2.0.txt": {
+      "bytes": 2354,
+      "sha256": "4531a67d443284d93ffed0803df5b10634aff21c3d77e381f2d48af01d875868"
     },
     "LICENSE-data.txt": {
-      "bytes": 1058,
-      "sha256": "0d20eb7fe873f6a650c6f4662a46b2a2370e44fd424e06454de86ba1ab2299e2"
+      "bytes": 2665,
+      "sha256": "7e8143d7b991b684a7ef4e88c5503b1796018c407d8ad3468ce4793defc0921e"
+    },
+    "NOTICE-Foursquare.txt": {
+      "bytes": 1704,
+      "sha256": "dfe9ad6088bb5747d5d0909c2459524d966352100576bdcfc1468d304ce6fc70"
     },
     "review-queue.json": {
-      "bytes": 89398,
-      "sha256": "d0eb1858b0bb286ad1ce9ac19494fff2d05c2ca0f13da3be2b4a0d07c885580a"
+      "bytes": 95133,
+      "sha256": "4a4fed1e174347cc05c1a124dd24271b1bc23099ad794e37447ecf5c4fa6a8af"
     },
     "shards/t9.json": {
-      "bytes": 271832,
-      "sha256": "4bb9e50290dde8f65b239b7d5cb73a52310bd8cf0d89e7f2a2615ed5c31ff3c0"
+      "bytes": 275948,
+      "sha256": "d9c330fa119a46a25ac0fa660be15ea0bf97cf24827849f8853a91ca9bd6c6c1"
     },
     "shards/t9w.json": {
       "bytes": 668657,
-      "sha256": "f72a83ec5fc039bf4b23a3f9340d8d5b24b75e35b357513b30b7d830d9f0a2d1"
+      "sha256": "68042c1a9844c3891d5aa2696c85b74e1cd8b7e59e12b7aa3f9a1a857d8defe6"
     },
     "shards/t9y.json": {
-      "bytes": 751428,
-      "sha256": "bd9b16723d0d3d4a38fa43450a248fa93b6fa10abc222689e170774d763ab299"
+      "bytes": 759350,
+      "sha256": "2f5f08dc68cd474e4835fd31ff010f94dd3a7c8941145c963b22ee8f18ced94e"
     },
     "shards/t9y2.json": {
       "bytes": 189607,
-      "sha256": "a841e29d83e93550b075263e2b3af9afb9ba8a3c120a285dde0c52a15a450a9e"
+      "sha256": "c618082c3bc633fe47e525bf5f3ca37996521e84fbf10a584d4408cc91f78354"
     },
     "shards/t9y3.json": {
-      "bytes": 158999,
-      "sha256": "9c589b5761e35e1993c843ee2b2332886df8cd82fa4c01c072db40aa706699b0"
+      "bytes": 161585,
+      "sha256": "be895e3fb310ad9b779223f960391b493c53d28428628e1ed0eb0367055d06ab"
     },
     "shards/tc.json": {
-      "bytes": 51555,
-      "sha256": "2656764a97d8399d8c94ca12fa8f64e1a80a4635c196af9031575c1c628b2d68"
+      "bytes": 55532,
+      "sha256": "fa3a934536e6c72c05c8c3cf70745ce7af784a04649ca7a7ca7dee00c4faeccf"
     },
     "shards/td.json": {
-      "bytes": 743930,
-      "sha256": "7b683d5e725835cd08d1e417bf1480601bc1ba35efe6bd5387586b00699d909e"
+      "bytes": 830078,
+      "sha256": "813deda63eb1c9ea6d0ad4de19e1cd0cdbee407e6d50b2fc307c017d7f7434ef"
     },
     "shards/tdj.json": {
       "bytes": 247906,
-      "sha256": "c841b8b9a049520144bd36f0bc2812f0b6924c641e3c45084015fc266a78ee33"
+      "sha256": "aef628f0c835f809c6c7ffa52153bb3679eee5fb1b993c77f1bbc4bd211342de"
     },
     "shards/tdn.json": {
-      "bytes": 268062,
-      "sha256": "d248d507ec881aafa5363fdf7dbf7b8894d36934b1a88b0af5a2a4c12e831041"
+      "bytes": 273678,
+      "sha256": "a7e3844cc31d00615f923b392bcadecc8df795021d63a6f509199c4328c469d1"
     },
     "shards/tdr.json": {
-      "bytes": 663408,
-      "sha256": "1c6867913fcbd94c0ce5e61a81cb55366c3b823d1e248332ed581bab221faa89"
+      "bytes": 710771,
+      "sha256": "59c57cc3a417c41b9a583a2d37ddc958c1a6a8d9ce5abdd6e55184465cabf717"
     },
     "shards/te.json": {
-      "bytes": 383070,
-      "sha256": "cc78a646f92beea6984498f8e893232993d1965cb432caeaedc55bdd0db12cae"
+      "bytes": 590237,
+      "sha256": "a61a09e653262975b4fc13a892bdb7db4f0ed07e642c61be2cca545cd1fc71aa"
+    },
+    "shards/tep.json": {
+      "bytes": 612101,
+      "sha256": "5c04e9c6883e5a5e92661bbdf53eadd0288dba39523f9d93500c4d835f1369bb"
     },
     "shards/tf.json": {
-      "bytes": 168247,
-      "sha256": "a90b788d68ea29fa98afa360167ad401c3622bd6848224ff7025cbad1d9bb74a"
+      "bytes": 212350,
+      "sha256": "b3efe387a808175b007a9fc78491c7c7b381bd56a9e6b1d2741591510555a81c"
     },
     "shards/tg.json": {
-      "bytes": 77951,
-      "sha256": "75e370381bf93e474a5b669b2a71932ac9accfb54d7279b33bf38cf3de5536dd"
+      "bytes": 276478,
+      "sha256": "fc638924f4f542d90b56891277aafa447ff88d0f9922a8dc8e3d7f3a5c3c456e"
     },
     "shards/ts.json": {
-      "bytes": 265381,
-      "sha256": "8f224a70ae13c651053c6e09c26eb90502f91c202ad2e1dc6a87a41c0d0c4270"
+      "bytes": 312596,
+      "sha256": "f6d29f5b2957c1c6ebdddbd8ee0f25e16f429ba0a29f7921d71646518d4f368c"
     },
     "shards/tt.json": {
-      "bytes": 514590,
-      "sha256": "2c0ecc03a12922e32de6133f603fd4fcd50642dbc9c6abd209cf2e209304bf52"
+      "bytes": 626229,
+      "sha256": "3c8940cbde244408be030b958dc1c0fbddfd7f7d58ff95b1ecf7472ebbb801e9"
     },
     "shards/tu.json": {
-      "bytes": 113849,
-      "sha256": "28b2a8a5e0931f6cbb67af4928fc78851c487388bc22299b174895c24fc6fbd7"
+      "bytes": 113099,
+      "sha256": "c208bf108bf4fdbd9ccec1838476e94602b6b3e88515577e935cd638e27d6eab"
     },
     "shards/tv.json": {
       "bytes": 38887,
-      "sha256": "58b5817c96faee28a65c7bdd23e67b01f3a346d5ab9fa1afc7bc0aa17514247f"
+      "sha256": "aa31524535ecec7dafddcf8b9614ada6a0f920b8a307c8acd3c8ead55ce82819"
     },
     "shards/tw.json": {
       "bytes": 1859,
-      "sha256": "e4511f103c6e144351bd9213eb1fd3565ea6f8774777a73d45c9c838c70008ee"
+      "sha256": "008764bea351b286235d3582961b52d5d33f3c63e7eb8115d38bfc44a6462fae"
     },
     "shards/w4.json": {
       "bytes": 1564,
-      "sha256": "efd6365cb8ca43cbaf3ea6b866ce58008ee68b2ae66bbcd2c2e382022302a8bf"
+      "sha256": "f2e1c5517fe19aada736f1e00c5f9a9559043fb7815ed51a732125be80f21569"
     },
     "shards/wh.json": {
       "bytes": 5162,
-      "sha256": "579a3404b0e8e29e647541935e63f7f0fb230d27bb37521b187c12b5de9d00f7"
+      "sha256": "fcb3927e542473d3e571a9d549d9ec3206967ab0d0ebf50e1a33bf1f1f2fa8de"
     },
     "stations.json": {
-      "bytes": 1584426,
-      "sha256": "9d726563f855cf76abf5a081b25e20c41ab02df1346e314d529374399c685802"
+      "bytes": 2055039,
+      "sha256": "ad5d9f2845ba4af0ecadf2c1f9fa2b2e2954d72071c8a4309e1895783c10bed1"
     }
   },
   "shards": [
     {
       "cell": "t9",
-      "stations": 90,
-      "bytes": 271832
+      "stations": 91,
+      "bytes": 275948
     },
     {
       "cell": "t9w",
@@ -265,8 +325,8 @@
     },
     {
       "cell": "t9y",
-      "stations": 253,
-      "bytes": 751428
+      "stations": 255,
+      "bytes": 759350
     },
     {
       "cell": "t9y2",
@@ -275,18 +335,18 @@
     },
     {
       "cell": "t9y3",
-      "stations": 57,
-      "bytes": 158999
+      "stations": 58,
+      "bytes": 161585
     },
     {
       "cell": "tc",
-      "stations": 18,
-      "bytes": 51555
+      "stations": 19,
+      "bytes": 55532
     },
     {
       "cell": "td",
-      "stations": 245,
-      "bytes": 743930
+      "stations": 280,
+      "bytes": 830078
     },
     {
       "cell": "tdj",
@@ -295,43 +355,48 @@
     },
     {
       "cell": "tdn",
-      "stations": 88,
-      "bytes": 268062
+      "stations": 89,
+      "bytes": 273678
     },
     {
       "cell": "tdr",
-      "stations": 225,
-      "bytes": 663408
+      "stations": 237,
+      "bytes": 710771
     },
     {
       "cell": "te",
-      "stations": 149,
-      "bytes": 383070
+      "stations": 227,
+      "bytes": 590237
+    },
+    {
+      "cell": "tep",
+      "stations": 277,
+      "bytes": 612101
     },
     {
       "cell": "tf",
-      "stations": 63,
-      "bytes": 168247
+      "stations": 78,
+      "bytes": 212350
     },
     {
       "cell": "tg",
-      "stations": 38,
-      "bytes": 77951
+      "stations": 129,
+      "bytes": 276478
     },
     {
       "cell": "ts",
-      "stations": 98,
-      "bytes": 265381
+      "stations": 115,
+      "bytes": 312596
     },
     {
       "cell": "tt",
-      "stations": 246,
-      "bytes": 514590
+      "stations": 282,
+      "bytes": 626229
     },
     {
       "cell": "tu",
-      "stations": 50,
-      "bytes": 113849
+      "stations": 49,
+      "bytes": 113099
     },
     {
       "cell": "tv",
@@ -380,6 +445,8 @@
   "attribution": [
     "© OpenStreetMap contributors",
     "Contains data from Open Charge Map contributors",
+    "Contains data from Telangana Renewable Energy Development Corporation (TGREDCO), \"EV charging stations - details of location & ownership\" (data as of April 2024), Telangana Open Data Portal, under the Government Open Data License - India (https://data.telangana.gov.in/dataset/ev-charging-stations-details-location-ownership). Not endorsed by the data provider.",
+    "Contains data from Overture Maps Foundation Places (https://docs.overturemaps.org/attribution/), under the Community Data License Agreement - Permissive 2.0 (https://cdla.dev/permissive-2-0/), with data from Meta, Microsoft, PinMeTo, Krick, RenderSEO, DAC, BrightQuery, Birdeye, Uberall, OpenTravel Alliance. Data from Foursquare. Copyright 2024 Foursquare Labs, Inc. All rights reserved. Available under Apache 2.0. Foursquare data was transformed to the Overture schema. Data from AllThePlaces. Available under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/).",
     "Government counts: Ministry of Heavy Industries, Rajya Sabha answers (via BHEL)"
   ]
 }

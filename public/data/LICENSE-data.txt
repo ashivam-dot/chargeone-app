@@ -11,6 +11,24 @@ It also contains data from Open Charge Map contributors (Data Provider 1 only), 
 CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ and https://openchargemap.org/site/about/terms
 Values from Open Charge Map keep that licence and attribution; every field lists its source and licence.
 
+Location-only listings (source "tgredco") come from Telangana Renewable Energy Development Corporation
+(TGREDCO), "EV charging stations - details of location & ownership" (data as of April 2024), Telangana
+Open Data Portal, under the Government Open Data License - India:
+https://data.telangana.gov.in/dataset/ev-charging-stations-details-location-ownership and https://data.gov.in/government-open-data-license-india
+They keep that licence and attribution, are not endorsed by the provider, and must not be uploaded to
+OpenStreetMap. Owner names and names of people in that list are not included.
+
+Location-only listings (source "overture") come from Overture Maps Foundation Places
+(https://docs.overturemaps.org/attribution/), under the Community Data License Agreement - Permissive 2.0
+(full text in LICENSE-CDLA-Permissive-2.0.txt, https://cdla.dev/permissive-2-0/), with data from
+Meta, Microsoft, PinMeTo, Krick, RenderSEO, DAC, BrightQuery, Birdeye, Uberall, OpenTravel Alliance.
+Data from Foursquare. Copyright 2024 Foursquare Labs, Inc. All rights reserved. Available under Apache 2.0. Foursquare data was transformed to the Overture schema. The Foursquare NOTICE is in NOTICE-Foursquare.txt and the Apache License 2.0
+in LICENSE-Apache-2.0.txt. Changes: ChargeOne selected EV charging places in India, dropped some, and
+merged them with the other sources.
+Data from AllThePlaces. Available under CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/).
+Each such record names its upstream dataset ("origin") and licence. They must not be uploaded to
+OpenStreetMap.
+
 Records Open Charge Map marks as copied from Google Maps (Google Place IDs) are excluded.
-If you publish a produced work from this database, credit "© OpenStreetMap contributors, Open Charge Map contributors, ChargeOne".
+If you publish a produced work from this database, credit "© OpenStreetMap contributors, Open Charge Map contributors, Overture Maps Foundation, ChargeOne".
 If you publicly use an adapted version of this database, you must offer it under the ODbL as well.
