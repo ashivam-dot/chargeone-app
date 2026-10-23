@@ -70,6 +70,13 @@ export default defineConfig({
             options: { cacheName: 'station-details', expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 3600 } },
           },
           {
+            // Roadside stays, food, fuel and rest areas, one file per ~156 km cell a planned route crosses.
+            // Their own cache, so a long trip's cells don't push the charger index out of station-data.
+            urlPattern: ({ url }) => url.pathname.startsWith('/data/corridor/'),
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'corridor-places', expiration: { maxEntries: 80, maxAgeSeconds: 30 * 24 * 3600 } },
+          },
+          {
             urlPattern: ({ url }) => url.pathname.startsWith('/data/') || url.pathname.startsWith('/map/'),
             handler: 'StaleWhileRevalidate',
             // index, manifest, coverage, places, the stations.json fallback and the two map styles.

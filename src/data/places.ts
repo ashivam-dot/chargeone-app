@@ -116,7 +116,7 @@ function boundedNumber(raw: string | undefined, min: number, max: number): numbe
  * In India "hotel" often means an eatery, and hostels are often student or worker housing.
  * Such places are tagged as stays in OSM but can't take a traveller for the night.
  */
-const NOT_A_STAY =
+export const NOT_A_STAY =
   /\b(mess|parotta|biriyani|biryani|tiffins?|meals|dhaba|canteen|restaurant|cafe|bakery|sweets?|juice|chai|tea|coffee|dining|kitchen|food|snacks?|chaat|vada ?pav|idli|dosa|pizza|burger|bhojanalaya|khanaval|pg|paying guest|boys|girls|ladies|gents|students?|working wom[ae]n|co-?living|nestaway|zolo|stanza living)\b/i;
 
 export function osmToPlace(el: OsmElement): Place | null {
