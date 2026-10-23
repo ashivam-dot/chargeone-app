@@ -73,6 +73,22 @@ test.describe('charger data you can trust', () => {
     await expect(page.locator('.station__foot')).toContainText('Fix on OpenStreetMap');
   });
 
+  test('an old link with a merged osm- or ocm- id still opens the charger, through the alias buckets', async ({ page }) => {
+    const index = (await (await page.request.get('/data/index.json')).json()) as { columns: { id: string[]; c1: string[]; name: string[] } };
+    // The index lists each station's own ids, shortened (n123 = osm-n123, bare digits = ocm-<digits>).
+    const own = new Set(index.columns.id.map((s) => (/^[nwr]\d+$/.test(s) ? `osm-${s}` : /^\d+$/.test(s) ? `ocm-${s}` : s)));
+    const nameOf = new Map(index.columns.c1.map((c, i) => [`c1_${c}`, index.columns.name[i]]));
+    const bucket = (await (await page.request.get('/data/aliases/0.json')).json()) as { aliases: Record<string, string> };
+    for (const prefix of ['osm-', 'ocm-']) {
+      const found = Object.entries(bucket.aliases).find(([old, c1]) => old.startsWith(prefix) && !own.has(old) && nameOf.get(c1));
+      expect(found, `an ${prefix} alias the index doesn't list`).toBeTruthy();
+      const [old, c1] = found!;
+      await openApp(page, { path: `/?s=${old}` });
+      await expect(page.locator('.sheet .sheet__head h2')).toHaveText(nameOf.get(c1)!);
+      await expect(page.getByTestId('trust')).toBeVisible();
+    }
+  });
+
   test('with a car saved, 2-wheeler-only chargers are hidden until the driver asks for them', async ({ page }) => {
     await openApp(page);
     await expect(page.getByTestId('mode-car')).toHaveAttribute('aria-pressed', 'true');
