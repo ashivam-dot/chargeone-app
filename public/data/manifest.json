@@ -26,7 +26,7 @@
       "licence": "ODbL-1.0",
       "attribution": "© OpenStreetMap contributors",
       "url": "https://www.openstreetmap.org/copyright",
-      "snapshotAt": "2026-10-22T19:55:06Z",
+      "snapshotAt": "2026-10-23T09:06:06Z",
       "raw": 608,
       "records": 595,
       "rejected": {
@@ -148,8 +148,8 @@
       "sha256": "c4c4387b0da9e7d1685ea8f47570114eb85adf34c80a135cfaf514ca4f42f930"
     },
     "chargeone-stations-odbl.zip": {
-      "bytes": 432779,
-      "sha256": "08a2c218074bec8e875b5e35f7c5abd57771c79d7eb408dc17dcaa5c79a3e529"
+      "bytes": 432780,
+      "sha256": "070f139eebe675446233e4163ea725ca1e9eabb509dcd98dbae1e48558ec0b79"
     },
     "coverage.json": {
       "bytes": 12537,
@@ -157,7 +157,7 @@
     },
     "index.json": {
       "bytes": 243069,
-      "sha256": "07a482432eea62005f8fb0fa13bd2f02e63cb0e7cc947866a3ccb75f5b33856a"
+      "sha256": "4b31a5bba2097a51d4cd399db9b47f899b2df1c5d5d527228fca34cae1f13594"
     },
     "LICENSE-data.txt": {
       "bytes": 1058,
@@ -217,7 +217,7 @@
     },
     "shards/tg.json": {
       "bytes": 77951,
-      "sha256": "ef4f10c6cc01184999714d7ecbe460c4789adb82c4abb256bf44ee164a894de1"
+      "sha256": "75e370381bf93e474a5b669b2a71932ac9accfb54d7279b33bf38cf3de5536dd"
     },
     "shards/ts.json": {
       "bytes": 265381,
@@ -249,7 +249,7 @@
     },
     "stations.json": {
       "bytes": 1584426,
-      "sha256": "74b85eda752a16cbaedece69d8e89c3bbffa67399347b5850c6b3a314fdcfffa"
+      "sha256": "9d726563f855cf76abf5a081b25e20c41ab02df1346e314d529374399c685802"
     }
   },
   "shards": [
