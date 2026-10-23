@@ -29,6 +29,7 @@ import { Plans, type Paywall } from './ui/Plans.tsx';
 import { lazy } from './ui/shell/lazy.tsx';
 import { TabBar, type Tab } from './ui/shell/TabBar.tsx';
 import { SignIn, signInReady } from './ui/SignIn.tsx';
+import { forgetFirebaseToken } from './lib/firebaseSession.ts';
 import { StationSheet } from './ui/StationSheet.tsx';
 import { TripPlanner, type DriveRequest, type PlannedTrip, type TripView } from './ui/TripPlanner.tsx';
 import { YouScreen } from './ui/YouScreen.tsx';
@@ -37,7 +38,7 @@ const CarScreen = lazy(() => import('./ui/car/CarScreen.tsx').then((m) => m.CarS
 const CopilotScreen = lazy(() => import('./ui/copilot/CopilotScreen.tsx').then((m) => m.CopilotScreen));
 const DriveMode = lazy(() => import('./ui/drive/DriveMode.tsx').then((m) => m.DriveMode));
 
-type Overlay = 'plans' | 'signin' | 'about' | 'garage' | null;
+type Overlay = 'plans' | 'signin' | 'username' | 'methods' | 'about' | 'garage' | null;
 
 const STATUS_POLL_MS = 60_000;
 /** Must match the side panel width plus margin in styles.css (min-width: 820px). */
@@ -127,7 +128,7 @@ export function App() {
   // Fetch the other screens once the map is up, so they open instantly and still open offline.
   useEffect(() => {
     if (!dataset) return;
-    const t = setTimeout(() => [CarScreen, CopilotScreen, DriveMode].forEach((c) => c.preload()), 2000);
+    const t = setTimeout(() => [CarScreen, CopilotScreen, DriveMode, SignIn].forEach((c) => c.preload()), 2000);
     return () => clearTimeout(t);
   }, [dataset]);
 
@@ -603,7 +604,7 @@ export function App() {
       {tab === 'copilot' && !drive && (
         <CopilotScreen
           signedIn={signedIn}
-          account={me?.user?.email ?? null}
+          account={me?.user ? me.user.email || me.user.phone || (me.user.username ? `@${me.user.username}` : null) || me.user.name || null : null}
           canUse={plan.copilot}
           trialAvailable={trialAvailable}
           vehicle={vehicle}
@@ -623,6 +624,7 @@ export function App() {
           onToggleDark={toggleDark}
           onChanged={refreshMe}
           onSignedOut={() => {
+            forgetFirebaseToken();
             clearSavedTrips();
             removeJson('plan');
             setTripOpen(false);
@@ -631,6 +633,8 @@ export function App() {
             refreshMe();
           }}
           onSignIn={() => setOverlay('signin')}
+          onSetUsername={() => setOverlay('username')}
+          onSignInMethods={() => setOverlay('methods')}
           signInReady={canSignIn}
           onPlans={() => unlock()}
           onGarage={() => setOverlay('garage')}
@@ -660,10 +664,12 @@ export function App() {
         />
       )}
 
-      {overlay === 'signin' && (
+      {(overlay === 'signin' || overlay === 'username' || overlay === 'methods') && (
         <SignIn
           config={config}
           dark={dark}
+          start={overlay === 'signin' ? undefined : overlay}
+          me={me}
           onClose={() => {
             trialWanted.current = false;
             setOverlay(null);

@@ -28,7 +28,9 @@ export function json(body: unknown, init: ResponseInit = {}): Response {
 
 export function errorResponse(err: unknown): Response {
   if (err instanceof HttpError) {
-    return json({ error: err.code, message: err.message, ...err.extra }, { status: err.status });
+    const retry = err.extra.retryAfter;
+    const headers: Record<string, string> = typeof retry === 'number' ? { 'Retry-After': String(retry) } : {};
+    return json({ error: err.code, message: err.message, ...err.extra }, { status: err.status, headers });
   }
   console.error('Unhandled error', err instanceof Error ? err.stack : String(err));
   return json({ error: 'internal', message: 'Something went wrong. Please try again.' }, { status: 500 });
@@ -109,7 +111,7 @@ export function clientIp(req: Request): string {
   return req.headers.get('CF-Connecting-IP') ?? 'unknown';
 }
 
-async function shortHash(value: string): Promise<string> {
+export async function shortHash(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return toHex(new Uint8Array(digest)).slice(0, 24);
 }
@@ -169,6 +171,14 @@ export async function enforceRateLimit(db: D1Database, key: string, limit: numbe
   if (!(await rateLimit(db, key, limit, windowSec))) {
     throw new HttpError(429, 'rate_limited', 'Too many requests. Please wait a moment.');
   }
+}
+
+/** Like enforceRateLimit, and the 429 says when to try again (Retry-After header and retryAfter seconds). */
+export async function enforceRateLimitRetry(db: D1Database, key: string, limit: number, windowSec: number, message: string, nowMs = Date.now()): Promise<void> {
+  if (await rateLimit(db, key, limit, windowSec, nowMs)) return;
+  const nowSec = Math.floor(nowMs / 1000);
+  const retryAfter = Math.max(1, Math.floor(nowSec / windowSec) * windowSec + windowSec - nowSec);
+  throw new HttpError(429, 'rate_limited', message, { retryAfter });
 }
 
 /** Start of today in India (UTC+5:30), in epoch seconds: the window for per-day allowances. */

@@ -115,6 +115,50 @@ SITE_URL=https://chargeone.akshshivam5.workers.dev npm run deploy   # build, rem
 - Tests: `worker/admin.test.ts`, `e2e/admin.spec.ts` (each device project opens a different test account; only
   desktop tries a wrong token, because of the 5-per-15-min login limit).
 
+## Sign-in methods: Google, email + password, username, phone OTP (2026-10-23)
+
+- Firebase Auth project `chargeone-512418` (Spark). Public web config + `GOOGLE_CLIENT_ID` are plain vars
+  in `wrangler.jsonc` (public by design); `/api/config.firebase` is null when unset, which hides the options.
+- Worker: `worker/firebase.ts` (RS256 ID-token check against the securetoken JWKS, Identity Toolkit REST),
+  `worker/identities.ts` (linking, usernames, password login, forgot, deletion). Migration
+  `0007_auth_identities.sql`: `auth_identities`, `users.username`, `trial_accounts`. Phone-only users keep
+  `users.email = ''` (API says null). Only masked phones and a keyed phone hash are stored.
+- Routes: `POST /api/auth/firebase {idToken,name?}`, `POST /api/auth/password-login {username|identifier,password}`
+  (unknown usernames cost the same Firebase call, same 401), `POST /api/auth/forgot {identifier}` (always the
+  same answer), `GET /api/auth/username-available?u=`, `POST /api/auth/username {username}`,
+  `POST /api/me/delete {firebaseIdToken?}`. 429s carry `Retry-After`.
+- Linking is explicit only (prevents pre-verification takeover): signing in with a different method on an
+  email that already has an account answers 409 `account_exists {methods}` and creates nothing (two
+  password logins on one email still join). Add Google while signed in: `POST /api/auth/link/google
+  {credential}` (same email, else 400 `email_mismatch`; 409 `google_in_use`; only UNIQUE errors mapped).
+  Remove a method: `POST /api/auth/unlink {provider}` (409 `last_method`, 404 `not_linked`), revokes every
+  session and reissues this device's cookie; removing password also frees the username. UI: You,
+  "Sign-in methods" (`MethodsView.tsx`). Unverified = 403 `email_unverified`.
+- Usernames only for accounts with a password identity (else 409 `username_needs_password`); "@name" is
+  accepted wherever a username is typed (`stripHandle`).
+- Trials are keyed by every login (Google sub, email, canonical mailbox (gmail dots/+tags folded), Firebase
+  uid, phone hash); throwaway-inbox-only accounts (`isDisposableEmail`) get 409 `trial_not_eligible`; at
+  most 20 trial starts per network a day (`trial-ip:` rate limit; `TRIAL_NETWORK_DAILY_LIMIT` overrides, `npm run dev:api` raises it for e2e).
+- JWKS cache: in-flight fetch shared, per-caller deadline, empty answer = failure, last good keys served up
+  to 24 h past expiry while Google's endpoint fails (retry once a minute).
+- `/api/auth/dev` (development only) takes `method: password|phone` to give the test user that identity.
+- Browser REST client without the SDK: `src/lib/firebaseRest.ts`. Test phone `+91 99999 00001` / `112233`
+  (Spark allows ~10 real SMS a day). Firebase console: add each app host to Authorized domains.
+- Tests: `worker/firebase.test.ts`, `worker/auth-firebase.test.ts`, `src/shared/auth.test.ts`, `src/lib/firebaseRest.test.ts`.
+- UI (lazy chunk, `src/ui/signin/`): `SignInSheet.tsx` (views signin/register/forgot/verify/username;
+  Google on top, "or", Email|Phone tabs), `EmailForms.tsx`, `PhoneForm.tsx` + `src/lib/phoneAuth.ts`
+  (Firebase SDK 13 loaded only when Phone opens, in-memory persistence, invisible reCAPTCHA),
+  `GoogleButton.tsx`, `fields.tsx`, `signin.css`. `src/ui/SignIn.tsx` is only the lazy wrapper +
+  `signInReady`. Focus moves to each new view's first field or heading. Username prompt once per password account after first sign-in (`chargeone:username-asked`); a
+  username typed at registration is claimed only for that same email. Delete account sends a fresh
+  Firebase ID token (`src/lib/firebaseSession.ts`). CSP in `public/_headers` allows reCAPTCHA.
+- E2E: `e2e/signin.spec.ts` with `e2e/firebase-mock.ts` (fakes Identity Toolkit, securetoken, GSI, and
+  the Worker's 3 token-taking routes; each sign-in becomes a real session via `/api/auth/dev`; Google
+  hosts are aborted and recorded as `leaks`). Phone test mode (reCAPTCHA off) needs ALL of: devLogin,
+  localhost/127.0.0.1, `window.__CHARGEONE_E2E_PHONE__ === true`. Run against `wrangler dev` with
+  `--var ENVIRONMENT:development --var SESSION_SECRET:<random>` (no .dev.vars needed). Screenshots:
+  `node scripts/signin-shots.ts <out-dir> --base http://127.0.0.1:8787`.
+
 Demo pipeline (only when re-recording): `scripts/demo-narration.json` -> `scripts/demo-voice.py`
 (Supertonic 3 via voice-server; a temporary venv with `voice-server/requirements.txt` and `MODEL_DIR`)
 -> `scripts/demo-video.ts` (full Chromium headless on the GPU: `npx playwright install chromium`; the

@@ -13,6 +13,8 @@ import { playEnabled } from './play.ts';
 import { PUBLIC_ROUTES_PER_DAY, PUBLIC_ROUTE_DAY_SLOT, publicRouterName, router } from './routing.ts';
 import { stationIndex } from './stations.ts';
 import { upiEnabled } from './upi.ts';
+import { FIREBASE_KEYS_URL, firebaseConfig } from './firebase.ts';
+import { maskEmail, type AuthProvider } from '../src/shared/auth.ts';
 import { lookupProvider, vehicleLookup } from './vehicleLookup.ts';
 import { voiceEnabled, voiceTts } from './voice.ts';
 
@@ -58,16 +60,37 @@ const secret = (name: string) => `npx wrangler secret put ${name}`;
 export function integrations(env: Env, origin: string): Integration[] {
   const list: Integration[] = [];
   const googleId = env.GOOGLE_CLIENT_ID?.trim() ?? '';
+  const fb = firebaseConfig(env);
   list.push({
     id: 'google',
     name: 'Google sign-in',
     configured: GOOGLE_CLIENT_ID.test(googleId),
-    detail: !googleId ? 'Off: nobody can sign in, so no trial, copilot or paid plans.' : GOOGLE_CLIENT_ID.test(googleId) ? 'Client ID set.' : 'Client ID does not look like a Google OAuth web client ID.',
+    detail: !googleId
+      ? fb
+        ? 'Off: no Google button (email and phone sign-in still work).'
+        : 'Off: nobody can sign in, so no trial, copilot or paid plans.'
+      : GOOGLE_CLIENT_ID.test(googleId) ? 'Client ID set.' : 'Client ID does not look like a Google OAuth web client ID.',
     missing: GOOGLE_CLIENT_ID.test(googleId) ? [] : ['GOOGLE_CLIENT_ID'],
     howTo: GOOGLE_CLIENT_ID.test(googleId)
       ? `Make sure ${origin} is under Authorized JavaScript origins of that client.`
       : `Google Cloud console > Credentials > OAuth client ID (Web application), add ${origin} as an Authorized JavaScript origin, put the ID in wrangler.jsonc vars.GOOGLE_CLIENT_ID, then deploy.`,
     probe: 'google-config',
+  });
+  const fbMissing = [!fb && !env.FIREBASE_API_KEY?.trim() && 'FIREBASE_API_KEY', !fb && !env.FIREBASE_PROJECT_ID?.trim() && 'FIREBASE_PROJECT_ID'].filter(Boolean) as string[];
+  list.push({
+    id: 'firebase',
+    name: 'Email and phone sign-in (Firebase)',
+    configured: fb !== null,
+    detail: fb
+      ? `Project ${fb.projectId}: email and password, username, mobile number with a code.`
+      : fbMissing.length
+        ? 'Off: only Google sign-in.'
+        : 'FIREBASE_API_KEY or FIREBASE_PROJECT_ID does not look right.',
+    missing: fb ? [] : fbMissing.length ? fbMissing : ['FIREBASE_API_KEY', 'FIREBASE_PROJECT_ID'],
+    howTo: fb
+      ? `Firebase console > Authentication: keep Email/Password and Phone on, and ${new URL(origin).hostname} under Authorised domains. Spark allows about 10 text messages a day.`
+      : 'Firebase console > Project settings > Your apps (Web): put apiKey, projectId, authDomain and appId in wrangler.jsonc vars FIREBASE_*, then deploy.',
+    probe: 'firebase-config',
   });
   const sessionOk = Boolean(env.SESSION_SECRET && env.SESSION_SECRET.length >= 32);
   list.push({
@@ -239,24 +262,30 @@ const likeTerm = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 export async function listUsers(env: Env, url: URL) {
   const { limit, offset, page: p } = page(url);
   const q = (url.searchParams.get('q') ?? '').trim().slice(0, 100).toLowerCase();
-  const where = q ? "WHERE (LOWER(u.email) LIKE ?1 ESCAPE '\\' OR LOWER(COALESCE(u.name, '')) LIKE ?1 ESCAPE '\\')" : 'WHERE ?1 IS NULL';
+  const where = q
+    ? "WHERE (LOWER(u.email) LIKE ?1 ESCAPE '\\' OR LOWER(COALESCE(u.name, '')) LIKE ?1 ESCAPE '\\' OR COALESCE(u.username, '') LIKE ?1 ESCAPE '\\')"
+    : 'WHERE ?1 IS NULL';
   const term = q ? likeTerm(q) : null;
   const [rows, count] = await Promise.all([
     env.DB.prepare(
-      `SELECT u.id, u.email, u.name, u.created_at, u.is_test, e.plan, e.active_until, e.source, e.status
-       FROM users u LEFT JOIN entitlements e ON e.user_id = u.id ${where}
+      `SELECT ${USER_COLUMNS} FROM users u LEFT JOIN entitlements e ON e.user_id = u.id ${where}
        ORDER BY u.created_at DESC LIMIT ?2 OFFSET ?3`,
     ).bind(term, limit, offset).all<UserRow>(),
     env.DB.prepare(`SELECT COUNT(*) AS n FROM users u ${where}`).bind(term).first<{ n: number }>(),
   ]);
   const now = new Date();
-  return { users: rows.results.map((r) => presentUser(r, now)), page: p, limit, total: count?.n ?? 0 };
+  const methods = await signInMethods(env, rows.results);
+  return { users: rows.results.map((r) => presentUser(r, now, methods.get(r.id) ?? [])), page: p, limit, total: count?.n ?? 0 };
 }
+
+const USER_COLUMNS = 'u.id, u.email, u.name, u.username, u.google_sub, u.created_at, u.is_test, e.plan, e.active_until, e.source, e.status';
 
 interface UserRow {
   id: string;
   email: string;
   name: string | null;
+  username: string | null;
+  google_sub: string | null;
   created_at: string;
   is_test: number;
   plan: PlanId | null;
@@ -265,12 +294,45 @@ interface UserRow {
   status: string | null;
 }
 
-function presentUser(r: UserRow, now: Date) {
+/** One sign-in method of an account, masked: "a•••@gmail.com", "+91•••••••001". */
+export interface SignInMethod {
+  provider: AuthProvider;
+  display: string;
+}
+
+/** Each account's sign-in methods (Google, email and password, phone), masked, by user id. */
+async function signInMethods(env: Env, rows: UserRow[]): Promise<Map<string, SignInMethod[]>> {
+  const out = new Map<string, SignInMethod[]>();
+  if (!rows.length) return out;
+  const { results } = await env.DB.prepare(
+    'SELECT user_id, provider, display FROM auth_identities WHERE user_id IN (SELECT value FROM json_each(?1)) ORDER BY created_at',
+  )
+    .bind(JSON.stringify(rows.map((r) => r.id)))
+    .all<{ user_id: string; provider: AuthProvider; display: string | null }>();
+  for (const r of rows) {
+    const mine = results.filter((i) => i.user_id === r.id);
+    const has = (p: AuthProvider) => mine.some((i) => i.provider === p);
+    const email = r.email && r.email !== 'deleted' ? maskEmail(r.email) : '';
+    const list: SignInMethod[] = [];
+    if (has('google') || (r.google_sub && !r.google_sub.includes(':'))) list.push({ provider: 'google', display: email });
+    if (has('password')) list.push({ provider: 'password', display: email });
+    for (const phone of mine.filter((i) => i.provider === 'phone')) list.push({ provider: 'phone', display: phone.display ?? '' });
+    out.set(r.id, list);
+  }
+  return out;
+}
+
+function presentUser(r: UserRow, now: Date, methods: SignInMethod[]) {
   const plan = r.plan ? effectivePlan({ plan: r.plan, activeUntil: r.active_until, periodStart: null }, now) : 'free';
   return {
     id: r.id,
-    email: r.email,
+    /** Null for phone-only accounts. */
+    email: r.email || null,
     name: r.name,
+    username: r.username,
+    /** Masked phone of a phone account, else null. */
+    phone: methods.find((m) => m.provider === 'phone')?.display ?? null,
+    methods,
     createdAt: r.created_at,
     isTest: r.is_test === 1,
     plan,
@@ -282,10 +344,9 @@ function presentUser(r: UserRow, now: Date) {
 
 async function findUser(env: Env, id: string): Promise<UserRow> {
   if (!/^[0-9a-f-]{36}$/.test(id)) throw new HttpError(400, 'invalid', 'Invalid user id.');
-  const row = await env.DB.prepare(
-    `SELECT u.id, u.email, u.name, u.created_at, u.is_test, e.plan, e.active_until, e.source, e.status
-     FROM users u LEFT JOIN entitlements e ON e.user_id = u.id WHERE u.id = ?1`,
-  ).bind(id).first<UserRow>();
+  const row = await env.DB.prepare(`SELECT ${USER_COLUMNS} FROM users u LEFT JOIN entitlements e ON e.user_id = u.id WHERE u.id = ?1`)
+    .bind(id)
+    .first<UserRow>();
   if (!row) throw new HttpError(404, 'unknown_user', 'No such user.');
   return row;
 }
@@ -306,8 +367,9 @@ export async function userDetail(env: Env, id: string, now = new Date()) {
     env.DB.prepare('SELECT id, counts, distance_km, replans, created_at FROM trips WHERE user_id = ?1 ORDER BY created_at DESC LIMIT 10').bind(id).all(),
     env.DB.prepare('SELECT ref, plan, amount_paise, status, created_at FROM upi_payments WHERE user_id = ?1 ORDER BY created_at DESC LIMIT 10').bind(id).all(),
   ]);
+  const methods = await signInMethods(env, [row]);
   return {
-    user: presentUser(row, now),
+    user: presentUser(row, now, methods.get(row.id) ?? []),
     entitlement,
     trial,
     counts,
@@ -389,10 +451,14 @@ export async function resetQuota(req: Request, env: Env, id: string) {
 
 // ---- Trips, feedback, reports, audit ----
 
+/** Who a row belongs to: the email, or the masked phone of a phone-only account. */
+const USER_LABEL =
+  "COALESCE(NULLIF(u.email, ''), (SELECT i.display FROM auth_identities i WHERE i.user_id = u.id AND i.provider = 'phone' ORDER BY i.created_at LIMIT 1))";
+
 export async function listTrips(env: Env, url: URL) {
   const { limit, offset, page: p } = page(url);
   const { results } = await env.DB.prepare(
-    `SELECT t.id, t.counts, t.distance_km, t.replans, t.created_at, u.email, u.is_test
+    `SELECT t.id, t.counts, t.distance_km, t.replans, t.created_at, ${USER_LABEL} AS email, u.is_test
      FROM trips t JOIN users u ON u.id = t.user_id ORDER BY t.created_at DESC LIMIT ?1 OFFSET ?2`,
   ).bind(limit, offset).all();
   return { trips: results, page: p, limit };
@@ -403,7 +469,7 @@ export async function listFeedback(env: Env, url: URL) {
   const { limit, offset, page: p } = page(url);
   const { results } = await env.DB.prepare(
     `SELECT f.id, f.rating, f.category, f.message, f.screen, f.app_version, f.platform, f.contact_ok, f.created_at,
-            CASE WHEN f.contact_ok = 1 THEN u.email END AS email, COALESCE(u.is_test, 0) AS is_test, f.user_id IS NOT NULL AS signed_in
+            CASE WHEN f.contact_ok = 1 THEN NULLIF(u.email, '') END AS email, COALESCE(u.is_test, 0) AS is_test, f.user_id IS NOT NULL AS signed_in
      FROM feedback f LEFT JOIN users u ON u.id = f.user_id ORDER BY f.created_at DESC LIMIT ?1 OFFSET ?2`,
   ).bind(limit, offset).all();
   return { feedback: results, page: p, limit };
@@ -413,7 +479,7 @@ export async function listReports(env: Env, url: URL) {
   const { limit, offset, page: p } = page(url);
   const problems = url.searchParams.get('problems') === '1';
   const { results } = await env.DB.prepare(
-    `SELECT c.id, c.station_id, c.kind, c.kw, c.vehicle, c.note, c.created_at, u.email, u.is_test
+    `SELECT c.id, c.station_id, c.kind, c.kw, c.vehicle, c.note, c.created_at, ${USER_LABEL} AS email, u.is_test
      FROM checkins c JOIN users u ON u.id = c.user_id ${problems ? `WHERE c.kind IN ${PROBLEM_KINDS}` : ''}
      ORDER BY c.created_at DESC LIMIT ?1 OFFSET ?2`,
   ).bind(limit, offset).all<{ station_id: string } & Record<string, unknown>>();
@@ -472,6 +538,7 @@ export async function testSession(req: Request, env: Env, secure: boolean): Prom
     env.DB.prepare('UPDATE users SET is_test = 1 WHERE id = ?1').bind(user.id),
     env.DB.prepare('DELETE FROM entitlements WHERE user_id = ?1').bind(user.id),
     env.DB.prepare('DELETE FROM trials WHERE user_id = ?1').bind(user.id),
+    env.DB.prepare('DELETE FROM trial_accounts WHERE user_id = ?1').bind(user.id),
   ]);
   await clearUserToday(env, user.id);
   await env.DB.prepare('DELETE FROM trips WHERE user_id = ?1').bind(user.id).run();
@@ -495,7 +562,7 @@ export async function testSession(req: Request, env: Env, secure: boolean): Prom
 
 // ---- Live self-tests ----
 
-export const PROBES = ['routing', 'ai', 'vehicle', 'voice', 'google-config'] as const;
+export const PROBES = ['routing', 'ai', 'vehicle', 'voice', 'google-config', 'firebase-config'] as const;
 type Probe = (typeof PROBES)[number];
 
 interface ProbeResult {
@@ -572,6 +639,17 @@ async function runProbe(name: Probe, req: Request, env: Env, url: URL): Promise<
         detail: res.ok
           ? `Client ID looks right and Google's keys are reachable. ${new URL(req.url).origin} must be an Authorized JavaScript origin of that client.`
           : `Google's signing keys answered ${res.status}.`,
+      };
+    }
+    case 'firebase-config': {
+      const fb = firebaseConfig(env);
+      if (!fb) return { ok: false, detail: 'FIREBASE_API_KEY or FIREBASE_PROJECT_ID is missing or malformed, so email and phone sign-in are hidden.' };
+      const res = await fetch(FIREBASE_KEYS_URL, { signal: AbortSignal.timeout(8000) });
+      return {
+        ok: res.ok,
+        detail: res.ok
+          ? `Project ${fb.projectId} is set and Firebase's token keys are reachable. ${new URL(req.url).hostname} must be an Authorized domain in Firebase Authentication.`
+          : `Firebase's token keys answered ${res.status}.`,
       };
     }
   }

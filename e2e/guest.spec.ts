@@ -117,7 +117,7 @@ test.describe('guest on a server that is not fully set up', () => {
   });
 
   test('a guest over the Basic limit sees the exact reason, not a sign-in screen', async ({ page }) => {
-    await withConfig(page, { googleClientId: null, devLogin: false });
+    await withConfig(page, { googleClientId: null, firebase: null, devLogin: false });
     await mockPlaceSearch(page);
     await page.route('**/api/route', (route) =>
       route.fulfill({
@@ -148,7 +148,7 @@ test.describe('guest on a server that is not fully set up', () => {
   });
 
   test('sign-in explains it is being set up and lets the guest carry on', async ({ page }) => {
-    await withConfig(page, { googleClientId: null, devLogin: false });
+    await withConfig(page, { googleClientId: null, firebase: null, devLogin: false });
     await openApp(page);
     await page.getByTestId('tab-you').click();
     await expect(page.getByTestId('screen-you')).toContainText('Free accounts are coming soon');
@@ -156,7 +156,7 @@ test.describe('guest on a server that is not fully set up', () => {
     await page.getByTestId('you-signin').click();
 
     const sheet = page.getByTestId('signin-unavailable');
-    await expect(sheet).toContainText('Google sign-in is being set up');
+    await expect(sheet).toContainText('Sign-in is being set up');
     await expect(sheet).toContainText('Trip length: Up to 100 km');
     await expect(sheet).toContainText('Trip plans: 1 a day');
     await page.getByTestId('signin-guest').click();

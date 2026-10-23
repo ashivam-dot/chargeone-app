@@ -25,7 +25,23 @@ import {
   upsertUser,
   verifyGoogleIdToken,
   currentUser,
+  type User,
 } from './auth.ts';
+import { firebaseConfig } from './firebase.ts';
+import {
+  accountProfile,
+  claimUsername,
+  deleteFirebaseAccount,
+  firebaseSignIn,
+  forgotPassword,
+  googleUser,
+  identityDeletion,
+  linkDevIdentity,
+  linkGoogle,
+  passwordLogin,
+  unlinkMethod,
+  usernameAvailability,
+} from './identities.ts';
 import { basicTripsToday, planBasicRoute } from './basic.ts';
 import { cancelAllSubscriptions, cancelSubscription, confirmCheckout, createCheckout, handleWebhook } from './billing.ts';
 import { getEntitlement, grantPlan, usageCounts } from './entitlements.ts';
@@ -66,13 +82,17 @@ const STATUS_CACHE_KEY = 'https://chargeone.internal/api/status';
 /** The edge cache exists only on Cloudflare; tests and Node run without it. */
 const edgeCache = (): Cache | null => (typeof caches === 'undefined' ? null : caches.default);
 
-async function meResponse(req: Request, env: Env, userId: string, email: string, name: string | null) {
+async function meResponse(req: Request, env: Env, user: User) {
   const now = new Date();
-  const e = await getEntitlement(env, userId);
+  const e = await getEntitlement(env, user.id);
   const plan = effectivePlan(e, now);
-  const [usage, trial] = await Promise.all([usageCounts(env, userId, plan, now), trialInfo(env, userId, await deviceKey(req), e, now)]);
+  const [usage, trial, profile] = await Promise.all([
+    usageCounts(env, user.id, plan, now),
+    trialInfo(env, user.id, await deviceKey(req), e, now),
+    accountProfile(env, user),
+  ]);
   return {
-    user: { email, name },
+    user: profile,
     plan,
     entitlement: e ? { plan: e.plan, activeUntil: e.activeUntil, status: e.status, source: e.source } : null,
     usage,
@@ -103,6 +123,8 @@ route('GET', '/api/config', async (_req, env) =>
   json(
     {
       googleClientId: env.GOOGLE_CLIENT_ID || null,
+      /** Public Firebase web config for email and phone sign-in; null hides those options. */
+      firebase: firebaseConfig(env),
       paymentsEnabled: Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET) || upiEnabled(env) || playEnabled(env),
       payments: { razorpay: Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET), upi: upiEnabled(env), play: playEnabled(env) },
       devLogin: isDev(env),
@@ -119,20 +141,50 @@ route('POST', '/api/auth/google', async (req, env) => {
   const body = await readJson(req, 4096);
   const credential = str(body, 'credential', { max: 4000 })!;
   const identity = await verifyGoogleIdToken(credential, env.GOOGLE_CLIENT_ID);
-  const user = await upsertUser(env, identity.sub, identity.email, identity.name);
-  const token = await issueSession(env, user);
-  return json(await meResponse(req, env, user.id, user.email, user.name), {
-    headers: { 'Set-Cookie': sessionCookie(token, secureCookies(req, env)) },
-  });
+  return signedIn(req, env, await googleUser(env, identity));
 });
+
+/** The session cookie plus the same body as /api/me, for every way of signing in. */
+async function signedIn(req: Request, env: Env, user: User, extra: Record<string, unknown> = {}): Promise<Response> {
+  const token = await issueSession(env, user);
+  return json({ ...(await meResponse(req, env, user)), ...extra }, { headers: { 'Set-Cookie': sessionCookie(token, secureCookies(req, env)) } });
+}
+
+// Email and password, and phone, through Firebase Auth. See worker/identities.ts.
+route('POST', '/api/auth/firebase', async (req, env) => signedIn(req, env, await firebaseSignIn(req, env)));
+route('POST', '/api/auth/password-login', async (req, env) => {
+  const { user, idToken } = await passwordLogin(req, env);
+  // The browser keeps the short-lived Firebase ID token only to delete the Firebase user with the account.
+  return signedIn(req, env, user, { firebaseIdToken: idToken });
+});
+route('POST', '/api/auth/link/google', async (req, env) => {
+  const user = await requireUser(req, env);
+  await enforceRateLimit(env.DB, `auth:${await clientKey(req)}`, 20, 600);
+  const body = await readJson(req, 4096);
+  const credential = str(body, 'credential', { max: 4000 })!;
+  await linkGoogle(env, user, await verifyGoogleIdToken(credential, env.GOOGLE_CLIENT_ID));
+  return signedIn(req, env, user);
+});
+route('POST', '/api/auth/unlink', async (req, env) => {
+  const user = await requireUser(req, env);
+  await unlinkMethod(req, env, user);
+  // Every other device signs in again, so a method someone else had added stops working at once.
+  await revokeSessions(env, user.id);
+  return signedIn(req, env, user);
+});
+route('POST', '/api/auth/forgot',async (req, env) => json(await forgotPassword(req, env)));
+route('GET', '/api/auth/username-available', async (req, env) => json(await usernameAvailability(req, env)));
+route('POST', '/api/auth/username', async (req, env) => json(await claimUsername(req, env, await requireUser(req, env))));
 
 route('POST', '/api/auth/dev', async (req, env) => {
   if (!isDev(env)) throw new HttpError(404, 'not_found', 'Not found.');
   const body = await readJson(req, 512);
   const email = str(body, 'email', { max: 80, pattern: /^[a-z0-9._-]+@local\.test$/, optional: true }) ?? 'driver@local.test';
+  const method = str(body, 'method', { max: 10, pattern: /^(password|phone)$/, optional: true }) as 'password' | 'phone' | undefined;
   const user = await upsertUser(env, `dev:${email}`, email, 'Test driver');
+  if (method) await linkDevIdentity(env, method, email, user.id);
   const token = await issueSession(env, user);
-  return json(await meResponse(req, env, user.id, user.email, user.name), {
+  return json(await meResponse(req, env, user), {
     headers: { 'Set-Cookie': sessionCookie(token, secureCookies(req, env)) },
   });
 });
@@ -150,13 +202,19 @@ route('POST', '/api/auth/logout-all', async (req, env) => {
 route('GET', '/api/me', async (req, env) => {
   const user = await currentUser(req, env);
   if (!user) return json(await guestMeResponse(req, env));
-  return json(await meResponse(req, env, user.id, user.email, user.name));
+  return json(await meResponse(req, env, user));
 });
 
 route('POST', '/api/me/delete', async (req, env) => {
   const user = await requireUser(req, env);
+  // Optional body {firebaseIdToken}: a fresh Firebase ID token, so the Firebase user goes too.
+  const body = req.headers.get('Content-Length') === '0' ? {} : await readJson(req, 8192).catch(() => ({}));
+  const firebaseIdToken = typeof body.firebaseIdToken === 'string' && body.firebaseIdToken.length <= 4096 ? body.firebaseIdToken : null;
   await cancelAllSubscriptions(env, user.id);
+  // Before the identity rows go, which prove the Firebase user belongs to this account.
+  const firebaseDeleted = await deleteFirebaseAccount(req, env, user, firebaseIdToken);
   await env.DB.batch([
+    ...identityDeletion(env, user.id),
     env.DB.prepare('DELETE FROM trips WHERE user_id = ?1').bind(user.id),
     env.DB.prepare('DELETE FROM entitlements WHERE user_id = ?1').bind(user.id),
     env.DB.prepare('DELETE FROM feedback WHERE user_id = ?1').bind(user.id),
@@ -165,7 +223,7 @@ route('POST', '/api/me/delete', async (req, env) => {
       "UPDATE users SET email = 'deleted', name = NULL, google_sub = NULL, session_version = session_version + 1 WHERE id = ?1",
     ).bind(user.id),
   ]);
-  return json({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie(secureCookies(req, env)) } });
+  return json({ ok: true, firebaseDeleted }, { headers: { 'Set-Cookie': clearSessionCookie(secureCookies(req, env)) } });
 });
 
 route('GET', '/api/status', async (_req, env) => {
@@ -199,7 +257,7 @@ route('POST', '/api/route', async (req, env) => {
 route('POST', '/api/trial/start', async (req, env) => {
   const user = await requireUser(req, env);
   await startTrial(req, env, user);
-  return json(await meResponse(req, env, user.id, user.email, user.name));
+  return json(await meResponse(req, env, user));
 });
 
 route('POST', '/api/feedback', async (req, env) => {
@@ -289,7 +347,7 @@ route('POST', '/api/dev/grant', async (req, env) => {
     status: 'active',
     periodStart: now,
   });
-  return json(await meResponse(req, env, user.id, user.email, user.name));
+  return json(await meResponse(req, env, user));
 });
 
 const SEO_PATH = /^\/(charger|ev-charging)\//;
