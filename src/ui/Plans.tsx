@@ -9,6 +9,7 @@ const UpiPay = lazy(
   () => <p class="muted">Loading UPI…</p>,
 );
 import { BASIC, COMPARE, FREE_TRIP_KM, PLANS, PLAN_ROWS, TRIAL_DAYS, YEARLY_SAVING_PCT, cheapestWith, formatRupees, isPlus, type Perk, type Plan, type PlanId } from '../shared/plans.ts';
+import { PerkItem } from './PerkItem.tsx';
 import { Sheet } from './Sheet.tsx';
 
 /** Why the plans screen opened: the server refused a trip, or the user tapped a locked feature. */
@@ -118,25 +119,6 @@ function faq(m: Method): Array<[string, string]> {
 }
 
 const PLUS_SUMMARY = `${PLANS.plus_monthly.longTripQuota} long trips a month, any distance`;
-
-export function PerkItem({ label, value }: { label: string; value: boolean | string }) {
-  const included = value !== false;
-  return (
-    <li class={`perk${included ? '' : ' perk--no'}`}>
-      {included ? <Check size={16} aria-hidden="true" /> : <Minus size={16} aria-hidden="true" />}
-      <span>
-        {typeof value === 'string' ? (
-          <>
-            {label}: <strong>{value}</strong>
-          </>
-        ) : (
-          label
-        )}
-        {!included && <span class="visually-hidden"> (not included)</span>}
-      </span>
-    </li>
-  );
-}
 
 function Cell({ value }: { value: boolean | string }) {
   if (value === true) return <Check size={16} class="cell--yes" role="img" aria-label="Included" />;

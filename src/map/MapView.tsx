@@ -22,6 +22,12 @@ export type FlyTarget =
   | { kind: 'point'; lat: number; lng: number; zoom: number }
   | { kind: 'bbox'; bbox: [number, number, number, number] };
 
+/** What the map shows: for the coverage line and anything else that depends on the view. */
+export interface MapViewport {
+  zoom: number;
+  bounds: { south: number; west: number; north: number; east: number };
+}
+
 export interface StopMarker {
   id: string;
   lng: number;
@@ -59,6 +65,8 @@ interface Props {
   selectedPlace: number | null;
   onSelect: (id: string | null) => void;
   onSelectPlace: (index: number) => void;
+  /** Called when the map stops moving. */
+  onViewport?: (view: MapViewport) => void;
 }
 
 // MapLibre looks for its worker next to its own module file, which bundling moves.
@@ -79,6 +87,14 @@ const TAP_SLOP_PX = 8;
 const LIGHT_STYLE = new URL('/map/day.json', location.href).href;
 const DARK_STYLE = new URL('/map/night.json', location.href).href;
 const ENGLISH_NAME: ExpressionSpecification = ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name:latin'], ['get', 'name']];
+
+/** "12 · 4 DC": all chargers in the cluster, then how many are DC (the DC part on a second, smaller line). */
+const CLUSTER_LABEL: ExpressionSpecification = [
+  'case',
+  ['>', ['get', 'dc'], 0],
+  ['format', ['get', 'point_count_abbreviated'], {}, ' ·\n', { 'font-scale': 0.7 }, ['concat', ['to-string', ['get', 'dc']], ' DC'], { 'font-scale': 0.7 }],
+  ['to-string', ['get', 'point_count_abbreviated']],
+];
 
 /** The base style labels places in Latin and local script; show one English name instead. */
 function englishLabels(map: MapLibreMap): void {
@@ -150,7 +166,15 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
   const halo = dark ? '#0b0d10' : '#ffffff';
   const ink = dark ? '#ffffff' : '#0a0a0b';
   addMapIcons(map);
-  map.addSource(SOURCE, { type: 'geojson', data: data.stations, cluster: true, clusterRadius: 46, clusterMaxZoom: 11 });
+  // Each cluster also counts its DC chargers, so the bubble can say "12 · 4 DC".
+  map.addSource(SOURCE, {
+    type: 'geojson',
+    data: data.stations,
+    cluster: true,
+    clusterRadius: 46,
+    clusterMaxZoom: 11,
+    clusterProperties: { dc: ['+', ['case', ['get', 'dc'], 1, 0]] },
+  });
   map.addSource(ROUTE, { type: 'geojson', data: data.route, lineMetrics: true });
   map.addSource(ALT_ROUTES, { type: 'geojson', data: data.altRoutes });
   map.addSource(STOPS, { type: 'geojson', data: data.stops });
@@ -254,7 +278,7 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
     type: 'symbol',
     source: SOURCE,
     filter: ['has', 'point_count'],
-    layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-allow-overlap': true },
+    layout: { 'text-field': CLUSTER_LABEL, 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-line-height': 1, 'text-allow-overlap': true },
     paint: { 'text-color': dark ? '#ffffff' : '#0a0a0b' },
   });
   map.addLayer({
@@ -372,6 +396,7 @@ export function MapView(props: Props) {
   const carMarker = useRef<Marker | null>(null);
   const pulseMarker = useRef<Marker | null>(null);
   const tilt = useRef<Tilt3dControl | null>(null);
+  const attributionControl = useRef<AttributionControl | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const styleUrl = useRef(dark ? DARK_STYLE : LIGHT_STYLE);
@@ -396,7 +421,8 @@ export function MapView(props: Props) {
       dragRotate: false,
     });
     map.touchZoomRotate.disableRotation();
-    map.addControl(new AttributionControl({ compact: true, customAttribution: attribution }), 'bottom-left');
+    attributionControl.current = new AttributionControl({ compact: true, customAttribution: attribution });
+    map.addControl(attributionControl.current, 'bottom-left');
     // On a phone the open credit sits under "Plan a trip"; show it on load, then fold it to its (i) button
     // after 5 s, as the OSMF attribution guidelines allow. A tap on (i) opens it again.
     window.setTimeout(() => container.current?.querySelector('.maplibregl-compact-show')?.classList.remove('maplibregl-compact-show'), 5000);
@@ -473,6 +499,12 @@ export function MapView(props: Props) {
         if (typeof id === 'string') latest.current.onSelect(id);
       }
     });
+    const report = () => {
+      const b = map.getBounds();
+      latest.current.onViewport?.({ zoom: map.getZoom(), bounds: { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() } });
+    };
+    map.on('moveend', report);
+    map.once('load', report);
     for (const layer of ['clusters', 'stations', 'stops', 'places']) {
       map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
@@ -485,9 +517,27 @@ export function MapView(props: Props) {
     };
   }, []);
 
+  // The credits arrive with the data, after the map is made: swap the control when they change.
+  const credits = attribution.join('|');
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !attributionControl.current) return;
+    map.removeControl(attributionControl.current);
+    attributionControl.current = new AttributionControl({ compact: true, customAttribution: attribution });
+    map.addControl(attributionControl.current, 'bottom-left');
+  }, [credits]);
+
+  // A status poll changes a few chargers' colours at most, usually none: re-send the stations to the map
+  // (and re-tile them) only when the stations or a charger's live state actually changed.
+  const drawn = useRef<{ stations: Station[]; live: string } | null>(null);
   useEffect(() => {
     const source = mapRef.current?.getSource(SOURCE) as GeoJSONSource | undefined;
-    void source?.setData(stationsGeoJson(stations, statuses));
+    if (!source) return;
+    const now = new Date();
+    const live = stations.map((s) => liveState(statuses.get(s.id), now)[0]).join('');
+    if (drawn.current && drawn.current.stations === stations && drawn.current.live === live) return;
+    drawn.current = { stations, live };
+    void source.setData(stationsGeoJson(stations, statuses));
   }, [stations, statuses]);
 
   useEffect(() => {

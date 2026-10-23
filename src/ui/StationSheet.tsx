@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import type { Station } from '../data/model.ts';
+import type { DetailField, Station } from '../data/model.ts';
+import { TRUST_LABEL, fieldSource, reportAge, speedUnknown, trustBadge, trustReason } from '../data/trust.ts';
 import { safeUrl } from '../data/normalize.ts';
 import type { Place, PlacesData } from '../data/places.ts';
 import { nearbyPlaces, sortStays } from '../planner/journey.ts';
@@ -25,6 +26,8 @@ interface Props {
   placesLoading: boolean;
   placesFailed: boolean;
   onOpenPlace: (p: Place) => void;
+  /** True when the charger's details (hours, price, address, sources) couldn't be read. */
+  detailFailed?: boolean;
 }
 
 const GOOD: ReportKind[] = ['worked', 'charging_now'];
@@ -109,6 +112,8 @@ export function StationSheet(props: Props) {
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [kw, setKw] = useState('');
   const [copied, setCopied] = useState(false);
+  // Reports are kept under the stable c1 id; the worker also accepts the older osm-/ocm- ids.
+  const reportId = station.c1Id ?? station.id;
 
   useEffect(() => {
     setReports(null);
@@ -116,13 +121,13 @@ export function StationSheet(props: Props) {
     setKw('');
     let live = true;
     api
-      .reports(station.id)
+      .reports(reportId)
       .then((r) => live && setReports(r.reports))
       .catch(() => live && setReports([]));
     return () => {
       live = false;
     };
-  }, [station.id]);
+  }, [reportId]);
 
   const report = async (kind: ReportKind) => {
     if (!signedIn) {
@@ -135,7 +140,7 @@ export function StationSheet(props: Props) {
       const pos = await currentPosition();
       const parsedKw = Number(kw);
       await api.checkin({
-        stationId: station.id,
+        stationId: reportId,
         kind,
         kw: GOOD.includes(kind) && parsedKw >= 0.5 && parsedKw <= 400 ? parsedKw : undefined,
         vehicle: vehicleName ?? undefined,
@@ -144,7 +149,7 @@ export function StationSheet(props: Props) {
       });
       setMessage({ kind: 'ok', text: 'Thanks! Other drivers can see this now.' });
       onReported();
-      api.reports(station.id).then((r) => setReports(r.reports)).catch(() => undefined);
+      api.reports(reportId).then((r) => setReports(r.reports)).catch(() => undefined);
     } catch (e) {
       let text = e instanceof Error ? e.message : 'Could not send the report.';
       if (e instanceof ApiError && e.code === 'too_far' && typeof e.extra.distanceM === 'number') {
@@ -173,19 +178,49 @@ export function StationSheet(props: Props) {
 
   const updated = formatDate(latestUpdate(station));
   const website = safeUrl(station.website);
-  const facts: Array<[string, string]> = [];
-  facts.push(['Speed', `${SPEED_LABEL[station.speed]}${station.maxKw ? ` · up to ${formatKw(station.maxKw)}` : ''}`]);
-  if (station.points) facts.push(['Charging points', String(station.points)]);
-  if (station.hours || station.is24x7) facts.push(['Hours', station.is24x7 ? 'Open 24×7' : (station.hours ?? '')]);
-  if (station.price) facts.push(['Price', station.price]);
-  if (station.vehicles.length) facts.push(['For', station.vehicles.map((v) => VEHICLE_LABEL[v]).join(', ')]);
-  if (station.access === 'customers') facts.push(['Access', 'Customers only']);
+  const now = new Date();
+  const pending = station.detail === 'pending';
+  const later = pending ? (props.detailFailed ? "Couldn't load" : 'Loading…') : null;
+  const badge = trustBadge(station, status, now);
+  const reported = reportAge(status, now);
+  // Unknown stays unknown: nothing missing is shown as "no", "closed" or 0.
+  const facts: Array<{ key: string; label: string; value: string; field?: DetailField; unknown: boolean }> = [];
+  const fact = (label: string, value: string | null, field?: DetailField, missing = 'Not listed') =>
+    facts.push({ key: label, label, value: value ?? missing, field: value === null ? undefined : field, unknown: value === null });
+  fact('Operator', station.operator, 'operator');
+  fact(
+    'Speed',
+    speedUnknown(station) ? null : `${SPEED_LABEL[station.speed]}${station.maxKw ? ` · up to ${formatKw(station.maxKw)}` : ''}`,
+    'maxKw',
+    'Unknown',
+  );
+  fact('Charging points', station.points === null ? null : String(station.points), 'points');
+  fact('Hours', station.is24x7 ? 'Open 24×7' : station.hours ?? later, 'hours');
+  fact('Price', station.price ?? later, 'price');
+  fact('For', station.vehicles.length ? station.vehicles.map((v) => VEHICLE_LABEL[v]).join(', ') : null, undefined, 'Unknown');
+  fact('Access', station.access === 'customers' ? 'Customers only' : station.access === 'public' ? 'Public' : null, 'access', 'Unknown');
+  if (station.state) fact('State', station.state);
 
   return (
     <Sheet title={station.name} onClose={onClose}>
       <p class="station__sub">
-        {[station.operator, station.address ?? area].filter(Boolean).join(' · ') || 'Operator not mapped yet'}
+        {[station.operator ?? 'Operator not listed', station.address ?? area].filter(Boolean).join(' · ')}
       </p>
+
+      <div class="trust" data-testid="trust">
+        <span class={`trust__badge trust__badge--${badge}`} data-testid="trust-badge">
+          {TRUST_LABEL[badge]}
+        </span>
+        {speedUnknown(station) && (
+          <span class="trust__badge trust__badge--speed" data-testid="speed-unknown">
+            Speed unknown
+          </span>
+        )}
+        <span class="trust__why small muted">
+          {trustReason(station, status, now)}
+          {reported ? ` ${reported}.` : ''}
+        </span>
+      </div>
 
       <div class="actions">
         <a class="btn btn--primary" href={directionsUrl(station)} target="_blank" rel="noopener noreferrer">
@@ -232,6 +267,7 @@ export function StationSheet(props: Props) {
       {station.connectors.length > 0 ? (
         <section aria-label="Connectors">
           <h3>Connectors</h3>
+          {fieldSource(station, 'connectors') && <p class="fact__src small muted">{fieldSource(station, 'connectors')}</p>}
           <ul class="connectors">
             {station.connectors.map((c, i) => (
               <li key={`${c.type}-${i}`}>
@@ -242,16 +278,33 @@ export function StationSheet(props: Props) {
           </ul>
         </section>
       ) : (
-        <p class="notice">Connector types aren't mapped for this charger yet. Check before you drive here.</p>
+        <p class="notice" data-testid="connectors-unknown">
+          Connectors: not listed. No source says which plugs this charger has, so check before you drive here.
+        </p>
       )}
 
-      <dl class="facts">
-        {facts.map(([k, v]) => (
-          <div key={k}>
-            <dt>{k}</dt>
-            <dd>{v}</dd>
+      <dl class="facts" data-testid="facts">
+        {facts.map((f) => {
+          const src = f.field ? fieldSource(station, f.field) : null;
+          return (
+            <div key={f.key} data-fact={f.key}>
+              <dt>{f.label}</dt>
+              <dd class={f.unknown ? 'fact--unknown' : undefined}>
+                {f.value}
+                {src && <small class="fact__src">{src}</small>}
+              </dd>
+            </div>
+          );
+        })}
+        {station.address && fieldSource(station, 'address') && (
+          <div data-fact="Address">
+            <dt>Address</dt>
+            <dd>
+              {station.address}
+              <small class="fact__src">{fieldSource(station, 'address')}</small>
+            </dd>
           </div>
-        ))}
+        )}
       </dl>
 
       <section aria-label="Recent reports">

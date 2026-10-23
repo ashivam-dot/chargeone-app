@@ -48,9 +48,16 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {
+            // A charger's details, read when it's opened. Keyed by data version (?v=), so old ones age out.
+            urlPattern: ({ url }) => url.pathname.startsWith('/data/shards/'),
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'station-details', expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 3600 } },
+          },
+          {
             urlPattern: ({ url }) => url.pathname.startsWith('/data/') || url.pathname.startsWith('/map/'),
             handler: 'StaleWhileRevalidate',
-            options: { cacheName: 'station-data', expiration: { maxEntries: 6 } },
+            // index, manifest, coverage, places, the stations.json fallback and the two map styles.
+            options: { cacheName: 'station-data', expiration: { maxEntries: 12 } },
           },
           {
             // OpenFreeMap's terms cap stored offline tiles at 3,000 per download.
@@ -79,6 +86,6 @@ export default defineConfig({
     proxy: { '/api': 'http://localhost:8787' },
   },
   test: {
-    include: ['src/**/*.test.ts', 'worker/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'worker/**/*.test.ts', 'pipeline/**/*.test.ts'],
   },
 });

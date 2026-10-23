@@ -11,7 +11,7 @@ import { isDev, type Env } from './env.ts';
 import { HttpError, claimSlot, clientKey, deviceKey, indianDayStart, num, readJson, releaseSlot, slotCount, str } from './http.ts';
 import { playEnabled } from './play.ts';
 import { PUBLIC_ROUTES_PER_DAY, PUBLIC_ROUTE_DAY_SLOT, publicRouterName, router } from './routing.ts';
-import { stationIndex } from './stations.ts';
+import { stationsByIds } from './stations.ts';
 import { upiEnabled } from './upi.ts';
 import { FIREBASE_KEYS_URL, firebaseConfig } from './firebase.ts';
 import { maskEmail, type AuthProvider } from '../src/shared/auth.ts';
@@ -483,7 +483,7 @@ export async function listReports(env: Env, url: URL) {
      FROM checkins c JOIN users u ON u.id = c.user_id ${problems ? `WHERE c.kind IN ${PROBLEM_KINDS}` : ''}
      ORDER BY c.created_at DESC LIMIT ?1 OFFSET ?2`,
   ).bind(limit, offset).all<{ station_id: string } & Record<string, unknown>>();
-  const stations = await stationIndex(env).catch(() => new Map());
+  const stations = await stationsByIds(env, results.map((r) => r.station_id)).catch(() => new Map<string, { name: string }>());
   return { reports: results.map((r) => ({ ...r, station_name: stations.get(r.station_id)?.name ?? null })), page: p, limit };
 }
 

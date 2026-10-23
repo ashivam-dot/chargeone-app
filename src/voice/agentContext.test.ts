@@ -41,6 +41,7 @@ const stop = (name: string, alongKm: number): Stop => ({
   mode: 'dc',
   live: 'working',
   confidence: 'high',
+  trusted: true,
   notes: [],
   backups: [],
 });
@@ -56,6 +57,8 @@ const plan = (stops: Stop[], over: Partial<TripPlan> = {}): TripPlan => ({
   stops,
   warnings: [],
   gapAtKm: null,
+  extras: [],
+  extrasFeasible: false,
   ...over,
 });
 

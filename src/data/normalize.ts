@@ -70,6 +70,8 @@ const OSM_SOCKETS: Record<string, ConnectorType> = {
   gb_dc: 'GB/T DC',
   gb_ac: 'GB/T AC',
   leccs: 'LECCS',
+  // Ather's connector, tagged socket:type7 in India; standardised as LECCS (IS 17017-2-6).
+  type7: 'LECCS',
   bs1363: '3-pin socket',
   as3112: '3-pin socket',
   schuko: '3-pin socket',
@@ -378,7 +380,7 @@ export function dedupeStations(stations: Station[]): Station[] {
     const copy: Station = { ...s, connectors: [...s.connectors], sources: [...s.sources], vehicles: [...s.vehicles] };
     result.push(copy);
     const k = key(copy.lat, copy.lng);
-    grid.set(k, [...(grid.get(k) ?? []), copy]);
+    (grid.get(k) ?? grid.set(k, []).get(k)!).push(copy);
   }
   return result.sort((a, b) => a.id.localeCompare(b.id));
 }

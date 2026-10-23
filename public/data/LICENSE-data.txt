@@ -1,0 +1,16 @@
+ChargeOne India charging stations database
+
+This database is made available under the Open Database License (ODbL) 1.0:
+https://opendatacommons.org/licenses/odbl/1-0/
+Any rights in individual contents of the database are licensed under the Database Contents License:
+https://opendatacommons.org/licenses/dbcl/1-0/
+
+It is a derivative database of OpenStreetMap. © OpenStreetMap contributors, https://www.openstreetmap.org/copyright
+
+It also contains data from Open Charge Map contributors (Data Provider 1 only), licensed under
+CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ and https://openchargemap.org/site/about/terms
+Values from Open Charge Map keep that licence and attribution; every field lists its source and licence.
+
+Records Open Charge Map marks as copied from Google Maps (Google Place IDs) are excluded.
+If you publish a produced work from this database, credit "© OpenStreetMap contributors, Open Charge Map contributors, ChargeOne".
+If you publicly use an adapted version of this database, you must offer it under the ODbL as well.

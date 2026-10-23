@@ -4,7 +4,7 @@ import { api, type Me } from '../lib/api.ts';
 import { freshFirebaseToken } from '../lib/firebaseSession.ts';
 import { BASIC, FEATURE_ROWS, PLANS, TRIAL_DAYS, isPlus } from '../shared/plans.ts';
 import type { MyVehicle } from '../shared/vehicles.ts';
-import { PerkItem } from './Plans.tsx';
+import { PerkItem } from './PerkItem.tsx';
 import { Page } from './shell/Page.tsx';
 import './screens.css';
 
