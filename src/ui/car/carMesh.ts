@@ -314,7 +314,7 @@ function wheelLayout(d: CarDesign, rimR: number): WheelLayout {
     case 'turbine':
       return { n, rin: 0.33, rout: 0.89, half: 0.016, twist: 0.8, slot: 0 };
     case 'blade':
-      return { n, rin: 0.3, rout: 0.9, half: 0.012, grow: 0.4, twist: 1.0, slot: 0 };
+      return { n, rin: 0.3, rout: 0.9, half: 0.017, grow: 0.08, twist: 0.6, slot: 0.005 };
     case 'disc':
       return { n, rin: 0.72, rout: 0.84, half: ((Math.PI * rimR * 0.78) / n) * 0.78, twist: 0.3, slot: 0 };
     default:
@@ -325,7 +325,7 @@ function wheelLayout(d: CarDesign, rimR: number): WheelLayout {
 /** The wheel face as a flat shape: the rim disc with the openings between the spokes cut out. */
 function wheelShape(lay: WheelLayout, rimR: number): Shape {
   const face = new Shape();
-  face.absarc(0, 0, rimR * 0.955, 0, Math.PI * 2, false);
+  face.absarc(0, 0, rimR * 0.975, 0, Math.PI * 2, false);
   const rin = lay.rin * rimR + 0.006;
   const rout = lay.rout * rimR;
   const ang = (k: number, r: number) => (2 * Math.PI * k) / lay.n + lay.twist * clamp01((r - rin) / (rout - rin)) ** 1.2;
@@ -393,7 +393,7 @@ function wheel(m: Mats, d: CarDesign, R: number, width: number, rimR: number): G
   const sw = R - rimR;
   const side = (s: number): Vector2[] => {
     const pts = [
-      [rimR * 0.985, 0.9],
+      [rimR * 0.985, 0.86],
       [rimR + sw * 0.1, 0.94],
       [rimR + sw * 0.16, 0.98],
       [rimR + sw * 0.24, 0.96],
@@ -437,8 +437,10 @@ function wheel(m: Mats, d: CarDesign, R: number, width: number, rimR: number): G
   disc.position.z = face - 0.07;
   g.add(disc);
 
-  // Rim lip: a bright rolled edge.
-  const lipProf = [new Vector2(rimR * 0.94, 0), new Vector2(rimR * 0.97, 0.006), new Vector2(rimR * 0.995, 0.002), new Vector2(rimR * 0.995, -0.012)];
+  // Rim lip: the bright rolled flange, which stands out past the bead seat (the nominal rim size) over the
+  // tyre bead, so the visible wheel is a little bigger than the rim's nominal diameter, as on a real car.
+  const flange = rimR + 0.016;
+  const lipProf = [new Vector2(rimR * 0.94, 0), new Vector2(rimR * 0.985, 0.007), new Vector2(flange - 0.004, 0.006), new Vector2(flange, 0.0), new Vector2(flange - 0.002, -0.016)];
   const lip = new Mesh(new LatheGeometry(lipProf, 56), m.rim);
   lip.rotation.x = Math.PI / 2;
   lip.position.z = face;
@@ -605,7 +607,12 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     const yA = yt - rty;
     // Heights of the shoulder, the door crease and the cladding line, kept in order on short sections.
     const span = yA - y0;
-    let ys = yt - drop;
+    // The shoulder follows a straight line from the scuttle to the tail, not the window sill: a belt-line
+    // kick-up at the C-pillar then fills in above the shoulder instead of dragging the whole flank up with it
+    // (that drag was the lumpy reflection over the rear quarters).
+    const inBelt = t > p.cowlX && t < p.rearGlassX;
+    const ref = inBelt ? lerp(top(p.cowlX), top(p.rearGlassX), (t - p.cowlX) / (p.rearGlassX - p.cowlX)) : yt;
+    let ys = Math.min(yt, ref) - drop;
     let yc = d.shoulder.crease ? H * lerp(d.shoulder.crease.y[0], d.shoulder.crease.y[1], u) : (y0 + ys) / 2;
     let ySill = sillTop;
     const cw = Math.min(0.025, span * 0.06);
@@ -789,6 +796,16 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     }
     return pts[0][0];
   };
+  /** Height of the roof skin at station t and half width z. */
+  const ghYAt = (t: number, z: number): number => {
+    const pts = ghSide(t);
+    for (let k = N_GS; k < pts.length - 1; k++) {
+      const [z0, y0] = pts[k];
+      const [z1, y1] = pts[k + 1];
+      if ((z - z0) * (z - z1) <= 0 && z0 !== z1) return lerp(y0, y1, (z - z0) / (z1 - z0));
+    }
+    return ghTop(t);
+  };
   const ghRing = (t: number) => {
     const side = ghSide(t);
     const x = xOf(t);
@@ -885,26 +902,34 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     if (clad) {
       // Arch cladding stands proud of the body: a face band plus the lip that wraps into the arch.
       for (const ax of axles) {
-        const face: Array<[Vector3, Vector3]> = [];
+        // The face band is a small grid (several rows across its width) that follows the body surface
+        // point by point; a two-edge strip cut through the curved flank and let paint show through in
+        // scallops over the arch.
+        const ROWS = 5;
+        const zBody = (x: number, y: number) => {
+          const t = clamp01(tOf(x));
+          return Math.max(halfWidthAt(t, y) ?? 0, section(t).zLow);
+        };
+        const faceRings: Vector3[][] = [];
         const lipBand: Array<[Vector3, Vector3]> = [];
-        for (let i = 0; i <= 32; i++) {
-          const a = -0.12 + ((Math.PI + 0.24) * i) / 32;
+        for (let i = 0; i <= 40; i++) {
+          const a = -0.12 + ((Math.PI + 0.24) * i) / 40;
+          const row: Vector3[] = [];
+          for (let r = 0; r <= ROWS; r++) {
+            const u = r / ROWS;
+            const [x, y] = archPoint(ax, a, archR - 0.004 + (clad.archWidth + 0.004) * u);
+            // Full thickness most of the way out, then a rounded fall to the body at the outer edge.
+            const off = clad.proud * (u < 0.6 ? 1 : 0.25 + 0.75 * Math.cos(((u - 0.6) / 0.4) * (Math.PI / 2)));
+            row.push(new Vector3(x, y, zSign * (zBody(x, Math.max(y, GC + 0.02)) + off + 0.001)));
+          }
+          if (zSign < 0) row.reverse();
+          faceRings.push(row);
           const [xi, yi] = archPoint(ax, a, archR - 0.004);
-          const [xo, yo] = archPoint(ax, a, archR + clad.archWidth);
-          const zBody = (x: number, y: number) => {
-            const t = clamp01(tOf(x));
-            return Math.max(halfWidthAt(t, y) ?? 0, section(t).zLow);
-          };
           const zi = zBody(xi, Math.max(yi, GC + 0.02));
-          const zo = zBody(xo, yo);
-          face.push([new Vector3(xi, yi, zSign * (zi + clad.proud)), new Vector3(xo, yo, zSign * (zo + clad.proud * 0.35))]);
-          lipBand.push([new Vector3(xi, yi, zSign * (zi - 0.03)), new Vector3(xi, yi, zSign * (zi + clad.proud))]);
+          lipBand.push([new Vector3(xi, yi, zSign * (zi - 0.03)), new Vector3(xi, yi, zSign * (zi + clad.proud + 0.001))]);
         }
-        if (zSign < 0) {
-          face.forEach((pair) => pair.reverse());
-          lipBand.forEach((pair) => pair.reverse());
-        }
-        group.add(strip(face, m.clad));
+        if (zSign < 0) lipBand.forEach((pair) => pair.reverse());
+        group.add(loft(faceRings, false, () => 0, [m.clad]));
         group.add(strip(lipBand, m.clad));
       }
       // Sill moulding between the arches.
@@ -963,26 +988,47 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
       group.add(sideRibbon([[x + 0.065, y], [x - 0.065, y]], flush ? 0.02 : 0.028, flush ? m.black : m.chrome, zSign, flush ? 0.003 : 0.009));
     });
     // Mirror on the door, at the base of the A-pillar.
-    const mt = p.cowlX + 0.05;
+    // A real mirror: a base plate on the door top, a short arm, and a housing that is wide across the car,
+    // shallow front to back, with a flat glass face toward the rear.
+    const mt = p.cowlX + 0.045;
     const ms = section(mt);
-    const mirror = new Mesh(new SphereGeometry(0.5, 20, 14), d.pillars === 'black' ? m.black : m.paint);
-    mirror.scale.set(0.17, 0.1, 0.13);
-    mirror.position.set(xOf(mt) - 0.02, belt(mt) + 0.07, zSign * (ms.zA + 0.06));
-    mirror.rotation.y = zSign * 0.2;
-    group.add(mirror);
-    const stalk = new Mesh(new BoxGeometry(0.06, 0.03, 0.08), m.black);
-    stalk.position.set(xOf(mt), belt(mt) + 0.035, zSign * (ms.zA + 0.005));
-    group.add(stalk);
+    const mBelt = belt(mt);
+    const zBase = Math.min(ms.zA, ghHalfAt(mt, mBelt + 0.03) + 0.01);
+    const base = new Mesh(new BoxGeometry(0.12, 0.06, 0.03), m.black);
+    base.position.set(xOf(mt) + 0.01, mBelt + 0.025, zSign * zBase);
+    group.add(base);
+    const arm = new Mesh(new BoxGeometry(0.06, 0.028, 0.09), m.black);
+    arm.position.set(xOf(mt) - 0.005, mBelt + 0.045, zSign * (zBase + 0.05));
+    group.add(arm);
+    const housing = new Mesh(new SphereGeometry(0.5, 24, 16), d.roof === 'black' ? m.black : m.paint);
+    housing.scale.set(0.09, 0.115, 0.22);
+    const mz = zSign * (zBase + 0.15);
+    housing.position.set(xOf(mt) - 0.02, mBelt + 0.085, mz);
+    housing.rotation.y = zSign * 0.12;
+    group.add(housing);
+    const glassFace = new Mesh(new CylinderGeometry(0.5, 0.5, 0.01, 24), m.housing);
+    glassFace.scale.set(0.1, 1, 0.2);
+    glassFace.rotation.set(0, zSign * 0.12, Math.PI / 2);
+    glassFace.position.set(xOf(mt) - 0.059, mBelt + 0.085, mz);
+    group.add(glassFace);
     if (d.roofRails) {
+      // Rails stand on the actual roof skin at their own width (which is lower than the centre line), on
+      // three solid feet, so they never float.
       const rail: Vector3[] = [];
+      const surf: number[] = [];
+      const RISE = 0.042;
       for (let k = 0; k <= 8; k++) {
-        const t = lerp(p.roofFrontX + 0.05, p.roofRearX - 0.01, k / 8);
-        rail.push(new Vector3(xOf(t), ghTop(t) + 0.035, zSign * roofHalf(t) * 0.86));
+        const t = lerp(p.roofFrontX + 0.04, p.roofRearX - 0.015, k / 8);
+        const z = roofHalf(t) * 0.8;
+        const y = ghYAt(t, z);
+        surf.push(y);
+        rail.push(new Vector3(xOf(t), y + RISE, zSign * z));
       }
-      group.add(new Mesh(new TubeGeometry(new CatmullRomCurve3(rail), 24, 0.013, 8), m.black));
-      for (const k of [0, 8]) {
-        const leg = new Mesh(new BoxGeometry(0.07, 0.04, 0.03), m.black);
-        leg.position.copy(rail[k]).add(new Vector3(0, -0.02, 0));
+      group.add(new Mesh(new TubeGeometry(new CatmullRomCurve3(rail), 24, 0.012, 8), m.black));
+      for (const k of [0, 4, 8]) {
+        const hgt = RISE + 0.008;
+        const leg = new Mesh(new BoxGeometry(k === 4 ? 0.06 : 0.11, hgt, 0.026), m.black);
+        leg.position.set(rail[k].x, surf[k] + hgt / 2 - 0.006, rail[k].z);
         group.add(leg);
       }
     }
@@ -1222,7 +1268,8 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
   for (const ax of axles) {
     for (const zSign of [1, -1]) {
       const w = wheel(m, d, R, tyreW, rimR);
-      w.position.set(ax, R, zSign * (W / 2 - tyreW / 2 - 0.015));
+      // Tyre sidewall almost flush with the body side, as on the real cars (a sunk-in wheel reads as small).
+      w.position.set(ax, R, zSign * (W / 2 - tyreW / 2 - 0.005));
       if (zSign < 0) w.scale.z = -1;
       const pivot = new Group();
       pivot.add(w);
