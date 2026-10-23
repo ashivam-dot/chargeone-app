@@ -127,7 +127,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   const m = built.manifest.counts;
   console.log(
     `Stations ${m.stations} (DC ${m.dc}, AC ${m.ac}, unknown ${m.unknownSpeed}) · with kW ${m.withKw} · with connectors ${m.withConnectors} · ` +
-      `multi-source ${m.multiSource} · merged ${m.merged} · listed duplicates dropped ${layer.listedDuplicates} · review ${m.review} · quarantined ${m.quarantined} · sites ${m.sites}`,
+      `multi-source ${m.multiSource} · merged ${m.merged} · listed duplicates dropped ${layer.listedDuplicates} · state-list points outside their state ${layer.outsideState.length} · review ${m.review} · quarantined ${m.quarantined} · sites ${m.sites}`,
   );
   if (!gates.ok) {
     for (const f of gates.failures) console.error(`  GATE FAILED: ${f}`);

@@ -309,16 +309,21 @@ export function resolve(records: SourceRecord[]): Resolution {
 
 /** A location-only listing this close to a station a stronger source describes is that station (see listedDuplicates). */
 export const LISTED_DEDUPE_METRES = 100;
+/** ... and this close when both name the same known operator (the candidate radius). */
+export const LISTED_SAME_OPERATOR_METRES = THRESHOLDS.candidateMetres;
 
 /** Source strength for de-duplication: OSM and OCM describe chargers, the lists only place them. */
 const LIST_RANK: Record<SourceRecord['source'], number> = { osm: 0, ocm: 0, tgredco: 1, overture: 2 };
 
 /**
  * Clusters made only of location-only listings (a government list, a places dataset) that sit within
- * LISTED_DEDUPE_METRES of a record from a stronger source: the same charger, geocoded a little apart, and
- * usually without the operator that would let resolution merge it. They are dropped, not merged: the
- * listing adds nothing the stronger source lacks, and a null operator is never a wildcard for merging.
- * The hard rules still hold: a listing of another known operator, or of another vehicle class, stays.
+ * LISTED_DEDUPE_METRES of a record from a stronger source, or within LISTED_SAME_OPERATOR_METRES of one
+ * that names the same known operator: the same charger, geocoded a little apart, and usually without
+ * the operator that would let resolution merge it. They are dropped, not merged: the listing adds
+ * nothing the stronger source lacks, and a null operator is never a wildcard for merging. The hard
+ * rules still hold: a listing of another known operator, or of another vehicle class, than that record
+ * stays. The stronger station may hold a record filed under another network (OCM lists one charger
+ * under two operators, reconciled by its title); that record doesn't keep the listing alive.
  */
 export function listedDuplicates(records: SourceRecord[], clusters: number[][]): Set<number> {
   const prepared = records.map(prepare);
@@ -338,16 +343,14 @@ export function listedDuplicates(records: SourceRecord[], clusters: number[][]):
         (cells.get(cell) ?? []).some((j) => {
           const other = clusterOf.get(j)!;
           if (other === k || rankOf[other] >= rankOf[k]) return false;
-          // Every record of the listing must be compatible with every record of the stronger station.
-          return (
-            distanceMetres(records[i], records[j]) <= LISTED_DEDUPE_METRES &&
-            c.every((x) =>
-              clusters[other].every((y) => {
-                const d = distanceMetres(records[x], records[y]);
-                return !operatorClash(prepared[x], prepared[y], d) && !vehicleConflict(prepared[x].vclass, prepared[y].vclass);
-              }),
-            )
-          );
+          const d = distanceMetres(records[i], records[j]);
+          const limit = sameOperator(records[i].operator, records[j].operator) ? LISTED_SAME_OPERATOR_METRES : LISTED_DEDUPE_METRES;
+          if (d > limit || LIST_RANK[records[j].source] >= rankOf[k]) return false;
+          // This stronger record must be compatible with every record of the listing.
+          return c.every((x) => {
+            const dx = distanceMetres(records[x], records[j]);
+            return !operatorClash(prepared[x], prepared[j], dx) && !vehicleConflict(prepared[x].vclass, prepared[j].vclass);
+          });
         }),
       ),
     );

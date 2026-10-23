@@ -140,6 +140,18 @@ const PLACE_NAME =
   /\b(fs|f\s*s|filling|fills|fuels?|petro\w*|service\s*station|bp|iocl?|bpcl|hpcl|indian\s*oil|bharat|hindustan|motors?|cars?|auto|autolines|automotive|auto\s*mobiles?|hyundai|honda|maruti|kia|mahindra|showroom|hotels?|resorts?|restaurant|dhaba|food|court|cafe|mall|market|bazaa?r|plaza|complex|centre|center|convention|stadium|hospital|college|university|school|institut\w*|office|rta|bhavan|bhawan|building|park|parking|railway|station|substation|junction|airport|metro|temple|ashra?m\w*|club|tower|hub|ltd|limited|pvt|corporation|enterprises|carriers|estates?|township|works|croma|silks|marriott|fairfield|green\s*drive|westside|tgredco|tsiic|tsird|ghmc|hmda|nh\s*\d+|highway|road|x\s*roads?|circle|chowk|bridge|toll|residency|inn|lodge|suites?|gardens?|colony|nagar)\b/i;
 /** "B. Brahmaiah & Co.", "P. Narasimha Reddy & Sons": a business named after its owner still names a person. */
 const OWNER_NAMED = /\b[A-Z]\.\s?(?!(?:Nagar|Filling|Road|Colony|Station)\b)[A-Z][a-z]{2,}|&\s*sons\b/;
+/**
+ * Telugu and other Indian personal-name parts. Many fuel outlets carry the dealer's own name ("K Krishnarjun
+ * Rao Filling Station", "Bandi Laxmikanthamma FS", "IOCL - Chakka Venkata Subba Rao"): that names a person,
+ * so the station shows as "<operator> charger" instead. Over-hiding a deity's name is the safe error.
+ */
+const PERSON_NAME_PART =
+  /\b(?:rao|reddy|naidu|chary|chari|chetty|setty|shetty|goud|gowda|subba|srinivas|shankar|\p{L}{3,}(?:amma|aiah|ayya|reddy|lal))\b/iu;
+/** Places named after a person: districts and towns ("Ranga Reddy Dist", "Kamareddy"), "<name> Nagar". */
+const PERSON_NAMED_PLACE =
+  /\b(?:ranga|sanga|kama|yella|bala|narayan)\s*reddy\b|\b(?:rao|reddy|naidu|chary|shankar|\p{L}{3,}(?:amma|aiah|reddy|lal))\s+(?:nagar|colony|road|rd|marg|street|circle|chowk|dist(?:rict)?|mandal|village|pet|pally|guda|temple|hospital|statue|bhavan)\b/giu;
+const namesPerson = (text: string) => PERSON_NAME_PART.test(text.replace(PERSON_NAMED_PLACE, ' '));
+
 /** Short all-capital names are organisations ("NSIC", "ESCI", "TUFIDC"). */
 const ACRONYM = /^[A-Z]{3,8}$/;
 
@@ -151,7 +163,7 @@ const words = (s: string) => s.toLowerCase().match(/\p{L}{3,}/gu) ?? [];
  */
 function shownName(name: string, where: string): string | null {
   const n = name.replace(/\s+/g, ' ').trim();
-  if (!n || PRIVATE_PERSON.test(n) || OWNER_NAMED.test(n)) return null;
+  if (!n || PRIVATE_PERSON.test(n) || OWNER_NAMED.test(n) || namesPerson(n)) return null;
   const local = new Set(words(where));
   const onlyLocality = words(n).length > 0 && words(n).every((w) => local.has(w));
   if (!PLACE_NAME.test(n) && !ACRONYM.test(n) && !onlyLocality) return null;
@@ -160,7 +172,7 @@ function shownName(name: string, where: string): string | null {
 
 function shownAddress(address: string): string | null {
   const a = address.replace(/\s+/g, ' ').replace(/(,\s*)+/g, ', ').replace(/^[,\s]+|[,\s]+$/g, '').trim();
-  if (!a || PRIVATE_PERSON.test(a)) return null;
+  if (!a || PRIVATE_PERSON.test(a) || OWNER_NAMED.test(a) || namesPerson(a)) return null;
   return a.slice(0, 240);
 }
 

@@ -3,7 +3,7 @@ import { assignIds, type Registry } from './ids.ts';
 import { stateAt, type StateShape } from './lib/geo.ts';
 import { mergeCluster } from './merge.ts';
 import { groupSites, listedDuplicates, resolve } from './resolve.ts';
-import type { CanonicalStation, ReviewItem, Site, SourceRecord } from './types.ts';
+import { STATE_LIST_SOURCES, type CanonicalStation, type ReviewItem, type Site, type SourceRecord } from './types.ts';
 
 export interface BuildContext {
   registry: Registry;
@@ -23,10 +23,30 @@ export interface StationLayer {
   blocked: number;
   /** Location-only listings dropped as a charger OSM or OCM already describe (resolve.ts listedDuplicates). */
   listedDuplicates: number;
+  /** Records of a state's own list (STATE_LIST_SOURCES) that the state shapes put in another state. */
+  outsideState: string[];
 }
 
-export function buildStations(records: SourceRecord[], ctx: BuildContext): StationLayer {
+/**
+ * Drops records of a state's own list that the state shapes place in another state: the bounding-box
+ * check in the adapter lets a typo'd point land over the border (TGREDCO rows in Maharashtra).
+ */
+export function insideListedState(records: SourceRecord[], shapes: StateShape[] | undefined): { kept: SourceRecord[]; outside: string[] } {
+  if (!shapes?.length) return { kept: records, outside: [] };
+  const outside: string[] = [];
+  const kept = records.filter((r) => {
+    if (!STATE_LIST_SOURCES.has(r.source) || !r.stateHint) return true;
+    const state = stateAt(shapes, r.lat, r.lng);
+    if (state === null || state === r.stateHint) return true;
+    outside.push(r.sourceId);
+    return false;
+  });
+  return { kept, outside };
+}
+
+export function buildStations(allRecords: SourceRecord[], ctx: BuildContext): StationLayer {
   const today = ctx.now.toISOString().slice(0, 10);
+  const { kept: records, outside: outsideState } = insideListedState(allRecords, ctx.shapes);
   const resolved = resolve(records);
   const { review, blocked } = resolved;
   // Location-only listings of a charger OSM or OCM already describe are dropped before ids are issued.
@@ -77,6 +97,7 @@ export function buildStations(records: SourceRecord[], ctx: BuildContext): Stati
     review: reviewItems,
     merged: records.length - dropped.size - clusters.length,
     listedDuplicates: dropped.size,
+    outsideState,
     blocked: blocked.length,
   };
 }

@@ -7,6 +7,8 @@ export type SourceKey = 'osm' | 'ocm' | 'tgredco' | 'overture';
 
 /** Sources that only list where a charger is (a government list, a places dataset): weak evidence, never verified. */
 export const LISTED_SOURCES: ReadonlySet<SourceKey> = new Set<SourceKey>(['tgredco', 'overture']);
+/** Sources that are one state's own list: a record the state shapes put in another state is a typo'd point. */
+export const STATE_LIST_SOURCES: ReadonlySet<SourceKey> = new Set<SourceKey>(['tgredco']);
 
 export type LicenceId = 'ODbL-1.0' | 'CC-BY-4.0' | 'GODL-India' | 'CDLA-Permissive-2.0' | 'CC0-1.0' | 'Apache-2.0';
 

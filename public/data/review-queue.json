@@ -1,36 +1,7 @@
 {
-  "version": "4a8abca473e1",
-  "generatedAt": "2026-10-23T13:53:33.463Z",
+  "version": "e08b038f0643",
+  "generatedAt": "2026-10-23T14:10:00.763Z",
   "items": [
-    {
-      "kind": "possible-duplicate",
-      "score": 0.988,
-      "distanceM": 7,
-      "a": {
-        "id": "c1_dltyc2cslayp",
-        "legacyId": "ocm-308971",
-        "name": "Hotel Aroma Natural Veg",
-        "operator": "ChargeZone",
-        "sources": [
-          "ocm-308970",
-          "ocm-308971"
-        ]
-      },
-      "b": {
-        "id": "c1_qylqazeklnkr",
-        "legacyId": "c1_qylqazeklnkr",
-        "name": "ChargeZone EV Charging Station",
-        "operator": "ChargeZone",
-        "sources": [
-          "ovt-906059ec-7f64-4178-89e3-dac125cd8b26"
-        ]
-      },
-      "reasons": [
-        "7 m apart",
-        "same operator (ChargeZone)",
-        "not merged: different operators (Statiq / ChargeZone)"
-      ]
-    },
     {
       "kind": "possible-duplicate",
       "score": 0.873,
@@ -1645,61 +1616,6 @@
       "reasons": [
         "28 m apart",
         "one operator unknown"
-      ]
-    },
-    {
-      "kind": "possible-duplicate",
-      "score": 0.632,
-      "distanceM": 121,
-      "a": {
-        "id": "c1_gtazkmgchfoy",
-        "legacyId": "ocm-469487",
-        "name": "Hyundai EV Chg Stn Manor",
-        "operator": "ChargeZone",
-        "sources": [
-          "ocm-469487"
-        ]
-      },
-      "b": {
-        "id": "c1_ggkqikiwxzik",
-        "legacyId": "c1_ggkqikiwxzik",
-        "name": "CHARGEZONE - EV Charging Station",
-        "operator": "ChargeZone",
-        "sources": [
-          "ovt-46643fbe-d713-418d-be17-d3dbca8baaee"
-        ]
-      },
-      "reasons": [
-        "121 m apart",
-        "same operator (ChargeZone)"
-      ]
-    },
-    {
-      "kind": "possible-duplicate",
-      "score": 0.623,
-      "distanceM": 148,
-      "a": {
-        "id": "c1_olc3ezqbfq6o",
-        "legacyId": "osm-w1334165085",
-        "name": "Jio-BP Pulse Hub, Marathalli",
-        "operator": "Jio-bp pulse",
-        "sources": [
-          "ocm-309317",
-          "osm-w1334165085"
-        ]
-      },
-      "b": {
-        "id": "c1_doe42lqesjen",
-        "legacyId": "c1_doe42lqesjen",
-        "name": "Jio-bp pulse",
-        "operator": "Jio-bp pulse",
-        "sources": [
-          "ovt-05c6dfe0-f87c-470b-88cd-7e76c096e435"
-        ]
-      },
-      "reasons": [
-        "148 m apart",
-        "same operator (Jio-bp pulse)"
       ]
     },
     {

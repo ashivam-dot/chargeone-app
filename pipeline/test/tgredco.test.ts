@@ -56,7 +56,7 @@ describe('TGREDCO coordinates', () => {
 
 describe('TGREDCO adapter', () => {
   it('keeps public car-capable rows and says why the others went', () => {
-    expect(result.rawCount).toBe(19);
+    expect(result.rawCount).toBe(21);
     expect(reason('tg-8')).toBe('no-coordinates');
     expect(reason('tg-9')).toBe('outside-state');
     expect(reason('tg-10')).toBe('not-car');
@@ -82,6 +82,16 @@ describe('TGREDCO adapter', () => {
     expect(byId('tg-15')!.name).toBeNull();
     expect(byId('tg-17')!.name).toBe('Begumpet');
     expect(byId('tg-18')!.name).toBe('Anutex Sample Mall, Dr. AS Rao Nagar');
+  });
+
+  it('hides a fuel outlet named after its dealer, in the name and the address, but keeps places named after people', () => {
+    expect(byId('tg-20')!.name).toBeNull();
+    expect(byId('tg-20')!.address).toBe('National Highway 1, Sample Village');
+    expect(byId('tg-21')!.name).toBeNull();
+    expect(byId('tg-21')!.address).toBeNull();
+    expect(byId('tg-21')!.operator).toBe('BPCL');
+    expect(JSON.stringify(result.records)).not.toMatch(/Sample Rao|Laxmikanthamma/);
+    expect(byId('tg-18')!.address).toBe('Dr. AS Rao Nagar Rd');
   });
 
   it('claims nothing it cannot know: no plugs, unknown status, unverified, GODL-India', () => {

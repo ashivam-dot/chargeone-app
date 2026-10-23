@@ -318,7 +318,7 @@ Each such record names its upstream dataset ("origin") and licence. They must no
 OpenStreetMap.
 
 Records Open Charge Map marks as copied from Google Maps (Google Place IDs) are excluded.
-If you publish a produced work from this database, credit "© OpenStreetMap contributors, Open Charge Map contributors, Overture Maps Foundation, ChargeOne".
+If you publish a produced work from this database, credit "© OpenStreetMap contributors, Open Charge Map contributors, TGREDCO via Telangana Open Data Portal (GODL-India), Overture Maps Foundation, ChargeOne".
 If you publicly use an adapted version of this database, you must offer it under the ODbL as well.
 `;
 

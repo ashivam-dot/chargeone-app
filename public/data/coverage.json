@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-23T13:53:33.463Z",
+  "generatedAt": "2026-10-23T14:10:00.763Z",
   "denominator": {
     "title": "State / UT wise installed EV charging stations (EVCS) as on 29.07.2026",
     "asOf": "2026-07-29",
@@ -10,7 +10,7 @@
     "note": "Government counts are \"at least\" figures of installed stations of every kind (cars, 2W, 3W, buses, captive). They are a ceiling for what open data can show, not a target."
   },
   "national": {
-    "stations": 2566,
+    "stations": 2560,
     "dc": 1383,
     "government": [
       {
@@ -28,7 +28,7 @@
         "url": "https://www.hindustantimes.com/car-bike/india-has-over-52-700-public-ev-charging-stations-including-16-561-fast-chargers-for-cars-govt-101784783674297.html"
       }
     ],
-    "wording": "ChargeOne lists 2566 of at least 52718 installed charging stations in India (government count as of 2026-07-29)."
+    "wording": "ChargeOne lists 2560 of at least 52718 installed charging stations in India (government count as of 2026-07-29)."
   },
   "states": [
     {
@@ -43,13 +43,13 @@
     },
     {
       "state": "Karnataka",
-      "stations": 449,
+      "stations": 447,
       "dc": 342,
       "withKw": 375,
-      "withKwShare": 0.835,
+      "withKwShare": 0.839,
       "government": 6805,
       "share": 0.066,
-      "wording": "ChargeOne lists 449 of at least 6805 installed charging stations (government count as of 2026-07-29)."
+      "wording": "ChargeOne lists 447 of at least 6805 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Telangana",
@@ -73,13 +73,13 @@
     },
     {
       "state": "Maharashtra",
-      "stations": 194,
+      "stations": 190,
       "dc": 75,
       "withKw": 70,
-      "withKwShare": 0.361,
+      "withKwShare": 0.368,
       "government": 6985,
-      "share": 0.028,
-      "wording": "ChargeOne lists 194 of at least 6985 installed charging stations (government count as of 2026-07-29)."
+      "share": 0.027,
+      "wording": "ChargeOne lists 190 of at least 6985 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Delhi",

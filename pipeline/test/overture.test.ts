@@ -10,7 +10,8 @@ import { emptyRegistry } from '../ids.ts';
 import { CDLA_PERMISSIVE_2_TEXT, FOURSQUARE_NOTICE, LICENCES, OVERTURE_CDLA_CONTRIBUTORS } from '../licences.ts';
 import { buildOutputs } from '../outputs.ts';
 import { validateStations } from '../schema.ts';
-import { buildStations } from '../stations.ts';
+import { listedDuplicates } from '../resolve.ts';
+import { buildStations, insideListedState } from '../stations.ts';
 import { ccs2, metresNorth, record } from './helpers.ts';
 
 const now = new Date('2026-10-23T00:00:00Z');
@@ -131,6 +132,36 @@ describe('Overture listings in the station layer', () => {
     expect(layer.stations).toHaveLength(1);
     expect(layer.stations[0].members.map((m) => m.source)).toContain('tgredco');
     expect(layer.stations[0].confidence).toBeLessThan(PLAN_MIN_CONFIDENCE);
+  });
+
+  it('are dropped next to a mapped station that also holds another network’s record, and up to 150 m from the same network', () => {
+    const listing = { ...rec(places.chargezone)!, operator: 'ChargeZone' };
+    const cz = record({ sourceId: 'ocm-1', source: 'ocm', lat: listing.lat + metresNorth(7), lng: listing.lng, operator: 'ChargeZone', operatorMethod: 'mapped', connectors: [ccs2(60)] });
+    const statiq = record({ sourceId: 'ocm-2', source: 'ocm', lat: listing.lat + metresNorth(7), lng: listing.lng, operator: 'Statiq', operatorMethod: 'mapped', connectors: [ccs2(30)] });
+    // OCM cz + statiq is one station (OCM filed one charger under two networks, reconciled by its title).
+    expect([...listedDuplicates([cz, statiq, listing], [[0, 1], [2]])]).toEqual([1]);
+
+    const far = record({ sourceId: 'ocm-3', source: 'ocm', lat: listing.lat + metresNorth(130), lng: listing.lng, operator: 'ChargeZone', operatorMethod: 'mapped', connectors: [ccs2(60)] });
+    expect([...listedDuplicates([far, listing], [[0], [1]])]).toEqual([1]);
+    const farOther = { ...far, operator: null, operatorMethod: null };
+    expect([...listedDuplicates([farOther, listing], [[0], [1]])]).toEqual([]);
+    const farTata = { ...far, operator: 'Tata Power EZ Charge' };
+    expect([...listedDuplicates([farTata, listing], [[0], [1]])]).toEqual([]);
+  });
+
+  it('drops a state list’s point that the state shapes put in another state', () => {
+    const tgCsv = 'S.No.,Name of the EV Charging Station,State,District,Address,Latitude,Longitude,Name of the Owning Organisation\n1,Border FS,Telangana,Adilabad,Somewhere,18.5,77.5,BPCL\n2,Inside FS,Telangana,Hyderabad,Somewhere,17.4,78.4,BPCL\n';
+    const tg = tgredcoToCanonical({ file: 't.csv', csv: tgCsv }).records;
+    const box = (name: string, minX: number, minY: number, maxX: number, maxY: number) => ({
+      name,
+      bbox: [minX, minY, maxX, maxY] as [number, number, number, number],
+      polygons: [[[[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY], [minX, minY]]]],
+    });
+    const shapes = [box('Maharashtra', 77, 18.3, 78, 19), box('Telangana', 78, 17, 79, 18)] as never;
+    const { kept, outside } = insideListedState(tg, shapes);
+    expect(outside).toEqual(['tg-1']);
+    expect(kept.map((r) => r.sourceId)).toEqual(['tg-2']);
+    expect(buildStations(tg, { registry: emptyRegistry(), now, shapes }).outsideState).toEqual(['tg-1']);
   });
 
   it('pass the schema and the provenance gate, and ship the CDLA text and the Foursquare NOTICE', () => {
