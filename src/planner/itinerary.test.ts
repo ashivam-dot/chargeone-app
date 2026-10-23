@@ -145,3 +145,23 @@ describe('dayClock', () => {
     expect(clockLabel(sameTimeLater(day(6, 15), 1))).toBe('06:15');
   });
 });
+
+describe('rests', () => {
+  it('makes a short top-up near the two-hour mark the rest, and never lets a meal stretch past 2 h 15', () => {
+    // 116 min to a 7-minute top-up just before lunch: the top-up becomes a 15-minute rest.
+    const c = run({ departAt: day(10, 30), endKm: 400, stops: [stop('a', 116, 7)], pois: [poi('r', 129, 'food')] });
+    const charge = c.items.find((i) => i.kind === 'charge')!;
+    expect(charge.until - charge.at).toBe(15 * MIN);
+    for (const it of c.items) expect(it.drivenSinceRestMin).toBeLessThanOrEqual(BREAK_EVERY_MIN + BREAK_TOLERANCE_MIN);
+  });
+
+  it("doesn't rest and then eat straight after", () => {
+    // Dinner at the destination looks possible until the rests on the way are counted.
+    const pois = [111, 234, 275, 405, 452, 519, 624].map((km) => poi(`f${km}`, km, 'food')).concat([poi('fuel', 633, 'fuel')]);
+    const c = run({ departAt: day(7, 12), endKm: 712, minPerKm: 1.01, pois: pois.sort((a, b) => a.alongKm - b.alongKm) });
+    c.items.forEach((it, k) => {
+      if (k > 0 && it.kind === 'meal') expect(c.items[k - 1].kind === 'break' && it.at - c.items[k - 1].until < 10 * MIN).toBe(false);
+    });
+    expect(c.items.some((it) => it.meal === 'Dinner')).toBe(true);
+  });
+});

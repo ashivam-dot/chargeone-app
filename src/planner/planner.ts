@@ -41,6 +41,8 @@ export interface PlanInput {
   vehicle: MyVehicle;
   options: PlanOptions;
   now: Date;
+  /** One day of a longer trip: names its ends and the km offset of its start in the warnings. */
+  leg?: { offsetKm: number; startName: string; endName: string };
 }
 
 export type ChargeMode = 'dc' | 'ac';
@@ -600,7 +602,10 @@ export function planTrip(input: PlanInput): TripPlan {
     const feasible = reached && gaps.length === 0;
     if (!feasible && gaps.length) {
       const g = gaps[0];
-      const span = `no confirmed car charger for ${Math.round(g.toKm - g.fromKm)} km between ${g.fromName ?? 'the start'} (km ${Math.round(g.fromKm)}) and ${g.toName ?? 'the destination'}`;
+      const leg = input.leg;
+      const span =
+        `no confirmed car charger for ${Math.round(g.toKm - g.fromKm)} km between ${g.fromName ?? leg?.startName ?? 'the start'} ` +
+        `(km ${Math.round(g.fromKm + (leg?.offsetKm ?? 0))}) and ${g.toName ?? leg?.endName ?? 'the destination'}`;
       warnings.unshift(
         extrasFeasible
           ? `We can't plan this trip only on chargers we're sure of: ${span}. ` +

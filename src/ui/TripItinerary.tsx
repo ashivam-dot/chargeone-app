@@ -143,8 +143,8 @@ export function DayTimeline(props: DayTimelineProps) {
                 <div>
                   <button type="button" class="timeline__line" onClick={() => focusKm((g.fromKm + g.toKm) / 2)}>
                     <span>
-                      <strong>No confirmed car charger for {Math.round(g.toKm - g.fromKm)} km</strong> between {g.fromName ?? props.fromName} (km{' '}
-                      {Math.round(g.fromKm)}) and {g.toName ?? props.toName} (km {Math.round(g.toKm)})
+                      <strong>No confirmed car charger for {Math.round(g.toKm - g.fromKm)} km</strong> between {g.fromName ?? (di === 0 ? props.fromName : "last night's stop")} (km{' '}
+                      {Math.round(g.fromKm)}) and {g.toName ?? (d.night ? "tonight's stop" : props.toName)} (km {Math.round(g.toKm)})
                     </span>
                   </button>
                   {g.unconfirmed.length > 0 ? (
@@ -374,7 +374,9 @@ function NightCard(props: DayTimelineProps & { item: ItineraryItem }) {
         <span class="muted">km {Math.round(night.alongKm)}</span>
         <div class="timeline__charge">
           {stay
-            ? `No charger here. Arrive with about ${Math.max(0, night.arriveSocPct)}%, enough to reach the next charger in the morning.`
+            ? day.plan.feasible
+              ? `No charger here. Arrive with about ${Math.max(0, night.arriveSocPct)}%, enough to reach the next charger in the morning.`
+              : "No charger here, and today's drive has a gap in the chargers, so we can't say how much charge you'll arrive with. Ask the hotel about a 3-pin socket for slow charging overnight."
             : `No charger or hotel is mapped near here. Arrive with about ${Math.max(0, night.arriveSocPct)}%; ask a hotel about a 3-pin socket for slow charging overnight.`}
         </div>
         <Stays stays={night.stays} food={night.food} area={null} onOpenPlace={props.onOpenPlace} radius={stay ? 'here' : 'within 15 km'} />

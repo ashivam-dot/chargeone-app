@@ -163,12 +163,18 @@ export function dayClock(input: DayClockInput): DayClock {
       // Meals whose window has passed while charging or driving are dropped.
       for (const m of meals) if (!m.done && t > m.end - MEAL_MIN * MIN) m.done = true;
       const meal = meals.find((m) => !m.done);
-      const mergeMeal = meal && arrive >= meal.start && arrive <= meal.end - 30 * MIN && food > 0 ? meal : null;
+      // The rests still due on the way push the arrival later; a meal only waits for the target if it's still in time then.
+      const restsOnWay = Math.max(0, Math.ceil((since + drive(target.km) - BREAK_EVERY_MIN - BREAK_TOLERANCE_MIN) / BREAK_EVERY_MIN));
+      const arriveAfterRests = arrive + restsOnWay * BREAK_MIN * MIN;
+      const mergeMeal = meal && arrive >= meal.start && arriveAfterRests <= meal.end - 30 * MIN && food > 0 ? meal : null;
       let mealKm: number | null = null;
       let mealPoi: PlaceOnRoute | null = null;
       if (meal && !mergeMeal && meal.start < arrive) {
         const first = kmAfter((meal.start - t) / MIN);
-        const last = Math.min(target.km - 0.5, kmAfter((meal.end - MEAL_MIN * MIN - t) / MIN));
+        let last = Math.min(target.km - 0.5, kmAfter((meal.end - MEAL_MIN * MIN - t) / MIN));
+        // Eat by the time a rest is due, when the window allows, rather than rest and then eat straight after.
+        const restDue = kmAfter(BREAK_EVERY_MIN + BREAK_TOLERANCE_MIN - since);
+        if (restDue >= first) last = Math.min(last, restDue);
         if (last >= first) {
           mealPoi = poisBetween(pois, first, last, ['food'])[0] ?? null;
           mealKm = mealPoi?.alongKm ?? Math.min(last, kmAfter((meal.start - t) / MIN + 30));
@@ -184,7 +190,9 @@ export function dayClock(input: DayClockInput): DayClock {
         if (target.stop) {
           const s = target.stop;
           const charge = s.chargeMinutes + s.detourKm * 2 * DETOUR_MIN_PER_KM;
-          const stay = mergeMeal ? Math.max(charge, MEAL_MIN) : charge;
+          // Near the two-hour mark a short top-up also becomes the rest, so no break follows right after it.
+          const rest = since >= BREAK_EVERY_MIN - 30 ? BREAK_MIN : 0;
+          const stay = Math.max(charge, mergeMeal ? MEAL_MIN : 0, rest);
           if (mergeMeal) mergeMeal.done = true;
           items.push({
             kind: 'charge',
@@ -212,7 +220,7 @@ export function dayClock(input: DayClockInput): DayClock {
         }
         break;
       }
-      if (mealKm !== null && mealKm <= breakKm + BREAK_TOLERANCE_MIN / minPerKm) {
+      if (mealKm !== null && mealKm <= kmAfter(BREAK_EVERY_MIN + BREAK_TOLERANCE_MIN - since)) {
         move(mealKm);
         meal!.done = true;
         items.push({

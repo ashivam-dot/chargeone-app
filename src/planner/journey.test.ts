@@ -230,6 +230,17 @@ describe('planJourney', () => {
     expect(j.days.some((d) => d.plan.stops.some((s) => d.startKm + s.alongKm > 690))).toBe(true);
   });
 
+  it('words gap warnings in whole-trip km and names the night stops, not the trip ends', () => {
+    const gappy = [100, 200, 300, 700, 800, 900, 1000, 1100].map((km) => station(`g${km}`, km));
+    const j = journey(1200, 8, null, { stations: gappy });
+    const gapWarnings = j.warnings.filter((w) => w.includes('no confirmed car charger'));
+    expect(gapWarnings.length).toBeGreaterThan(0);
+    for (const g of j.gaps) expect(gapWarnings.some((w) => w.includes(`(km ${Math.round(g.fromKm)})`))).toBe(true);
+    for (const d of j.days.slice(1))
+      for (const g of d.plan.gaps.filter((x) => x.fromName === null))
+        expect(gapWarnings.some((w) => w.includes(`last night's stop (km ${Math.round(d.startKm + g.fromKm)})`))).toBe(true);
+  });
+
   it('never drives more than about 2 h without a rest', () => {
     const corridor = [poi('1', 110, 'fuel', 'fuel'), poi('2', 230, 'rest_area', 'rest'), poi('3', 340, 'restaurant', 'food')];
     const j = journey(1000, 10, places, { corridor });

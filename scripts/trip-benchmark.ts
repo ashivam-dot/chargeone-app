@@ -21,9 +21,11 @@ import { fileURLToPath } from 'node:url';
 import { decodeIndex } from '../src/data/compact.ts';
 import { forCars } from '../src/data/filters.ts';
 import type { PlacesData } from '../src/data/places.ts';
+import { CORRIDOR_SCHEMA, cellsAlongRoute, decodeCell, type CorridorIndex, type CorridorPlace } from '../src/data/corridor.ts';
 import { planTrip, findCandidates, DEFAULT_OPTIONS, type Candidate, type PlanInput, type TripPlan } from '../src/planner/planner.ts';
 import { planJourney, staysNearDestination, type Journey } from '../src/planner/journey.ts';
-import { RouteIndex } from '../src/planner/geometry.ts';
+import { clockLabel } from '../src/planner/itinerary.ts';
+import { RouteIndex, type RouteGeometry } from '../src/planner/geometry.ts';
 import { VEHICLES, myVehicleFromModel } from '../src/shared/vehicles.ts';
 import { parseValhalla } from '../worker/valhalla.ts';
 
@@ -172,21 +174,46 @@ function summarisePlan(p: TripPlan) {
 }
 
 function summariseJourney(j: Journey) {
-  const nights = j.days.filter((d) => d.overnight);
+  // Every day but the last ends with a night: at a charger, at a roadside hotel, or "around km X".
+  const nights = j.days.filter((d) => d.night);
   return {
     feasible: j.feasible,
     days: j.days.length,
     nights: nights.length,
-    nightsWithStay: nights.filter((d) => (d.overnight?.stays.length ?? 0) > 0).length,
-    nightsWithFood: nights.filter((d) => (d.overnight?.food.length ?? 0) > 0).length,
+    nightsAtCharger: nights.filter((d) => d.overnight).length,
+    nightsWithStay: nights.filter((d) => (d.night?.stays.length ?? 0) > 0).length,
+    nightsWithFood: nights.filter((d) => (d.night?.food.length ?? 0) > 0).length,
     stopCount: j.stopCount,
     tooLong: j.tooLong,
+    // Clock checks: longest drive without a rest (min), latest night arrival (HH:MM), longest day at the wheel (min).
+    maxDriveSinceRestMin: Math.max(0, ...j.days.flatMap((d) => d.items.map((i) => i.drivenSinceRestMin))),
+    latestNightArrival: j.days
+      .filter((d) => d.night)
+      .map((d) => clockLabel(d.arriveAt))
+      .sort()
+      .pop() ?? null,
+    longestDayDriveMin: Math.max(0, ...j.days.map((d) => d.driveMinutes)),
+    clockOrdered: j.days.every((d) => d.items.every((it, k) => k === 0 || (it.at >= d.items[k - 1].until - 1000 && it.km >= d.items[k - 1].km - 0.01))),
     dayDetail: j.days.map((d) => ({
       fromKm: r1(d.startKm),
       toKm: r1(d.endKm),
       feasible: d.plan.feasible,
       stops: d.plan.stops.length,
       gapAtKm: d.plan.gapAtKm === null ? null : r1(d.startKm + d.plan.gapAtKm),
+      // The day on the clock, one line per row the app shows.
+      timeline: d.items.map((it) => {
+        const stop = it.stopIndex !== undefined ? d.plan.stops[it.stopIndex] : null;
+        const what = stop
+          ? `charge at ${stop.station.name} (${stop.mode.toUpperCase()} ${stop.powerKw} kW) ${stop.arriveSocPct}%->${stop.departSocPct}%`
+          : it.poi
+            ? `${it.poi.place.cat} ${it.poi.place.name}`
+            : it.gap
+              ? `no confirmed charger for ${Math.round(it.gap.toKm - it.gap.fromKm)} km`
+              : '';
+        const span = it.until > it.at + 60_000 ? `${clockLabel(it.at)}-${clockLabel(it.until)}` : clockLabel(it.at);
+        return `${span} ${it.kind}${it.meal ? ` (${it.meal})` : ''} km ${Math.round(it.km)} ${what}`.trim();
+      }),
+      night: d.night ? { kind: d.night.kind, name: d.night.name, km: d.night.alongKm, stays: d.night.stays.length, food: d.night.food.length } : null,
       overnight: d.overnight
         ? { station: d.overnight.station.name, km: d.overnight.alongKm, stays: d.overnight.stays.length, food: d.overnight.food.length, morningSocPct: d.overnight.morningSocPct }
         : null,
@@ -204,6 +231,20 @@ async function main() {
   } catch {
     places = null;
   }
+  // Roadside stays, food, fuel and rest areas (public/data/corridor), as the app loads them for a route.
+  let corridorIndex: CorridorIndex | null = null;
+  try {
+    const idx = JSON.parse(readFileSync(join(REPO, 'public/data/corridor/index.json'), 'utf8')) as CorridorIndex;
+    corridorIndex = idx.schema === CORRIDOR_SCHEMA && idx.cells ? idx : null;
+  } catch {
+    corridorIndex = null;
+  }
+  const corridorFor = (coords: RouteGeometry['coords']): CorridorPlace[] =>
+    corridorIndex
+      ? cellsAlongRoute(coords, Object.keys(corridorIndex.cells)).flatMap((cell) =>
+          decodeCell(JSON.parse(readFileSync(join(REPO, `public/data/corridor/${cell}.json`), 'utf8'))),
+        )
+      : [];
   const now = new Date();
   const budget = { left: MAX_FETCHES };
   const results: unknown[] = [];
@@ -220,6 +261,7 @@ async function main() {
     const index = new RouteIndex(route.coords);
     const totalKm = index.lengthKm || route.distanceKm;
     const dest = r.points[r.points.length - 1];
+    const corridor = corridorFor(route.coords);
 
     for (const carId of CARS) {
       const model = VEHICLES.find((v) => v.id === carId);
@@ -241,10 +283,10 @@ async function main() {
 
       const strict = planTrip(input);
       const looseP = planTrip({ ...input, options: loose });
-      const jStrict = planJourney({ ...input, dailyHours: DAILY_HOURS, places });
-      const jLoose = planJourney({ ...input, options: loose, dailyHours: DAILY_HOURS, places });
+      const jStrict = planJourney({ ...input, dailyHours: DAILY_HOURS, places, corridor });
+      const jLoose = planJourney({ ...input, options: loose, dailyHours: DAILY_HOURS, places, corridor });
       // What a Free-plan user gets: TripPlanner passes dailyHours 0 when plan.multiDay is false.
-      const jFree = planJourney({ ...input, dailyHours: 0, places });
+      const jFree = planJourney({ ...input, dailyHours: 0, places, corridor });
 
       results.push({
         route: r.id,
@@ -292,7 +334,7 @@ async function main() {
       largestGap: 'longest stretch along the route between consecutive chargers within 8 km (route start and end count as anchors)',
       strictPlan: 'planTrip() with DEFAULT_OPTIONS (what the app plans by default)',
       loosePlan: 'planTrip() with allowUnverified: true',
-      journey8h: 'planJourney() dailyHours 8 with places.json (nightsWithStay = overnights whose charger has >=1 stay within 3 km)',
+      journey8h: 'planJourney() dailyHours 8 with places.json (and the corridor places; nights = every night stop (charger, roadside hotel or around km X), nightsWithStay = nights with >=1 stay listed)',
       freePlanSingleDay: 'planJourney() dailyHours 0 (Free plan has multiDay=false)',
     },
     skippedRoutes: skipped,
@@ -311,7 +353,7 @@ async function main() {
         `gap=${x.largestGapUsable8km.gapKm}@${x.largestGapUsable8km.fromKm}`.padEnd(16),
         `strict=${x.strictPlan.feasible ? 'OK' : 'FAIL@' + x.strictPlan.gapAtKm}/${x.strictPlan.stops}`.padEnd(18),
         `loose=${x.loosePlan.feasible ? 'OK' : 'FAIL@' + x.loosePlan.gapAtKm}/${x.loosePlan.stops}`.padEnd(18),
-        `j8=${x.journey8hLoose.days}d n${x.journey8hLoose.nights} stay${x.journey8hLoose.nightsWithStay} ${x.journey8hLoose.feasible ? 'OK' : 'FAIL'}`,
+        `j8=${x.journey8hLoose.days}d n${x.journey8hLoose.nights} chg${x.journey8hLoose.nightsAtCharger} stay${x.journey8hLoose.nightsWithStay} ${x.journey8hLoose.feasible ? 'OK' : 'FAIL'}`,
       ].join(' '),
     );
   }

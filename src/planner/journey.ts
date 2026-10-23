@@ -300,6 +300,12 @@ export function planJourney(input: JourneyInput): Journey {
       stations: skip ? input.stations.filter((s) => s.id !== skip) : input.stations,
       route: sliceRoute(index, fromKm, toKm, input.route),
       options: { ...input.options, startSocPct: soc, arriveReservePct },
+      // Gap warnings in whole-trip km, naming the night stops rather than "the start" and "the destination".
+      leg: {
+        offsetKm: fromKm,
+        startName: fromKm > 0 ? "last night's stop" : 'the start',
+        endName: toKm >= totalKm - 0.5 ? 'the destination' : "the night's stop",
+      },
     });
   const clock = (fromKm: number, toKm: number, plan: TripPlan, depart: number, end: 'night' | 'arrive'): DayClock =>
     dayClock({
