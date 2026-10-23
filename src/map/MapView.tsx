@@ -16,7 +16,7 @@ import type { Station } from '../data/model.ts';
 import { INDIA_BBOX } from '../lib/geocode.ts';
 import { glInfo } from '../lib/gpu.ts';
 import type { Coord } from '../planner/geometry.ts';
-import { LIVE_COLOUR, liveState, type StationStatus } from '../shared/status.ts';
+import { STATE_COLOUR, chargerState, type StationStatus } from '../shared/status.ts';
 import { addMapIcons, drawRoute, futuristicStyle, ROUTE_GRADIENT, setTerrain3d, shouldPlayIntro, Tilt3dControl } from './futuristic.ts';
 
 export type FlyTarget =
@@ -106,6 +106,21 @@ function englishLabels(map: MapLibreMap): void {
   }
 }
 
+/** `st`: the pin's state (shared/status.ts chargerState); `rep`: a recent driver report decided it. */
+function stateProps(s: Station, statuses: Map<string, StationStatus>, now: Date): { st: string; rep: boolean } {
+  const info = chargerState(s, statuses.get(s.id), now);
+  return { st: info.state, rep: info.from === 'report' };
+}
+
+/** Pin colour by state; "unknown" is a hollow ring, so it reads as "no data" and not as a fourth colour only. */
+const STATE_FILL = (dark: boolean) =>
+  ['match', ['get', 'st'], 'working', STATE_COLOUR.working, 'in_use', STATE_COLOUR.in_use, 'unavailable', STATE_COLOUR.unavailable, dark ? '#1c2230' : '#ffffff'] as const;
+/** Unavailable pins are a little faded: they're on the map so drivers know, not as a place to head for. */
+function stateOpacity(base: number): ExpressionSpecification {
+  return ['match', ['get', 'st'], 'unavailable', Math.round(base * 72) / 100, base];
+}
+const STATE_GLYPH = ['match', ['get', 'st'], 'working', 'co-bolt', 'in_use', 'co-clock', 'unavailable', 'co-cross', 'co-unknown'] as const;
+
 function stationsGeoJson(stations: Station[], statuses: Map<string, StationStatus>): FeatureCollection<Point> {
   const now = new Date();
   return {
@@ -113,7 +128,7 @@ function stationsGeoJson(stations: Station[], statuses: Map<string, StationStatu
     features: stations.map((s) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
-      properties: { id: s.id, dc: s.speed === 'dc', kw: s.maxKw ? `${Math.round(s.maxKw)} kW` : '', name: s.name, live: liveState(statuses.get(s.id), now) },
+      properties: { id: s.id, dc: s.speed === 'dc', kw: s.maxKw ? `${Math.round(s.maxKw)} kW` : '', name: s.name, ...stateProps(s, statuses, now) },
     })),
   };
 }
@@ -294,45 +309,53 @@ function addLayers(map: MapLibreMap, data: LayerData, selectedId: string | null,
       'circle-stroke-width': 3,
     },
   });
-  // A soft static halo in the live colour, so free and busy chargers glow without per-frame repaints.
+  // A soft static halo when a driver's recent report says it works or is busy: live news, not listing data.
   map.addLayer({
     id: 'stations-glow',
     type: 'circle',
     source: SOURCE,
-    filter: ['all', ['!', ['has', 'point_count']], ['in', ['get', 'live'], ['literal', ['working', 'in_use']]]],
+    filter: ['all', ['!', ['has', 'point_count']], ['get', 'rep'], ['in', ['get', 'st'], ['literal', ['working', 'in_use']]]],
     paint: {
-      'circle-color': ['match', ['get', 'live'], 'working', LIVE_COLOUR.working, LIVE_COLOUR.in_use],
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 10, 14, 22],
+      'circle-color': ['match', ['get', 'st'], 'working', STATE_COLOUR.working, STATE_COLOUR.in_use],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 12, 14, 24],
       'circle-blur': 0.9,
-      'circle-opacity': dark ? 0.45 : 0.3,
+      'circle-opacity': dark ? 0.45 : 0.35,
     },
   });
+  // Unknown and unavailable pins sit under the working ones, so a dense area shows what works on top.
   map.addLayer({
     id: 'stations',
     type: 'circle',
     source: SOURCE,
     filter: ['!', ['has', 'point_count']],
+    layout: { 'circle-sort-key': ['match', ['get', 'st'], 'working', 3, 'in_use', 2, 'unavailable', 1, 0] },
     paint: {
-      'circle-color': ['match', ['get', 'live'], 'working', LIVE_COLOUR.working, 'in_use', LIVE_COLOUR.in_use, 'problem', LIVE_COLOUR.problem, LIVE_COLOUR.unknown],
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, ['case', ['get', 'dc'], 7, 5.5], 10, ['case', ['get', 'dc'], 9, 7.5], 15, ['case', ['get', 'dc'], 13, 11]],
-      'circle-stroke-color': '#ffffff',
-      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 5, 1.5, 12, 2.5],
+      'circle-color': STATE_FILL(dark) as unknown as string,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, ['case', ['get', 'dc'], 7.5, 6], 10, ['case', ['get', 'dc'], 10, 8.5], 15, ['case', ['get', 'dc'], 14, 12]],
+      'circle-stroke-color': ['match', ['get', 'st'], 'unknown', STATE_COLOUR.unknown, '#ffffff'],
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 5, ['match', ['get', 'st'], 'unknown', 2, 1.5], 12, 2.5],
+      'circle-opacity': stateOpacity(1),
+      'circle-stroke-opacity': stateOpacity(1),
     },
   });
-  // A lightning bolt inside each pin once it is big enough to read, and the charger's power and name close up.
+  // A glyph inside each pin, so the state never rests on colour alone: bolt, clock, cross or question mark.
   map.addLayer({
     id: 'station-bolts',
     type: 'symbol',
     source: SOURCE,
-    minzoom: 9,
+    minzoom: 6.5,
     filter: ['!', ['has', 'point_count']],
     layout: {
-      'icon-image': 'co-bolt',
-      'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.5, 15, ['case', ['get', 'dc'], 0.95, 0.8]],
+      'icon-image': STATE_GLYPH as unknown as string,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 6.5, ['case', ['get', 'dc'], 0.7, 0.58], 10, ['case', ['get', 'dc'], 1, 0.85], 15, ['case', ['get', 'dc'], 1.3, 1.12]],
       'icon-allow-overlap': true,
       'icon-ignore-placement': true,
+      'symbol-sort-key': ['match', ['get', 'st'], 'working', 3, 'in_use', 2, 'unavailable', 1, 0],
     },
-    paint: { 'icon-color': '#ffffff' },
+    paint: {
+      'icon-color': ['match', ['get', 'st'], 'unknown', dark ? '#c3c9d4' : STATE_COLOUR.unknown, '#ffffff'],
+      'icon-opacity': stateOpacity(1),
+    },
   });
   map.addLayer({
     id: 'station-labels',
@@ -385,9 +408,9 @@ function applyTripMode(map: MapLibreMap, on: boolean, dark: boolean): void {
   if (!map.getLayer('clusters')) return;
   map.setPaintProperty('clusters', 'circle-opacity', on ? 0.35 : 0.92);
   map.setPaintProperty('cluster-count', 'text-opacity', on ? 0 : 1);
-  map.setPaintProperty('stations', 'circle-opacity', on ? 0.55 : 1);
-  map.setPaintProperty('stations', 'circle-stroke-opacity', on ? 0.55 : 1);
-  map.setPaintProperty('station-bolts', 'icon-opacity', on ? 0.4 : 1);
+  map.setPaintProperty('stations', 'circle-opacity', stateOpacity(on ? 0.55 : 1));
+  map.setPaintProperty('stations', 'circle-stroke-opacity', stateOpacity(on ? 0.55 : 1));
+  map.setPaintProperty('station-bolts', 'icon-opacity', stateOpacity(on ? 0.4 : 1));
   map.setPaintProperty('station-labels', 'text-opacity', on ? 0 : 1);
   map.setPaintProperty('stations-glow', 'circle-opacity', on ? 0 : dark ? 0.45 : 0.3);
 }
@@ -538,7 +561,7 @@ export function MapView(props: Props) {
     const source = mapRef.current?.getSource(SOURCE) as GeoJSONSource | undefined;
     if (!source) return;
     const now = new Date();
-    const live = stations.map((s) => liveState(statuses.get(s.id), now)[0]).join('');
+    const live = stations.map((s) => { const i = chargerState(s, statuses.get(s.id), now); return i.state[0] + i.from[0]; }).join('');
     if (drawn.current && drawn.current.stations === stations && drawn.current.live === live) return;
     drawn.current = { stations, live };
     void source.setData(stationsGeoJson(stations, statuses));
@@ -609,8 +632,7 @@ export function MapView(props: Props) {
       el.setAttribute('aria-hidden', 'true');
       pulseMarker.current = new Marker({ element: el, pitchAlignment: 'map' });
     }
-    const live = liveState(statuses.get(s.id), new Date());
-    pulseMarker.current.getElement().style.setProperty('--live', LIVE_COLOUR[live]);
+    pulseMarker.current.getElement().style.setProperty('--live', STATE_COLOUR[chargerState(s, statuses.get(s.id), new Date()).state]);
     pulseMarker.current.setLngLat([s.lng, s.lat]).addTo(map);
   }, [selectedId, stations, statuses]);
 

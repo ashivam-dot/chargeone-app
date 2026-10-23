@@ -43,20 +43,61 @@ function labelFonts(map: MapLibreMap): void {
   }
 }
 
-/** A lightning bolt drawn once into the map as a recolourable (SDF) icon, for charger pins. */
+/**
+ * The charger-state glyphs, drawn once into the map as recolourable (SDF) icons: a bolt (working), a clock
+ * (in use), a cross (unavailable) and a question mark (unknown). Same 48 px grid, so they share one pin size.
+ */
+export const STATE_GLYPHS: Record<'co-bolt' | 'co-clock' | 'co-cross' | 'co-unknown', (g: CanvasRenderingContext2D) => void> = {
+  'co-bolt': (g) => {
+    g.beginPath();
+    for (const [x, y] of [[27, 5], [12, 27], [22, 27], [19, 43], [36, 19], [26, 19], [30, 5]]) g.lineTo(x, y);
+    g.closePath();
+    g.fill();
+  },
+  'co-clock': (g) => {
+    g.lineWidth = 5;
+    g.beginPath();
+    g.arc(24, 24, 15, 0, Math.PI * 2);
+    g.moveTo(24, 14);
+    g.lineTo(24, 25);
+    g.lineTo(31, 29);
+    g.stroke();
+  },
+  'co-cross': (g) => {
+    g.lineWidth = 7;
+    g.beginPath();
+    g.moveTo(13, 13);
+    g.lineTo(35, 35);
+    g.moveTo(35, 13);
+    g.lineTo(13, 35);
+    g.stroke();
+  },
+  'co-unknown': (g) => {
+    g.lineWidth = 6;
+    g.beginPath();
+    g.arc(24, 17, 8.5, Math.PI * 1.05, Math.PI * 0.42);
+    g.lineTo(24, 30);
+    g.stroke();
+    g.beginPath();
+    g.arc(24, 39, 3.8, 0, Math.PI * 2);
+    g.fill();
+  },
+};
+
 export function addMapIcons(map: MapLibreMap): void {
-  if (map.hasImage('co-bolt')) return;
   const size = 48;
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const g = c.getContext('2d');
-  if (!g) return;
-  g.fillStyle = '#000';
-  g.beginPath();
-  for (const [x, y] of [[27, 5], [12, 27], [22, 27], [19, 43], [36, 19], [26, 19], [30, 5]]) g.lineTo(x, y);
-  g.closePath();
-  g.fill();
-  map.addImage('co-bolt', g.getImageData(0, 0, size, size), { pixelRatio: 4, sdf: true });
+  for (const [name, draw] of Object.entries(STATE_GLYPHS)) {
+    if (map.hasImage(name)) continue;
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d');
+    if (!g) return;
+    g.fillStyle = g.strokeStyle = '#000';
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    draw(g);
+    map.addImage(name, g.getImageData(0, 0, size, size), { pixelRatio: 4, sdf: true });
+  }
 }
 
 /** Sky, fog, globe, terrain shading and 3D buildings. Called on every `style.load`, before ChargeOne's own layers. */

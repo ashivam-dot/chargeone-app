@@ -3,7 +3,8 @@ import type { Dataset } from '../data/model.ts';
 import { TRUST_LABEL } from '../data/trust.ts';
 import { CoverageTable, useCoverage } from './Coverage.tsx';
 import { formatDate } from '../lib/format.ts';
-import { LIVE_COLOUR, LIVE_LABEL, type LiveState } from '../shared/status.ts';
+import { STATE_LABEL, type ChargerState } from '../shared/status.ts';
+import { StateIcon } from './StateIcon.tsx';
 import { Sheet } from './Sheet.tsx';
 
 interface Props {
@@ -13,11 +14,11 @@ interface Props {
   onAddCharger?: () => void;
 }
 
-const LEGEND: Array<[LiveState, string]> = [
-  ['working', 'A driver charged here in the last 48 hours and nobody reported charging in the last hour'],
-  ['in_use', 'Someone is charging or queueing right now'],
-  ['problem', 'Reported not working, slow or blocked in the last 24 hours'],
-  ['unknown', 'No recent reports, so it may or may not work'],
+const LEGEND: Array<[ChargerState, string]> = [
+  ['working', 'Listed as operational by the map sources, or a driver charged here in the last 48 hours'],
+  ['in_use', 'A driver reported charging or queueing in the last hour'],
+  ['unavailable', 'Listed as temporarily unavailable, or reported not working, slow or blocked in the last 24 hours'],
+  ['unknown', 'No source says whether it works and no recent reports, so it may or may not work'],
 ];
 
 export function About({ dataset, manifest, onClose, onAddCharger }: Props) {
@@ -25,12 +26,12 @@ export function About({ dataset, manifest, onClose, onAddCharger }: Props) {
   const counts = manifest?.counts;
   return (
     <Sheet title="About ChargeOne" onClose={onClose} modal>
-      <h3>What the colours mean</h3>
+      <h3>What the pins mean</h3>
       <ul class="legend">
         {LEGEND.map(([state, text]) => (
           <li key={state}>
-            <span class="dot" style={{ background: LIVE_COLOUR[state] }} aria-hidden="true" />
-            <strong>{LIVE_LABEL[state]}</strong>
+            <StateIcon state={state} size={18} />
+            <strong>{STATE_LABEL[state]}</strong>
             <span class="muted">{text}</span>
           </li>
         ))}
@@ -43,7 +44,8 @@ export function About({ dataset, manifest, onClose, onAddCharger }: Props) {
 
       <h3>Where the status comes from</h3>
       <p>
-        Status comes from drivers who check in at the charger. A report only counts when the phone is actually at the charger, and each
+        A pin starts from the status the map sources list, which is not live. A newer report from a driver who checks in at the
+        charger takes its place. A report only counts when the phone is actually at the charger, and each
         driver can report a limited number of times a day. Charging companies don't share live data with independent apps yet, so please
         report after you charge. It takes one tap and helps the next driver. Where we know who runs a charger, its page links to that
         operator's app for their own live status and to pay.
