@@ -52,6 +52,26 @@ const smooth = (u: number) => {
   const v = clamp01(u);
   return v * v * (3 - 2 * v);
 };
+// Soft min and max: a hard Math.min/max between two smooth lines leaves a kink where they cross, and every
+// kink in a section line shows as a crease in the reflections. These round the switch over about k metres.
+const smin = (a: number, b: number, k: number) => (a + b - Math.sqrt((a - b) ** 2 + k * k)) / 2;
+const smax = (a: number, b: number, k: number) => (a + b + Math.sqrt((a - b) ** 2 + k * k)) / 2;
+/** A 0..1 ramp with rounded ends (no slope break where it saturates). */
+const ramp = (u: number, k = 0.12) => smax(0, smin(1, u, k), k);
+/**
+ * Joins a line arriving at `a` with value y0 and slope m0 to `target(t)`, which it reaches at `b` with the
+ * target's own slope: value and slope are continuous at both ends.
+ */
+const join = (t: number, a: number, b: number, y0: number, m0: number, target: (t: number) => number) => {
+  const s = smooth((t - a) / Math.max(1e-6, b - a));
+  return (1 - s) * (y0 + m0 * (t - a)) + s * target(t);
+};
+const slopeOf = (f: (t: number) => number, t: number, h = 1e-4) => (f(t) - f(t - h)) / h;
+/** A falling shape 1 -> 0 over u = 0..1 that is flat at 1 with finite curvature (no reflection spike). */
+const fade = (u: number) => {
+  const v = 1 - clamp01(u);
+  return v * v * (1.5 - 0.5 * v);
+};
 
 /** A smooth curve through control points that never overshoots them (Fritsch-Carlson monotone cubic). */
 export function monotone(pts: Curve): (x: number) => number {
@@ -132,7 +152,7 @@ function materials(d: CarDesign, paint: string): Mats {
     matte: new MeshStandardMaterial({ color: '#111215', roughness: 0.78, ...decal }),
     clad: new MeshStandardMaterial({ color: new Color(d.clad.colour), roughness: 0.72, metalness: 0.05, ...decal }),
     under: new MeshStandardMaterial({ color: '#09090b', roughness: 0.92, side: DoubleSide }),
-    glass: new MeshPhysicalMaterial({ color: '#33414d', metalness: 0, roughness: 0.02, clearcoat: 1, clearcoatRoughness: 0, envMapIntensity: 1.7 }),
+    glass: new MeshPhysicalMaterial({ color: '#33414d', metalness: 0, roughness: 0.02, envMapIntensity: 1.2 }),
     chrome: new MeshStandardMaterial({ color: '#dfe3e8', metalness: 1, roughness: 0.14, ...decal }),
     satin: new MeshStandardMaterial({ color: '#aeb3ba', metalness: 0.75, roughness: 0.38, ...decal }),
     housing: new MeshPhysicalMaterial({ color: '#0b0d11', metalness: 0.3, roughness: 0.06, clearcoat: 1, ...decal }),
@@ -172,7 +192,53 @@ function loft(rings: Vector3[][], closed: boolean, pick: (i: number, j: number) 
   });
   geo.setIndex(index);
   geo.computeVertexNormals();
+  gridNormals(rings, closed, geo.getAttribute('normal') as BufferAttribute);
   return new Mesh(geo, matList);
+}
+
+/**
+ * Vertex normals of a ring grid that don't depend on the ring spacing: the mean of the unit normals of the
+ * four quad corners round each vertex. Three's area weighting, on a fixed triangle diagonal, weighs the
+ * faces above a vertex by 2 x (gap before) + (gap after) and those below the other way round, so wherever
+ * the stations are unevenly spaced a crease's normals wobbled from ring to ring: fine ripples in the
+ * reflections along the door crease, the wings and the bonnet. A row repeated on purpose (a sharp edge)
+ * contributes nothing, so its two copies keep the normals of their own sides.
+ */
+function gridNormals(rings: Vector3[][], closed: boolean, out: BufferAttribute): void {
+  const n = rings[0].length;
+  const tv = new Vector3();
+  const rv = new Vector3();
+  const c = new Vector3();
+  const sum = new Vector3();
+  const unit = (v: Vector3, a: Vector3, b: Vector3): boolean => {
+    v.subVectors(a, b);
+    const l = v.length();
+    if (l < 1e-6) return false;
+    v.divideScalar(l);
+    return true;
+  };
+  for (let i = 0; i < rings.length; i++) {
+    for (let j = 0; j < n; j++) {
+      sum.set(0, 0, 0);
+      for (const di of [1, -1]) {
+        const ii = i + di;
+        if (ii < 0 || ii >= rings.length || !unit(tv, rings[ii][j], rings[i][j])) continue;
+        for (const dj of [1, -1]) {
+          let jj = j + dj;
+          if (closed) jj = (jj + n) % n;
+          else if (jj < 0 || jj >= n) continue;
+          if (!unit(rv, rings[i][jj], rings[i][j])) continue;
+          // Same handedness as the loft's triangles (row step x station step), whichever way each points.
+          c.crossVectors(rv, tv).multiplyScalar(di * dj);
+          const l = c.length();
+          if (l > 1e-6) sum.addScaledVector(c, 1 / l);
+        }
+      }
+      const l = sum.length();
+      if (l > 1e-6) out.setXYZ(i * n + j, sum.x / l, sum.y / l, sum.z / l);
+    }
+  }
+  out.needsUpdate = true;
 }
 
 /** A face item that misses the body is skipped; only the design lab needs to hear about it. */
@@ -476,7 +542,18 @@ function wheel(m: Mats, d: CarDesign, R: number, width: number, rimR: number): G
 // ---------------------------------------------------------------------------------------------------------
 // Body
 
-export function buildCar(d: CarDesign, paintHex: string): CarModel {
+/** Filled by buildCar for tests and the design lab: the lofted rings of the body and the glasshouse, front to back. */
+export interface CarSurfaces {
+  body?: Vector3[][];
+  bodyT?: number[];
+  glass?: Vector3[][];
+  glassT?: number[];
+  /** Points per ring on one side of the centre line (the ring is mirrored after them). */
+  bodySide?: number;
+  glassSide?: number;
+}
+
+export function buildCar(d: CarDesign, paintHex: string, surfaces?: CarSurfaces): CarModel {
   const L = d.lengthMm / 1000;
   const W = d.widthMm / 1000;
   const H = d.heightMm / 1000;
@@ -497,25 +574,38 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
   const T_TAIL = 0.03;
   const beltPts = d.curves?.belt;
   const beltCurve = beltPts ? monotone(beltPts) : null;
-  const belt = (t: number): number => {
-    const a = p.cowlX;
-    if (beltCurve && beltPts) {
-      const c0 = beltPts[0][0];
-      if (t >= c0) return H * beltCurve(t);
-      return H * lerp(p.hoodCowlH, beltCurve(c0), smooth((t - a) / Math.max(1e-4, c0 - a)));
-    }
-    const b = Math.min(p.cowlX + 0.06, p.rearGlassX - 0.01);
-    if (t <= b) return H * lerp(p.hoodCowlH, p.beltH, smooth((t - a) / (b - a)));
-    return H * lerp(p.beltH, p.tailH, clamp01((t - b) / (p.rearGlassX - b)));
-  };
   const hoodCurve = d.curves?.hood ? monotone(d.curves.hood) : null;
-  const top = (t: number): number => {
-    if (t <= p.cowlX && hoodCurve) return H * hoodCurve(t);
+  const hoodTop = (t: number): number => {
+    if (hoodCurve) return H * hoodCurve(t);
     if (t <= T_NOSE) return H * (p.noseH + (p.hoodFrontH - p.noseH) * Math.sin((Math.PI / 2) * (t / T_NOSE)));
-    if (t <= p.cowlX) return H * lerp(p.hoodFrontH, p.hoodCowlH, (t - T_NOSE) / (p.cowlX - T_NOSE));
+    return H * lerp(p.hoodFrontH, p.hoodCowlH, (t - T_NOSE) / (p.cowlX - T_NOSE));
+  };
+  const beltB = Math.min(p.cowlX + 0.06, p.rearGlassX - 0.01);
+  const beltLine = (t: number): number => (beltCurve ? H * beltCurve(t) : H * lerp(p.beltH, p.tailH, clamp01((t - beltB) / (p.rearGlassX - beltB))));
+  // The window sill leaves the bonnet at the scuttle with the bonnet's own height and slope. It used to
+  // restart from hoodCowlH, a few millimetres off the bonnet curve: a ridge across the car that rippled the
+  // reflections on the wings and the bonnet.
+  const beltJoinEnd = Math.min(p.rearGlassX - 0.01, Math.max(beltPts ? beltPts[0][0] : beltB, p.cowlX + 0.02));
+  const hoodEnd = hoodTop(p.cowlX);
+  const hoodSlope = slopeOf(hoodTop, p.cowlX);
+  const belt = (t: number): number => {
+    if (t >= beltJoinEnd) return beltLine(t);
+    if (t <= p.cowlX) return hoodEnd;
+    return join(t, p.cowlX, beltJoinEnd, hoodEnd, hoodSlope, beltLine);
+  };
+  // Behind the rear glass the deck runs into the tail at tailH and rolls down over the last T_TAIL. It
+  // leaves the window line with the line's height and slope: the step and slope break there (a kick-up
+  // belt ends above tailH) were the lumps over the tail lamps.
+  const tailTarget = (t: number): number => H * (p.tailH - 0.05 * clamp01((t - (1 - T_TAIL)) / T_TAIL) ** 2);
+  const tailFrom = belt(p.rearGlassX);
+  const tailSlope = slopeOf(belt, p.rearGlassX);
+  const tailDrop = tailFrom - tailTarget(p.rearGlassX);
+  const tailJoin = Math.min(1 - p.rearGlassX, tailDrop > 0 && tailSlope < 0 ? Math.min(0.04, Math.max(0.008, (2 * tailDrop) / -tailSlope)) : 0.02);
+  const top = (t: number): number => {
+    if (t <= p.cowlX) return hoodTop(t);
     if (t <= p.rearGlassX) return belt(t);
-    if (t <= 1 - T_TAIL) return H * p.tailH;
-    return H * (p.tailH - 0.05 * Math.sin((Math.PI / 2) * ((t - (1 - T_TAIL)) / T_TAIL)));
+    if (t >= p.rearGlassX + tailJoin) return tailTarget(t);
+    return join(t, p.rearGlassX, p.rearGlassX + tailJoin, tailFrom, tailSlope, tailTarget);
   };
   /** Height of the arch edge above the ground at x, or -Infinity outside the arches. */
   const archAt = (x: number): number => {
@@ -554,12 +644,12 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     if (t < FRONT_FACE_T) {
       const ym = H * 0.33;
       const k = y > ym ? Math.min(1.3, (y - ym) / (H * p.noseH - ym)) ** 2 * d.faceRake : ((ym - y) / ym) ** 2 * 0.06;
-      return -(1 - t / FRONT_FACE_T) * k;
+      return -(1 - smooth(t / FRONT_FACE_T)) * k;
     }
     if (t > 1 - REAR_FACE_T) {
       const ym = H * 0.36;
       const k = y > ym ? Math.min(1.3, (y - ym) / (H * p.tailH - ym)) ** 2 * 0.07 : ((ym - y) / ym) ** 2 * 0.05;
-      return (1 - (1 - t) / REAR_FACE_T) * k;
+      return (1 - smooth((1 - t) / REAR_FACE_T)) * k;
     }
     return 0;
   };
@@ -596,9 +686,11 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     // Haunches: full width over the wheels, a little in between.
     const flare = Math.max(...axles.map((ax) => Math.exp(-(((x - ax) / 0.6) ** 2))));
     const w = planHalf(t) * (0.975 + 0.025 * flare);
-    const nose = t < 0.18 ? (1 - t / 0.18) ** 1.5 : 0;
-    const tail = t > 0.9 ? ((t - 0.9) / 0.1) ** 1.5 : 0;
-    const u = clamp01((t - 0.1) / 0.8);
+    // Nose and tail roundings fade in and out with zero slope at both ends (a power 1.5 ramp had infinite
+    // curvature where it started: a ridge in the reflections round the front wings and the tail lamps).
+    const nose = fade(t / 0.18);
+    const tail = 1 - fade((t - 0.9) / 0.1);
+    const u = ramp((t - 0.1) / 0.8);
     const drop = lerp(d.shoulder.drop[0], d.shoulder.drop[1], u);
     const rb = Math.min(0.08, h * 0.2, w * 0.4);
     const rty = Math.min(0.04 + 0.1 * nose * (0.4 + d.noseRound) + 0.05 * tail, h * 0.3, drop * 0.9);
@@ -612,10 +704,15 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     // (that drag was the lumpy reflection over the rear quarters).
     const inBelt = t > p.cowlX && t < p.rearGlassX;
     const ref = inBelt ? lerp(top(p.cowlX), top(p.rearGlassX), (t - p.cowlX) / (p.rearGlassX - p.cowlX)) : yt;
-    let ys = Math.min(yt, ref) - drop;
+    let ys = smin(yt, ref, 0.03) - drop;
     let yc = d.shoulder.crease ? H * lerp(d.shoulder.crease.y[0], d.shoulder.crease.y[1], u) : (y0 + ys) / 2;
     let ySill = sillTop;
     const cw = Math.min(0.025, span * 0.06);
+    // Soft limits first, so a line that meets its limit bends into it instead of kinking (the hard max on the
+    // sill stepped the cladding edge at the bumper corners); the hard ones after only keep the order.
+    ys = smin(smax(ys, y0 + span * 0.45, 0.03), yA - span * 0.08, 0.02);
+    yc = smin(smax(yc, y0 + span * 0.18, 0.03), ys - cw - span * 0.08, 0.02);
+    ySill = smin(smax(ySill, y0 + span * 0.04, 0.03), yc - cw - span * 0.05, 0.02);
     ys = Math.min(Math.max(ys, y0 + span * 0.45), yA - span * 0.08);
     yc = Math.min(Math.max(yc, y0 + span * 0.18), ys - cw - span * 0.08);
     ySill = Math.min(Math.max(ySill, y0 + span * 0.04), yc - cw - span * 0.05);
@@ -714,6 +811,7 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
       // Only thin between the nose and the last few centimetres of the tail; the nose and tail-corner
       // roundings need their dense stations.
       const thin = t >= 0.12 && t <= 1 - 0.04 / L;
+      if (t === last) return out;
       if (last === undefined || !thin || (t - last) * L >= 0.012) out.push(t);
       else if (keep.has(t) && !keep.has(last)) out[out.length - 1] = t;
       return out;
@@ -721,6 +819,14 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
 
   const group = new Group();
   const lowerRings = tList.map(ring);
+  // At the very nose and tail the stations are under a millimetre apart, and the face rake (which moves
+  // each row by its own height) could carry a row a hair past the ring before it: a sliver folded back on
+  // itself at the bumper corners. Each row is kept running strictly front to back, from the middle out.
+  const mid = tList.findIndex((t) => t >= 0.5);
+  for (let j = 0; j < lowerRings[0].length; j++) {
+    for (let i = mid - 1; i >= 0; i--) lowerRings[i][j].x = Math.max(lowerRings[i][j].x, lowerRings[i + 1][j].x + 1e-4);
+    for (let i = mid + 1; i < lowerRings.length; i++) lowerRings[i][j].x = Math.min(lowerRings[i][j].x, lowerRings[i - 1][j].x - 1e-4);
+  }
   const n = lowerRings[0].length;
   const lowerMats: Material[] = [m.paint, m.clad, m.under];
   const clad = d.cladding ? d.clad : null;
@@ -770,9 +876,31 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
       return H * lerp(p.roofH, p.roofRearH, smooth((t - p.roofFrontX) / (p.roofRearX - p.roofFrontX)) ** 1.3);
     }
     if (t >= p.rearGlassX) return belt(t);
-    const u = clamp01((t - p.roofRearX) / (p.rearGlassX - p.roofRearX));
-    const rr = roofCurve ? H * roofCurve(p.roofRearX) : H * p.roofRearH;
-    return rr + (belt(t) - rr) * u ** 1.6;
+    // The rear glass leaves the roof with the roof's slope and lands on the deck with the deck's: the old
+    // power ramp started flat while the roof was still falling, a crease across the top of the tailgate glass.
+    // The glass stands above the deck by a margin that falls monotonically to GH_CLEAR, so the body top
+    // (domed more than the glass) never pokes through it over a kick-up belt.
+    const span = p.rearGlassX - p.roofRearX;
+    const u = (t - p.roofRearX) / span;
+    const e0 = roofRearY - belt(p.roofRearX) - GH_CLEAR;
+    const m0 = Math.min(0, Math.max(-3 * e0, (roofRearSlope - slopeOf(belt, p.roofRearX)) * span));
+    return belt(t) + GH_CLEAR + e0 * (2 * u ** 3 - 3 * u * u + 1) + m0 * (u ** 3 - 2 * u * u + u);
+  };
+  const GH_CLEAR = 0.008;
+  const roofMid = (t: number): number => (roofCurve ? H * roofCurve(t) : H * lerp(p.roofH, p.roofRearH, smooth((t - p.roofFrontX) / (p.roofRearX - p.roofFrontX)) ** 1.3));
+  const roofRearY = roofMid(p.roofRearX);
+  const roofRearSlope = slopeOf(roofMid, p.roofRearX);
+  /** Height of the body's top surface (the corner and the top) at half width z, or -Infinity outside it. */
+  const bodyTopAt = (sec: Section, z: number): number => {
+    let best = -Infinity;
+    const { pts } = sec;
+    for (let k = N_FLAT + N_BARC; k < pts.length - 1; k++) {
+      const [z0, y0] = pts[k];
+      const [z1, y1] = pts[k + 1];
+      if (y0 < sec.yA - 0.001 || z0 === z1 || (z - z0) * (z - z1) > 0) continue;
+      best = Math.max(best, lerp(y0, y1, (z - z0) / (z1 - z0)));
+    }
+    return best;
   };
   const N_GS = 8;
   const N_GC = 5;
@@ -787,6 +915,10 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     const wtop = Math.min(roofHalf(t), zg);
     const r = Math.min(0.06, h * 0.4, wtop * 0.5);
     const pts: Array<[number, number]> = [];
+    // Behind the side glass the C-pillar is body panel, so there it grows out of the body's top corner on
+    // its tangent (a Hermite curve up to the roof corner) instead of standing in a sunk ledge on the corner:
+    // that ledge followed the belt kick-up and showed as a crumpled fold down the C-pillar.
+    const kc = smooth((t - p.dloX) / 0.06);
     for (let i = 0; i <= N_GS; i++) {
       const u = i / N_GS;
       pts.push([lerp(zg, wtop, u) + 0.014 * Math.sin(Math.PI * u) * Math.min(1, h / 0.3), yg + (h - r) * u]);
@@ -795,10 +927,31 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
       const a = (Math.PI / 2) * (i / N_GC);
       pts.push([wtop - r + r * Math.cos(a), yt - r + r * Math.sin(a)]);
     }
+    if (kc > 0) {
+      // There the side and the roof corner are one convex roll (a quadratic Bezier) from the body's top
+      // corner, leaving it on its tangent, to the edge of the rear glass, arriving level with it.
+      const a0 = 0.35;
+      const cz = s.zA - s.rtz * (1 - Math.cos(a0)) - 0.001;
+      const cy = s.yA + s.rty * Math.sin(a0);
+      const ez = wtop - r;
+      const tz = -s.rtz * Math.sin(a0);
+      const ty = s.rty * Math.cos(a0);
+      const qz = Math.min(cz, Math.max(cz + (tz * Math.max(0, yt - cy)) / ty, (cz + ez) / 2));
+      const N = N_GS + N_GC;
+      for (let i = 0; i <= N; i++) {
+        const u = i / N;
+        const bz = (1 - u) ** 2 * cz + 2 * u * (1 - u) * qz + u * u * ez;
+        const by = (1 - u) ** 2 * cy + 2 * u * (1 - u) * yt + u * u * yt;
+        pts[i] = [lerp(pts[i][0], bz, kc), lerp(pts[i][1], by, kc)];
+      }
+    }
     for (let i = 1; i <= N_GT; i++) {
       const z = (wtop - r) * (1 - i / N_GT);
       pts.push([z, yt + 0.016 * (1 - (z / Math.max(1e-6, wtop - r)) ** 2)]);
     }
+    // Over the C-pillar the glasshouse is only a little taller than the body under it; lift it (softly)
+    // clear of the body's top corner and dome, which otherwise poked through as a crumpled patch.
+    if (kc > 0) for (const pt of pts) pt[1] = lerp(pt[1], smax(pt[1], bodyTopAt(s, pt[0]) + 0.003, 0.012), kc);
     return pts;
   };
   const ghHalfAt = (t: number, y: number): number => {
@@ -820,20 +973,79 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     }
     return ghTop(t);
   };
+  const FRAME = 0.045;
+  const aShift = 0.075 / L;
+  const rShift = 0.06 / L;
+  const dloTop = (t: number) => Math.min(ghTop(t) - FRAME, ghTop(t - aShift) - 0.012, ghTop(t + rShift) - 0.012, H * p.roofH - FRAME);
+  const dloEnd = (y: number) => {
+    const yb = belt(p.dloX);
+    const k = clamp01((y - yb) / Math.max(0.05, ghTop(p.dloX) - yb));
+    return p.dloX - (d.glass.rearSlant / L) * k;
+  };
+  // Where the falling top edge of the side glass reaches height y, near its rear end: the last station
+  // (scanning back from dloX) at which the window still reaches y.
+  const TOP_SCAN = 0.06;
+  const topEnd = (y: number) => {
+    if (dloTop(p.dloX) >= y) return p.dloX;
+    for (let t = p.dloX - 0.002; t > p.dloX - TOP_SCAN; t -= 0.002) {
+      const a = dloTop(t);
+      if (a >= y) {
+        const b = dloTop(t + 0.002);
+        return t + (0.002 * (a - y)) / Math.max(1e-9, a - b);
+      }
+    }
+    return p.dloX - TOP_SCAN;
+  };
+  const winEnd = (y: number) => Math.min(dloEnd(y), topEnd(y));
+  // The rear edge of the side glass (its slanted rear edge, and on some cars the falling top line too) cuts
+  // across the rings. The window graphic is picked per quad, so on straight rings that edge stepped from ring
+  // to ring (a saw-tooth). Instead the rings near it lean with it: ring SLANT_T runs exactly along the edge,
+  // and the lean fades out over SLANT_W either side.
+  // Only the steep part of that edge is followed: going up, it stops where the edge turns flatter than
+  // about 50 degrees from vertical (there it is the window's top line, which runs along the rows anyway).
+  const yWin0 = belt(p.dloX) + 0.012;
+  let yWin1 = yWin0;
+  for (let t = p.dloX - TOP_SCAN; t <= p.dloX; t += 0.002) yWin1 = Math.max(yWin1, dloTop(t));
+  let teMin = winEnd(yWin0);
+  let teMax = teMin;
+  for (let y = yWin0 + 0.004, prev = teMin; y <= yWin1; y += 0.004) {
+    const e = winEnd(y);
+    if ((L * (prev - e)) / 0.004 > 1.2) break;
+    teMin = Math.min(teMin, e);
+    teMax = Math.max(teMax, e);
+    prev = e;
+  }
+  const SLANT_T = (teMin + teMax) / 2;
+  // Wide enough to keep the rows running front to back, and clear of the rear glass edge.
+  const SLANT_W = Math.max(0.8 * (teMax - teMin), Math.min(Math.max(0.02, 2 * (teMax - teMin)), p.rearGlassX - SLANT_T - 0.004));
+  const lean = (t: number, y: number): number => {
+    const s = (t - SLANT_T) / SLANT_W;
+    return Math.abs(s) >= 1 ? t : t + (Math.min(teMax, Math.max(teMin, winEnd(y))) - SLANT_T) * (1 - s * s) ** 2;
+  };
+  /** The (leaned) station of each vertex of the ring at t, in ring order. */
+  const leanRow = (t: number) => {
+    const half = ghSide(t).map(([, y]) => lean(t, y));
+    return [...half, ...half.slice(0, -1).reverse()];
+  };
   const ghRing = (t: number) => {
-    const side = ghSide(t);
-    const x = xOf(t);
-    const out = side.map(([z, y]) => new Vector3(x, y, z));
-    for (let j = side.length - 2; j >= 0; j--) out.push(new Vector3(x, side[j][1], -side[j][0]));
+    const base = ghSide(t);
+    const side = base.map(([, y], j): [number, number] => {
+      const tl = lean(t, y);
+      return tl === t ? base[j] : ghSide(tl)[j];
+    });
+    const xs = base.map(([, y]) => xOf(lean(t, y)));
+    const out = side.map(([z, y], j) => new Vector3(xs[j], y, z));
+    for (let j = side.length - 2; j >= 0; j--) out.push(new Vector3(xs[j], side[j][1], -side[j][0]));
     return out;
   };
-  // The rear edge of the side glass slants, and the window graphic is picked per quad, so the rings are
-  // packed closer there to keep that edge from stepping.
-  const slantT0 = p.dloX - d.glass.rearSlant / L - 0.006;
-  const slantT1 = p.dloX + 0.004;
   const ghT: number[] = [];
-  for (let t = p.cowlX; t < p.rearGlassX; t += t > slantT0 && t < slantT1 ? 0.0012 : 0.005) ghT.push(t);
-  ghT.push(p.rearGlassX);
+  for (let t = p.cowlX; t < p.rearGlassX; t += Math.abs(t - SLANT_T) < SLANT_W ? 0.0025 : 0.005) ghT.push(t);
+  ghT.push(p.rearGlassX, SLANT_T);
+  ghT.sort((a, b) => a - b);
+  for (let i = ghT.length - 1; i > 0; i--) if (ghT[i] - ghT[i - 1] < 0.0008 && ghT[i] !== SLANT_T && ghT[i] !== p.rearGlassX) ghT.splice(i, 1);
+  for (let i = ghT.length - 1; i > 0; i--) if (ghT[i] - ghT[i - 1] < 0.0008) ghT.splice(i - 1, 1);
+  const slantRing = ghT.indexOf(SLANT_T);
+  const leanT = ghT.map(leanRow);
   const ghRings = ghT.map(ghRing);
   const ghN = ghRings[0].length;
   const GH_HALF = N_GS + 1 + N_GC + N_GT;
@@ -847,15 +1059,6 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
   const rearMat = d.glass.rearPillar === 'black' ? m.black : m.paint;
   const roofMat = d.roof === 'black' ? m.black : m.paint;
   const frameMat = d.pillars === 'black' || d.roof === 'black' ? m.black : m.paint;
-  const FRAME = 0.045;
-  const aShift = 0.075 / L;
-  const rShift = 0.06 / L;
-  const dloTop = (t: number) => Math.min(ghTop(t) - FRAME, ghTop(t - aShift) - 0.012, ghTop(t + rShift) - 0.012, H * p.roofH - FRAME);
-  const dloEnd = (y: number) => {
-    const yb = belt(p.dloX);
-    const k = clamp01((y - yb) / Math.max(0.05, ghTop(p.dloX) - yb));
-    return p.dloX - (d.glass.rearSlant / L) * k;
-  };
   const ghMats: Material[] = [m.glass, aMat, roofMat, m.black, rearMat, frameMat];
   const greenhouse = loft(
     ghRings,
@@ -868,9 +1071,16 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
       const top = ghTop(t);
       if (y > top - 0.012 && t > p.roofFrontX && t < roofEnd) return 2;
       if (t < p.roofFrontX && y > top - 0.03 && src >= N_GS) return 1;
-      const end = dloEnd(y);
-      if (t > end) return 4;
-      if (y > dloTop(t)) return t < p.roofFrontX - 0.01 ? 1 : 5;
+      // Inside the lean the window's rear edge is ring slantRing itself, and the top edge is tested at the
+      // quad's own (leaned) station; outside it the rings are straight.
+      if (Math.abs(t - SLANT_T) < SLANT_W) {
+        if (i >= slantRing) return 4;
+        const tq = (leanT[i][j] + leanT[i][j + 1] + leanT[i + 1][j] + leanT[i + 1][j + 1]) / 4;
+        if (y > dloTop(tq)) return 5;
+      } else {
+        if (t > dloEnd(y)) return 4;
+        if (y > dloTop(t)) return t < p.roofFrontX - 0.01 ? 1 : 5;
+      }
       if (y < belt(t) + 0.012) return 5;
       if (Math.abs(t - bX) < 0.036 / L) return 3;
       if (pillarsAt.length > 1 && Math.abs(t - cX) < 0.03 / L) return 3;
@@ -880,6 +1090,7 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     ghMats,
   );
   group.add(greenhouse);
+  if (surfaces) Object.assign(surfaces, { body: lowerRings, bodyT: tList, glass: ghRings, glassT: ghT, bodySide: SIDE_PTS, glassSide: GH_HALF });
 
   // ---------- Side details ----------
   const sidePoint = (x: number, y: number, zSign: number, off = 0.004) => new Vector3(x, y, zSign * ((halfWidthAt(clamp01(tOf(x)), y) ?? section(clamp01(tOf(x))).zLow) + off));
@@ -928,19 +1139,22 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
         const lipBand: Array<[Vector3, Vector3]> = [];
         for (let i = 0; i <= 40; i++) {
           const a = -0.12 + ((Math.PI + 0.24) * i) / 40;
+          const endTaper = smooth(Math.min(a + 0.12, Math.PI + 0.12 - a) / 0.15);
           const row: Vector3[] = [];
           for (let r = 0; r <= ROWS; r++) {
             const u = r / ROWS;
             const [x, y] = archPoint(ax, a, archR - 0.004 + (clad.archWidth + 0.004) * u);
             // Full thickness most of the way out, then a rounded fall to the body at the outer edge.
-            const off = clad.proud * (u < 0.6 ? 1 : 0.25 + 0.75 * Math.cos(((u - 0.6) / 0.4) * (Math.PI / 2)));
+            // ... and it tapers to the body over its last 0.15 rad at each end: at full thickness the ends,
+            // which run a little past horizontal, stood out below the sill as square tabs.
+            const off = clad.proud * endTaper * (u < 0.6 ? 1 : 0.25 + 0.75 * Math.cos(((u - 0.6) / 0.4) * (Math.PI / 2)));
             row.push(new Vector3(x, y, zSign * (zBody(x, Math.max(y, GC + 0.02)) + off + 0.001)));
           }
           if (zSign < 0) row.reverse();
           faceRings.push(row);
           const [xi, yi] = archPoint(ax, a, archR - 0.004);
           const zi = zBody(xi, Math.max(yi, GC + 0.02));
-          lipBand.push([new Vector3(xi, yi, zSign * (zi - 0.03)), new Vector3(xi, yi, zSign * (zi + clad.proud + 0.001))]);
+          lipBand.push([new Vector3(xi, yi, zSign * (zi - 0.03)), new Vector3(xi, yi, zSign * (zi + clad.proud * endTaper + 0.001))]);
         }
         if (zSign < 0) lipBand.forEach((pair) => pair.reverse());
         group.add(loft(faceRings, false, () => 0, [m.clad]));
