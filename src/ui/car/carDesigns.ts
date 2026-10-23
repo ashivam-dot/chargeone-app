@@ -76,7 +76,7 @@ function nexonFront(n: number): FaceItem[] {
   const h = 1.625;
   return [
     { kind: 'gloss', poly: [[-0.93, n - 0.004], [0.93, n - 0.004], [1.02, n - 0.03], [0.92, n - 0.032], [-0.92, n - 0.032], [-1.02, n - 0.03]] },
-    { kind: 'drl', pts: [[0, n - 0.018], [0.88, n - 0.018], [0.97, n - 0.028], [1.05, n - 0.075]], w: 7, mirror: true },
+    { kind: 'drl', pts: [[0, n - 0.018], [0.88, n - 0.018], [0.96, n - 0.024], [1.0, n - 0.03]], w: 7, mirror: true },
     // Raised closed panel, its shut lines narrowing down to the air dam.
     { kind: 'body', poly: [[-0.54, n - 0.045], [0.54, n - 0.045], [0.46, 0.345], [-0.46, 0.345]], lift: 4 },
     { kind: 'trim', pts: [[0.54, n - 0.045], [0.46, 0.345]], w: 4, mirror: true },
@@ -110,9 +110,9 @@ function nexonRear(t: number): FaceItem[] {
     { kind: 'housing', poly: [[0.6, top - 0.002], [1.14, top + 0.006], [1.14, top - 0.07], [0.98, top - 0.085], [0.78, top - 0.04]], mirror: true, lift: 1 },
     { kind: 'lens', poly: [[0.64, top - 0.006], [1.12, top + 0.002], [1.12, top - 0.064], [0.98, top - 0.078], [0.8, top - 0.038]], mirror: true, lift: 2 },
     // The X end: the bar's upper blade runs out to the corner, a lower blade angles down and back up.
-    { kind: 'tail', pts: [[0.64, top - 0.013], [1.12, top - 0.006]], w: 12, mirror: true },
-    { kind: 'tail', pts: [[0.8, top - 0.036], [0.98, top - 0.072], [1.12, top - 0.058]], w: 9, mirror: true },
-    { kind: 'tail', pts: [[0.96, top - 0.022], [1.1, top - 0.044]], w: 6, mirror: true },
+    { kind: 'tail', pts: [[0.64, top - 0.013], [1.12, top - 0.006]], w: 12, mirror: true, lift: 2 },
+    { kind: 'tail', pts: [[0.8, top - 0.036], [0.98, top - 0.072], [1.12, top - 0.058]], w: 9, mirror: true, lift: 2 },
+
     // Black band along the bottom of the tailgate.
     { kind: 'gloss', rect: [-0.8, 0.8, 0.375, 0.39] },
     // Lower bumper: black centre with a plate recess, body-colour corners carrying black reflector pods.
@@ -135,8 +135,7 @@ function punchFront(n: number): FaceItem[] {
   return [
     { kind: 'gloss', poly: [[-0.96, n - 0.004], [0.96, n - 0.004], [1.03, n - 0.03], [0.96, n - 0.046], [-0.96, n - 0.046], [-1.03, n - 0.03]] },
     // Corner DRLs (also the indicators) at the strip ends, wrapping round the corner along the bonnet shut line.
-    { kind: 'drl', pts: [[0.66, n - 0.026], [0.96, n - 0.02], [1.04, n - 0.035], [1.13, n - 0.05]], w: 11, mirror: true },
-    { kind: 'drl', pts: [[1.0, n - 0.04], [1.03, n - 0.1]], w: 7, mirror: true },
+    { kind: 'drl', pts: [[0.66, n - 0.026], [0.96, n - 0.02], [1.015, n - 0.03]], w: 11, mirror: true },
     // Raised centre panel.
     { kind: 'body', poly: [[-0.34, n - 0.05], [0.34, n - 0.05], [0.31, n - 0.2], [-0.31, n - 0.2]], lift: 5 },
     { kind: 'trim', pts: [[-0.34, n - 0.05], [-0.31, n - 0.2], [0.31, n - 0.2], [0.34, n - 0.05]], w: 4 },
@@ -165,8 +164,8 @@ function punchRear(t: number): FaceItem[] {
     { kind: 'housing', poly: [[0.62, top - 0.006], [1.1, top - 0.001], [1.1, top - 0.095], [0.86, top - 0.095], [0.7, top - 0.055]], mirror: true, lift: 1 },
     { kind: 'lens', poly: [[0.66, top - 0.01], [1.08, top - 0.006], [1.08, top - 0.088], [0.87, top - 0.088], [0.73, top - 0.054]], mirror: true, lift: 2 },
     { kind: 'tail', pts: [[0, top - 0.03], [0.78, top - 0.03]], w: 5, mirror: true },
-    { kind: 'tail', pts: [[0.78, top - 0.03], [0.9, top - 0.014], [1.08, top - 0.014]], w: 10, mirror: true },
-    { kind: 'tail', pts: [[0.78, top - 0.03], [0.9, top - 0.064], [1.08, top - 0.072]], w: 10, mirror: true },
+    { kind: 'tail', pts: [[0.78, top - 0.03], [0.9, top - 0.014], [1.08, top - 0.014]], w: 10, mirror: true, lift: 2 },
+    { kind: 'tail', pts: [[0.78, top - 0.03], [0.9, top - 0.064], [1.08, top - 0.072]], w: 10, mirror: true, lift: 2 },
     // Gloss garnish across the tailgate over the plate area, and the tailgate's lower shut line.
     { kind: 'gloss', rect: [-0.38, 0.38, 0.505, 0.53] },
     { kind: 'trim', pts: [[-0.9, 0.345], [0.9, 0.345]], w: 4 },
@@ -181,7 +180,10 @@ function punchRear(t: number): FaceItem[] {
 function xev9sFront(n: number): FaceItem[] {
   return [
     { kind: 'gloss', rect: [-0.92, 0.92, n - 0.05, n - 0.004] },
-    { kind: 'drl', pts: [[0, n - 0.024], [0.9, n - 0.024], [0.975, n - 0.045], [0.995, n - 0.09], [0.99, n - 0.27], [0.93, n - 0.315]], w: 20, mirror: true },
+    // The L's leg runs in a smoked strip down the corner and lands in the gloss lower bumper, so its light
+    // never ends on bare paint.
+    { kind: 'housing', poly: [[0.94, n - 0.04], [1.0, n - 0.04], [1.0, n - 0.275], [0.95, n - 0.325], [0.9, n - 0.31], [0.95, n - 0.265]], mirror: true, lift: 1 },
+    { kind: 'drl', pts: [[0, n - 0.024], [0.9, n - 0.024], [0.965, n - 0.045], [0.98, n - 0.09], [0.975, n - 0.27], [0.935, n - 0.305]], w: 20, mirror: true },
     // Headlamps: a smoked wedge inside the L, deepest at the outer edge, holding two square projector modules
     // with chrome bezels and a lit inner LED line under them.
     { kind: 'housing', poly: [[0.6, n - 0.062], [0.95, n - 0.062], [0.95, n - 0.24], [0.86, n - 0.2]], mirror: true, lift: 1 },
@@ -209,8 +211,8 @@ function xev9sRear(t: number): FaceItem[] {
   return [
     { kind: 'housing', poly: [[0.56, top - 0.035], [0.62, top + 0.012], [1.13, top + 0.012], [1.13, top - 0.06], [0.72, top - 0.14]], mirror: true, lift: 1 },
     { kind: 'lens', poly: [[0.6, top - 0.033], [0.645, top + 0.002], [1.11, top + 0.002], [1.11, top - 0.052], [0.73, top - 0.125]], mirror: true, lift: 3 },
-    { kind: 'tail', pts: [[0.63, top - 0.006], [1.11, top - 0.006]], w: 10, mirror: true },
-    { kind: 'tail', pts: [[0.64, top - 0.035], [0.74, top - 0.115], [0.84, top - 0.098], [1.1, top - 0.045]], w: 7, mirror: true },
+    { kind: 'tail', pts: [[0.63, top - 0.006], [1.11, top - 0.006]], w: 10, mirror: true, lift: 3 },
+    { kind: 'tail', pts: [[0.64, top - 0.035], [0.74, top - 0.115], [0.84, top - 0.098], [1.1, top - 0.045]], w: 7, mirror: true, lift: 3 },
     { kind: 'gloss', rect: [-0.57, 0.57, top - 0.065, top - 0.008] },
     // Fine hexagon-like relief on the joining panel, done as small diamonds.
     { kind: 'housing', pattern: 'diamonds', rect: [-0.54, 0.54, top - 0.058, top - 0.014], pitch: 22, fill: 0.7, lift: 1 },
@@ -221,102 +223,136 @@ function xev9sRear(t: number): FaceItem[] {
   ];
 }
 
-/** The front face, from the bonnet's leading edge `n` down. */
-function frontFace(style: FrontStyle, n: number): FaceItem[] {
-  const lowIntake: FaceItem = { kind: 'intake', rect: [-0.62, 0.62, 0.15, 0.27] };
-  const skid: FaceItem = { kind: 'chrome', rect: [-0.42, 0.42, 0.12, 0.135] };
+/** A headlamp cluster for the preset faces, at the pilots' level of detail: a satin bezel (so the lamp still
+ * reads on dark paint), a smoked housing, two LED projectors low in it and an amber turn strip at its outer
+ * edge. `hw` and `h` are the car's half width and height in metres, so the projectors stay round. */
+function cluster(s0: number, s1: number, yTop: number, yBot: number, hw: number, h: number): FaceItem[] {
+  const span = s1 - s0;
+  const ym = yBot + (yTop - yBot) * 0.42;
+  const r = Math.min(0.03, (yTop - yBot) * h * 0.3, span * hw * 0.16);
+  return [
+    { kind: 'satin', rect: [s0 - 0.012, s1 + 0.012, yBot - 0.006, yTop + 0.006], mirror: true },
+    { kind: 'housing', rect: [s0, s1, yBot, yTop], mirror: true, lift: 2 },
+    ...projector(s0 + span * 0.3, ym, r, hw, h),
+    ...projector(s0 + span * 0.62, ym, r, hw, h),
+    { kind: 'turn', pts: [[s1 - 0.03, yTop - 0.012], [s1 - 0.03, yBot + 0.012]], w: 6, mirror: true },
+  ];
+}
+/** The lower bumper of the preset faces: a trapezoid intake that widens downward, with fine slats, over a
+ * gloss-black lower lip carrying a satin skid. `top` is the intake's top edge. */
+function lowerFace(top: number, w = 0.6): FaceItem[] {
+  return [
+    { kind: 'intake', poly: [[-w, top], [w, top], [w + 0.1, 0.165], [-w - 0.1, 0.165]] },
+    { kind: 'trim', pattern: 'slats-h', rect: [-w + 0.04, w + 0.02, 0.18, top - 0.014], pitch: 24, fill: 0.3, lift: 1 },
+    { kind: 'gloss', poly: [[-0.9, 0.158], [0.9, 0.158], [0.97, 0.13], [-0.97, 0.13]], lift: 1 },
+    { kind: 'satin', poly: [[-0.4, 0.136], [0.4, 0.136], [0.36, 0.152], [-0.36, 0.152]], lift: 2 },
+  ];
+}
+
+/** The front face, from the bonnet's leading edge `n` down; `hw` and `h` are the half width and height in metres. */
+function frontFace(style: FrontStyle, n: number, hw: number, h: number): FaceItem[] {
+  const intakeTop = (below: number) => Math.min(0.3, n - below);
   switch (style) {
     case 'bar-split':
       return [
-        { kind: 'drl', pts: [[0, n - 0.012], [0.9, n - 0.012], [0.98, n - 0.03]], w: 9, mirror: true },
-        { kind: 'housing', rect: [-0.74, 0.74, n - 0.1, n - 0.065] },
-        { kind: 'housing', rect: [0.76, 0.97, n - 0.2, n - 0.06], mirror: true },
-        { kind: 'drl', pts: [[0.8, n - 0.075], [0.93, n - 0.075]], w: 10, mirror: true },
-        { kind: 'intake', rect: [-0.72, 0.72, 0.17, n - 0.16] },
-        { kind: 'chrome', pts: [[0, 0.165], [0.86, 0.165], [0.95, 0.2]], w: 7, mirror: true },
-        skid,
+        { kind: 'drl', pts: [[0, n - 0.012], [0.9, n - 0.012], [0.97, n - 0.028]], w: 9, mirror: true },
+        { kind: 'housing', rect: [-0.7, 0.7, n - 0.1, n - 0.065] },
+        ...cluster(0.72, 0.96, n - 0.07, n - 0.2, hw, h),
+        ...lowerFace(intakeTop(0.24)),
       ];
     case 'bar-down':
       return [
-        { kind: 'drl', pts: [[0, n - 0.015], [0.88, n - 0.015], [0.97, n - 0.11]], w: 12, mirror: true },
+        // The bar's ends turn down the corners inside a smoked surround, so they never run onto bare paint.
+        { kind: 'housing', poly: [[0.84, n - 0.004], [0.99, n - 0.004], [1.0, n - 0.125], [0.93, n - 0.125], [0.9, n - 0.03], [0.84, n - 0.03]], mirror: true, lift: 1 },
         { kind: 'housing', rect: [-0.86, 0.86, n - 0.06, n - 0.03] },
-        { kind: 'housing', rect: [0.6, 0.9, n - 0.22, n - 0.13], mirror: true },
-        { kind: 'drl', pts: [[0.63, n - 0.18], [0.86, n - 0.18]], w: 8, mirror: true },
-        lowIntake,
-        skid,
+        { kind: 'drl', pts: [[0, n - 0.015], [0.88, n - 0.015], [0.955, n - 0.04], [0.965, n - 0.11]], w: 12, mirror: true },
+        ...cluster(0.6, 0.88, n - 0.13, n - 0.23, hw, h),
+        ...lowerFace(intakeTop(0.26)),
       ];
     case 'c-shape':
       return [
         { kind: 'housing', rect: [-0.78, 0.78, n - 0.1, n - 0.03] },
-        { kind: 'drl', pts: [[0.99, n - 0.012], [0.8, n - 0.012], [0.75, n - 0.07], [0.8, n - 0.13], [0.98, n - 0.13]], w: 13, mirror: true },
-        { kind: 'housing', rect: [0.62, 0.9, n - 0.24, n - 0.17], mirror: true },
-        { kind: 'intake', rect: [-0.5, 0.5, 0.14, 0.24] },
-        { kind: 'chrome', rect: [-0.55, 0.55, 0.12, 0.13] },
+        { kind: 'housing', poly: [[0.74, n - 0.004], [0.99, n - 0.004], [0.99, n - 0.14], [0.74, n - 0.14]], mirror: true, lift: 1 },
+        { kind: 'drl', pts: [[0.97, n - 0.014], [0.8, n - 0.014], [0.76, n - 0.07], [0.8, n - 0.128], [0.97, n - 0.128]], w: 12, mirror: true },
+        ...cluster(0.62, 0.9, n - 0.17, n - 0.25, hw, h),
+        ...lowerFace(intakeTop(0.28), 0.5),
       ];
     case 'fang':
       return [
-        { kind: 'housing', rect: [0.58, 0.97, n - 0.09, n - 0.005], mirror: true },
-        { kind: 'drl', pts: [[0.62, n - 0.02], [0.95, n - 0.02]], w: 8, mirror: true },
-        { kind: 'drl', pts: [[0.84, n - 0.1], [0.86, n - 0.3]], w: 16, mirror: true },
+        { kind: 'satin', rect: [0.57, 0.98, n - 0.1, n - 0.002], mirror: true },
+        { kind: 'housing', rect: [0.58, 0.97, n - 0.092, n - 0.006], mirror: true, lift: 2 },
+        { kind: 'drl', pts: [[0.62, n - 0.02], [0.94, n - 0.02]], w: 8, mirror: true },
+        ...projector(0.72, n - 0.058, 0.024, hw, h),
+        ...projector(0.84, n - 0.058, 0.024, hw, h),
+        // The fang: a lit blade dropping from the lamp, in its own smoked slot.
+        { kind: 'housing', poly: [[0.8, n - 0.1], [0.9, n - 0.1], [0.91, n - 0.31], [0.82, n - 0.31]], mirror: true, lift: 1 },
+        { kind: 'drl', pts: [[0.85, n - 0.11], [0.865, n - 0.3]], w: 14, mirror: true },
         { kind: 'housing', rect: [-0.5, 0.5, n - 0.13, n - 0.02] },
         { kind: 'chrome', pts: [[0, n - 0.135], [0.5, n - 0.135]], w: 8, mirror: true },
-        lowIntake,
-        skid,
+        ...lowerFace(intakeTop(0.33), 0.55),
       ];
     case 'swept':
       return [
-        { kind: 'housing', rect: [0.56, 0.98, n - 0.075, n - 0.005], mirror: true },
-        { kind: 'drl', pts: [[0.6, n - 0.065], [0.92, n - 0.04], [0.98, n - 0.01]], w: 9, mirror: true },
-        { kind: 'chrome', pts: [[0, n - 0.035], [0.56, n - 0.035]], w: 10, mirror: true },
-        { kind: 'intake', rect: [-0.62, 0.62, 0.16, n - 0.14] },
-        skid,
+        ...cluster(0.58, 0.97, n - 0.008, n - 0.1, hw, h),
+        { kind: 'drl', pts: [[0.6, n - 0.024], [0.9, n - 0.02], [0.955, n - 0.014]], w: 8, mirror: true, lift: 2 },
+        { kind: 'chrome', pts: [[0, n - 0.035], [0.555, n - 0.035]], w: 10, mirror: true },
+        ...lowerFace(intakeTop(0.15)),
       ];
     case 'corners':
       return [
         { kind: 'housing', rect: [-0.8, 0.8, n - 0.045, n - 0.01] },
-        { kind: 'drl', pts: [[0.7, n - 0.025], [0.97, n - 0.025]], w: 12, mirror: true },
-        { kind: 'housing', rect: [0.7, 0.96, n - 0.22, n - 0.12], mirror: true },
-        lowIntake,
-        skid,
+        { kind: 'drl', pts: [[0.7, n - 0.025], [0.79, n - 0.025]], w: 12, mirror: true },
+        { kind: 'housing', rect: [0.8, 0.98, n - 0.05, n - 0.004], mirror: true },
+        { kind: 'drl', pts: [[0.81, n - 0.025], [0.96, n - 0.025]], w: 12, mirror: true },
+        ...cluster(0.7, 0.96, n - 0.12, n - 0.22, hw, h),
+        ...lowerFace(intakeTop(0.25)),
       ];
     case 'pixel':
       return [
-        { kind: 'housing', rect: [0.62, 0.93, n - 0.1, n - 0.012], mirror: true },
-        { kind: 'drl', pts: [[0.64, n - 0.02], [0.64, n - 0.09], [0.91, n - 0.09], [0.91, n - 0.02]], w: 7, mirror: true },
-        { kind: 'intake', rect: [-0.7, 0.7, 0.15, 0.25] },
+        { kind: 'satin', rect: [0.61, 0.94, n - 0.11, n - 0.002], mirror: true },
+        { kind: 'housing', rect: [0.62, 0.93, n - 0.1, n - 0.012], mirror: true, lift: 2 },
+        // Parametric pixels: square LED cells in a grid, with a lit frame.
+        { kind: 'drl', pattern: 'dots', rect: [0.66, 0.89, n - 0.082, n - 0.03], pitch: 20, fill: 0.5, mirror: true, lift: 3 },
+        { kind: 'drl', pts: [[0.64, n - 0.02], [0.64, n - 0.09], [0.91, n - 0.09], [0.91, n - 0.02], [0.64, n - 0.02]], w: 5, mirror: true },
+        ...lowerFace(intakeTop(0.2), 0.66),
       ];
     case 'v-face':
       return [
-        { kind: 'drl', pts: [[0, n - 0.07], [0.35, n - 0.015], [0.97, n - 0.015]], w: 11, mirror: true },
-        { kind: 'housing', rect: [0.64, 0.92, n - 0.22, n - 0.13], mirror: true },
-        lowIntake,
-        skid,
+        { kind: 'drl', pts: [[0, n - 0.07], [0.35, n - 0.015], [0.95, n - 0.015]], w: 11, mirror: true },
+        ...cluster(0.64, 0.92, n - 0.13, n - 0.22, hw, h),
+        ...lowerFace(intakeTop(0.25)),
       ];
     case 'boomerang':
       return [
-        { kind: 'drl', pts: [[0, n - 0.02], [0.66, n - 0.02]], w: 5, mirror: true },
-        { kind: 'housing', rect: [0.66, 0.97, n - 0.08, n - 0.005], mirror: true },
-        { kind: 'drl', pts: [[0.68, n - 0.02], [0.95, n - 0.02], [0.99, n - 0.12]], w: 9, mirror: true },
-        { kind: 'intake', rect: [-0.75, 0.75, 0.15, 0.25] },
+        { kind: 'drl', pts: [[0, n - 0.02], [0.64, n - 0.02]], w: 5, mirror: true },
+        { kind: 'satin', poly: [[0.645, n + 0.001], [1.0, n + 0.001], [1.01, n - 0.137], [0.93, n - 0.137], [0.89, n - 0.087], [0.645, n - 0.087]], mirror: true },
+        { kind: 'housing', poly: [[0.66, n - 0.005], [0.99, n - 0.005], [1.0, n - 0.13], [0.94, n - 0.13], [0.9, n - 0.08], [0.66, n - 0.08]], mirror: true, lift: 2 },
+        { kind: 'drl', pts: [[0.68, n - 0.02], [0.95, n - 0.02], [0.975, n - 0.12]], w: 9, mirror: true },
+        ...projector(0.76, n - 0.05, 0.022, hw, h),
+        ...projector(0.86, n - 0.05, 0.022, hw, h),
+        ...lowerFace(intakeTop(0.22), 0.7),
       ];
     case 'drop':
       return [
-        { kind: 'housing', rect: [0.6, 0.97, n - 0.05, n - 0.005], mirror: true },
-        { kind: 'drl', pts: [[0.62, n - 0.03], [0.82, n - 0.03], [0.86, n - 0.2]], w: 8, mirror: true },
-        { kind: 'intake', rect: [-0.5, 0.5, 0.14, 0.24] },
+        { kind: 'satin', rect: [0.59, 0.98, n - 0.083, n - 0.001], mirror: true },
+        { kind: 'housing', rect: [0.6, 0.97, n - 0.075, n - 0.005], mirror: true, lift: 2 },
+        { kind: 'drl', pts: [[0.62, n - 0.02], [0.95, n - 0.016]], w: 7, mirror: true },
+        ...projector(0.74, n - 0.05, 0.02, hw, h),
+        ...projector(0.86, n - 0.05, 0.02, hw, h),
+        ...lowerFace(intakeTop(0.2), 0.5),
       ];
     case 'strip':
       return [
-        { kind: 'drl', pts: [[0, n - 0.01], [0.97, n - 0.01]], w: 10, mirror: true },
-        { kind: 'housing', rect: [0.62, 0.92, n - 0.22, n - 0.14], mirror: true },
-        { kind: 'intake', rect: [-0.5, 0.5, 0.15, 0.24] },
+        { kind: 'drl', pts: [[0, n - 0.01], [0.95, n - 0.01]], w: 10, mirror: true },
+        ...cluster(0.62, 0.92, n - 0.13, n - 0.23, hw, h),
+        ...lowerFace(intakeTop(0.25), 0.5),
       ];
     case 'thin':
       return [
         { kind: 'drl', pts: [[0, n - 0.01], [0.95, n - 0.01]], w: 5, mirror: true },
-        { kind: 'housing', rect: [0.74, 0.95, n - 0.1, n - 0.06], mirror: true },
-        { kind: 'drl', pts: [[0.76, n - 0.08], [0.93, n - 0.07]], w: 5, mirror: true },
-        { kind: 'trim', rect: [-0.55, 0.55, 0.13, 0.2] },
+        ...cluster(0.72, 0.96, n - 0.05, n - 0.115, hw, h),
+        { kind: 'drl', pts: [[0.74, n - 0.062], [0.94, n - 0.058]], w: 5, mirror: true, lift: 2 },
+        ...lowerFace(intakeTop(0.2), 0.55),
       ];
   }
 }
@@ -487,7 +523,7 @@ const SPECS: Record<string, Spec> = {
     name: 'Tata Curvv EV',
     body: 'coupe',
     size: [4310, 1810, 1637, 2560, 186, 18],
-    profile: [0.31, 0.45, 0.62, 0.93, 0.56, 0.63, 0.62, 0.98, 0.7],
+    profile: [0.31, 0.45, 0.64, 0.95, 0.56, 0.63, 0.62, 0.98, 0.73],
     roofRearH: 0.96,
     dloX: 0.78,
     front: 'bar-split',
@@ -743,7 +779,8 @@ const SPECS: Record<string, Spec> = {
     name: 'Tesla Model Y',
     body: 'coupe',
     size: [4790, 1920, 1624, 2890, 167, 19],
-    profile: [0.27, 0.45, 0.64, 0.89, 0.47, 0.58, 0.6, 1, 0.68],
+    profile: [0.27, 0.45, 0.66, 0.955, 0.5, 0.59, 0.61, 1, 0.71],
+    dloX: 0.83,
     faceRake: 0.2,
     front: 'thin',
     rear: 'thin',
@@ -758,7 +795,7 @@ const SPECS: Record<string, Spec> = {
     name: 'VinFast VF 7',
     body: 'coupe',
     size: [4550, 1893, 1596, 2840, 190, 19],
-    profile: [0.3, 0.47, 0.68, 0.9, 0.52, 0.59, 0.61, 1, 0.67],
+    profile: [0.3, 0.47, 0.7, 0.95, 0.53, 0.6, 0.62, 1, 0.72],
     front: 'v-face',
     rear: 'boomerang',
     floatingRoof: true,
@@ -823,7 +860,7 @@ function make(s: Spec, paints: ReadonlyArray<readonly [string, string]> = []): C
     flushHandles: s.flushHandles ?? false,
     spoiler: s.body !== 'sedan',
     wheel: { spokes: s.spokes ?? 5, style: s.wheel ?? 'spoke', finish: s.finish ?? 'silver' },
-    front: s.frontItems ? s.frontItems(hoodFrontH) : frontFace(s.front, hoodFrontH),
+    front: s.frontItems ? s.frontItems(hoodFrontH) : frontFace(s.front, hoodFrontH, widthMm / 2000, heightMm / 1000),
     rear: s.rearItems ? s.rearItems(tailH) : rearFace(s.rear, tailH),
     paints: paints.map(([name, hex]): CarPaint => ({ name, hex: hex.toLowerCase() })),
   };

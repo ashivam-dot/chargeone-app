@@ -65,3 +65,43 @@ describe('car loft geometry', () => {
     expect(loftFaults(s.glass!, s.glassT!, s.glassSide!).slice(0, 5)).toEqual([]);
   });
 });
+
+/** Rows of a half ring that sit at its lowest height (the flat floor rows, plus any that collapsed onto it). */
+const floorRows = (ring: Vector3[], side: number) => {
+  const ys = ring.slice(0, side).map((p) => p.y);
+  const lo = Math.min(...ys);
+  return ys.filter((y) => y - lo < 0.001).length;
+};
+
+describe('car loft tips', () => {
+  // QC H1: at the very tail the bottom roundings collapsed onto the floor, so every row from the floor to the
+  // sill met at one point: a V-shaped dart in the bottom edge. The tip ring must keep them at their own heights.
+  it.each(Object.entries(DESIGNS))('%s keeps its bottom rows apart at the nose and tail tips', (_id, design) => {
+    const s: CarSurfaces = {};
+    buildCar(design, '#888888', s).dispose();
+    const rings = s.body!;
+    const side = s.bodySide!;
+    const mid = floorRows(rings[Math.floor(rings.length / 2)], side);
+    expect(floorRows(rings[rings.length - 1], side)).toBe(mid);
+    expect(floorRows(rings[0], side)).toBe(mid);
+  });
+});
+
+describe('car render budget', () => {
+  // QC L4: the same count as scripts/perf-car.ts --mesh (one draw call per mesh; indexed or plain triangles).
+  it.each(Object.entries(DESIGNS))('%s stays within 26 draw calls and 90k triangles', (_id, design) => {
+    const car = buildCar(design, design.paints[0]?.hex ?? '#888888');
+    let calls = 0;
+    let tris = 0;
+    car.group.traverse((o) => {
+      const m = o as Mesh;
+      if (!m.isMesh) return;
+      calls++;
+      const g = m.geometry;
+      tris += (g.index ? g.index.count : g.getAttribute('position').count) / 3;
+    });
+    car.dispose();
+    expect(calls).toBeLessThanOrEqual(26);
+    expect(tris).toBeLessThanOrEqual(90_000);
+  });
+});

@@ -152,7 +152,8 @@ function materials(d: CarDesign, paint: string): Mats {
     matte: new MeshStandardMaterial({ color: '#111215', roughness: 0.78, ...decal }),
     clad: new MeshStandardMaterial({ color: new Color(d.clad.colour), roughness: 0.72, metalness: 0.05, ...decal }),
     under: new MeshStandardMaterial({ color: '#09090b', roughness: 0.92, side: DoubleSide }),
-    glass: new MeshPhysicalMaterial({ color: '#33414d', metalness: 0, roughness: 0.02, envMapIntensity: 1.2 }),
+    // Dark tint, gentle reflections: brighter env reflections washed the side glass into a grey haze (QC L1).
+    glass: new MeshPhysicalMaterial({ color: '#25313b', metalness: 0, roughness: 0.02, envMapIntensity: 0.85 }),
     chrome: new MeshStandardMaterial({ color: '#dfe3e8', metalness: 1, roughness: 0.14, ...decal }),
     satin: new MeshStandardMaterial({ color: '#aeb3ba', metalness: 0.75, roughness: 0.38, ...decal }),
     housing: new MeshPhysicalMaterial({ color: '#0b0d11', metalness: 0.3, roughness: 0.06, clearcoat: 1, ...decal }),
@@ -483,7 +484,7 @@ function wheel(m: Mats, d: CarDesign, R: number, width: number, rimR: number): G
     new Vector2(R, 0.3 * hw),
   ];
   const prof = [...side(-1), ...tread, ...side(1)];
-  const tyre = new Mesh(new LatheGeometry(prof, 64), m.tyre);
+  const tyre = new Mesh(new LatheGeometry(prof, 40), m.tyre);
   tyre.rotation.x = Math.PI / 2;
   g.add(tyre);
 
@@ -507,7 +508,7 @@ function wheel(m: Mats, d: CarDesign, R: number, width: number, rimR: number): G
   // tyre bead, so the visible wheel is a little bigger than the rim's nominal diameter, as on a real car.
   const flange = rimR + 0.016;
   const lipProf = [new Vector2(rimR * 0.94, 0), new Vector2(rimR * 0.985, 0.007), new Vector2(flange - 0.004, 0.006), new Vector2(flange, 0.0), new Vector2(flange - 0.002, -0.016)];
-  const lip = new Mesh(new LatheGeometry(lipProf, 56), m.rim);
+  const lip = new Mesh(new LatheGeometry(lipProf, 40), m.rim);
   lip.rotation.x = Math.PI / 2;
   lip.position.z = face;
   g.add(lip);
@@ -516,7 +517,7 @@ function wheel(m: Mats, d: CarDesign, R: number, width: number, rimR: number): G
   // faces (bright) over dark-painted sides.
   const lay = wheelLayout(d, rimR);
   const depth = 0.02;
-  const geo = new ExtrudeGeometry(wheelShape(lay, rimR), { depth, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.003, bevelSegments: 1, curveSegments: 40 });
+  const geo = new ExtrudeGeometry(wheelShape(lay, rimR), { depth, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.003, bevelSegments: 1, curveSegments: 24 });
   // Dish: the hub stands proud of the rim edge.
   const pos = geo.getAttribute('position') as BufferAttribute;
   for (let i = 0; i < pos.count; i++) {
@@ -685,7 +686,15 @@ export function buildCar(d: CarDesign, paintHex: string, surfaces?: CarSurfaces)
     const x = xOf(t);
     // Haunches: full width over the wheels, a little in between.
     const flare = Math.max(...axles.map((ax) => Math.exp(-(((x - ax) / 0.6) ** 2))));
-    const w = planHalf(t) * (0.975 + 0.025 * flare);
+    const wTrue = planHalf(t) * (0.975 + 0.025 * flare);
+    // In the last few millimetres of the nose and tail the plan width runs to zero. Laid out at its true width
+    // there, the section's corner radii and line heights collapsed with it, so at the very tip every row from
+    // the floor to the sill met at one point at the bottom of the centre line: a V-shaped dart in the bottom
+    // edge of the tail. Below W_TIP the section keeps the layout of a W_TIP-wide one and is only narrowed,
+    // so each row reaches the centre line at its own height.
+    const W_TIP = Math.min(0.3, W * 0.17);
+    const w = Math.max(wTrue, W_TIP);
+    const zScale = wTrue / w;
     // Nose and tail roundings fade in and out with zero slope at both ends (a power 1.5 ramp had infinite
     // curvature where it started: a ridge in the reflections round the front wings and the tail lamps).
     const nose = fade(t / 0.18);
@@ -721,7 +730,11 @@ export function buildCar(d: CarDesign, paintHex: string, surfaces?: CarSurfaces)
     const tuck = Math.min(0.032, w * 0.2);
     const tumble = Math.min(d.shoulder.tumble, w * 0.3);
     const creaseDepth = Math.min(d.shoulder.crease?.depth ?? 0, w * 0.05);
-    const zAt = (y: number): number => Math.max(0, y <= ys ? w - tuck * ((ys - y) / Math.max(1e-3, ys - yb)) ** 2 : w - tumble * ((y - ys) / Math.max(1e-3, yt - ys)) ** 1.25);
+    // A sharp shoulder breaks its normals at ys anyway; a soft one needs a tumble with finite curvature
+    // there. The power 1.25 bends infinitely sharply just above ys, so its highlight ran round the tail
+    // corner and ended beside the tail lamps as a grey ghost patch.
+    const tumbleExp = d.shoulder.sharp ? 1.25 : 2;
+    const zAt = (y: number): number => Math.max(0, y <= ys ? w - tuck * ((ys - y) / Math.max(1e-3, ys - yb)) ** 2 : w - tumble * ((y - ys) / Math.max(1e-3, yt - ys)) ** tumbleExp);
     const zA = zAt(yA);
     const pts: Array<[number, number]> = [];
     const zb = zAt(y0);
@@ -765,7 +778,8 @@ export function buildCar(d: CarDesign, paintHex: string, surfaces?: CarSurfaces)
         pts[k] = [k <= N_FLAT ? Math.min(pt[0], zEdge) : zEdge, yArch];
       });
     }
-    const s: Section = { pts, yb: Math.max(yb, yArch), yt, zA, yA, rtz, rty, zLow: zb };
+    if (zScale < 1) for (const pt of pts) pt[0] *= zScale;
+    const s: Section = { pts, yb: Math.max(yb, yArch), yt, zA: zA * zScale, yA, rtz: rtz * zScale, rty, zLow: zb * zScale };
     sections.set(key, s);
     return s;
   };
@@ -797,7 +811,7 @@ export function buildCar(d: CarDesign, paintHex: string, surfaces?: CarSurfaces)
 
   const tSet = new Set<number>([T_NOSE, 0.05, 0.07, 0.09, 0.12, p.cowlX, p.rearGlassX, 0.88, 0.91, 0.93, 0.95, 0.965, 0.975, 0.985, 0.992, 0.997, 1]);
   for (let k = 0; k <= 18; k++) tSet.add((d.plan.noseDepth / L) * (k / 18) ** 2.2);
-  for (let k = 0; k <= 14; k++) tSet.add(1 - (d.plan.tailDepth / L) * (k / 14) ** 2.2);
+  for (let k = 0; k <= 30; k++) tSet.add(1 - (d.plan.tailDepth / L) * (k / 30) ** 2.2);
   for (let t = 0.12; t < 0.96; t += 0.011) tSet.add(t);
   for (const ax of axles) for (let x = ax - archR - 0.04; x <= ax + archR + 0.04; x += 0.018) tSet.add(clamp01(tOf(x)));
   // Drop stations that land almost on top of another one (the even spacing and the arch spacing interleave):
@@ -913,7 +927,9 @@ export function buildCar(d: CarDesign, paintHex: string, surfaces?: CarSurfaces)
     const yt = Math.max(ghTop(t), yg + 0.0005);
     const h = yt - yg;
     const wtop = Math.min(roofHalf(t), zg);
-    const r = Math.min(0.06, h * 0.4, wtop * 0.5);
+    // Soft min: a hard min(0.06, h*0.4) switched branch at one station over the C-pillar (where the window
+    // gets short) and creased every row there into a knot where the pillar meets the roof.
+    const r = Math.min(smin(0.06, h * 0.4, 0.03), wtop * 0.5);
     const pts: Array<[number, number]> = [];
     // Behind the side glass the C-pillar is body panel, so there it grows out of the body's top corner on
     // its tangent (a Hermite curve up to the roof corner) instead of standing in a sunk ledge on the corner:
@@ -1053,8 +1069,9 @@ export function buildCar(d: CarDesign, paintHex: string, surfaces?: CarSurfaces)
   const pillarsAt = d.glass.pillarsAt ?? [lerp(p.roofFrontX, Math.min(p.roofRearX, p.dloX), fastback ? 0.55 : 0.42), ...(d.body === 'micro' ? [] : [Math.min(p.roofRearX - 0.02, p.dloX - 0.07)])];
   const bX = pillarsAt[0];
   const cX = pillarsAt[1] ?? p.dloX;
-  // On a fastback the roof skin runs most of the way down the slope; only its last part is glass.
-  const roofEnd = fastback ? p.rearGlassX - 0.1 : p.roofRearX;
+  // On a sedan the roof skin runs most of the way down the slope and only its last part is glass; a coupe
+  // SUV's hatch glass starts high on the slope, else the long painted slope read as a sedan's C-pillar.
+  const roofEnd = d.body === 'sedan' ? p.rearGlassX - 0.1 : fastback ? Math.min(p.rearGlassX - 0.1, lerp(p.roofRearX, p.rearGlassX, 0.12)) : p.roofRearX;
   const aMat = d.pillars === 'black' ? m.black : m.paint;
   const rearMat = d.glass.rearPillar === 'black' ? m.black : m.paint;
   const roofMat = d.roof === 'black' ? m.black : m.paint;
@@ -1262,12 +1279,43 @@ export function buildCar(d: CarDesign, paintHex: string, surfaces?: CarSurfaces)
     }
   }
   if (d.spoiler && fastback) {
-    // Ducktail across the top of the boot lid.
-    const t = p.rearGlassX + 0.01;
-    const lip = new Mesh(new BoxGeometry(0.1, 0.022, section(t).zA * 1.9), m.paint);
-    lip.position.set(xOf(t), belt(p.rearGlassX) + 0.01, 0);
-    lip.rotation.z = -0.12;
-    group.add(lip);
+    // Ducktail across the top of the boot lid, moulded onto it: its front edge lies on the deck behind the
+    // glass and its trailing edge kicks up, fading to nothing at the corners. (A flat box here stood off the
+    // domed deck at both ends, so it read as a floating blade or a stuck-on shelf.)
+    const t0 = p.rearGlassX + 0.004;
+    const t1 = Math.min(0.985, t0 + 0.085 / L);
+    const s0 = section(t0);
+    const s1 = section(t1);
+    const zMax = 0.92 * Math.min(s0.zA, s1.zA);
+    const deckY = (s: Section, z: number) => {
+      const y = bodyTopAt(s, z);
+      return Number.isFinite(y) ? y : s.yt;
+    };
+    const M = 24;
+    const pos: number[] = [];
+    for (let j = 0; j <= M; j++) {
+      const z = zMax * (2 * (j / M) - 1);
+      const kick = 0.022 * (1 - (z / zMax) ** 4);
+      // On the leaning tailgate the body rings carry the face rake, so the lip does too.
+      const y0 = deckY(s0, z);
+      const y1 = deckY(s1, z);
+      pos.push(xOf(t0) + faceShift(t0, y0), y0 + 0.002, z);
+      pos.push(xOf(t1) + faceShift(t1, y1), y1 + 0.002 + kick, z);
+      pos.push(xOf(t1) + faceShift(t1, y1) + 0.004, y1 + 0.001, z);
+    }
+    const idx: number[] = [];
+    for (let j = 0; j < M; j++) {
+      for (let r = 0; r < 2; r++) {
+        const a = j * 3 + r;
+        const b = (j + 1) * 3 + r;
+        idx.push(a, a + 1, b, b, a + 1, b + 1);
+      }
+    }
+    const g = new BufferGeometry();
+    g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    group.add(new Mesh(g, m.paint));
   } else if (d.spoiler) {
     const t = p.roofRearX;
     const lip = new Mesh(new BoxGeometry(0.13, 0.03, roofHalf(t) * 1.7), d.roof === 'black' ? m.black : m.paint);
