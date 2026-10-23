@@ -134,6 +134,30 @@ export function About({ dataset, manifest, onClose, onAddCharger }: Props) {
           </a>
           . Not endorsed by the provider. These listings give a place only and show as unverified; owner names are left out.
         </li>
+        <li data-testid="attribution-overture">
+          Contains data from{' '}
+          <a href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener noreferrer">
+            Overture Maps Foundation
+          </a>{' '}
+          Places, under the{' '}
+          <a href="https://cdla.dev/permissive-2-0/" target="_blank" rel="noopener noreferrer">
+            Community Data License Agreement – Permissive 2.0
+          </a>
+          , with data from Meta, Microsoft, PinMeTo, Krick, RenderSEO, DAC, BrightQuery, Birdeye, Uberall and OpenTravel Alliance. Data
+          from Foursquare: Copyright 2024 Foursquare Labs, Inc. All rights reserved. Available under{' '}
+          <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener noreferrer">
+            Apache 2.0
+          </a>{' '}
+          (
+          <a href="/data/NOTICE-Foursquare.txt" target="_blank" rel="noopener noreferrer">
+            Foursquare NOTICE
+          </a>
+          ); transformed to the Overture schema and changed by ChargeOne. Data from AllThePlaces, available under{' '}
+          <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener noreferrer">
+            CC0 1.0
+          </a>
+          . These listings give a place only and show as unverified.
+        </li>
         <li>
           Government charger counts: Ministry of Heavy Industries (Rajya Sabha answers, via BHEL), used under the{' '}
           <a href="https://data.gov.in/government-open-data-license-india" target="_blank" rel="noopener noreferrer">

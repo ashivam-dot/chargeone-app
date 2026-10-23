@@ -3,12 +3,12 @@
 // came from and how old it is. Unknown stays unknown: no attribute defaults to false or 0.
 import type { ConnectorType } from '../src/data/model.ts';
 
-export type SourceKey = 'osm' | 'ocm' | 'tgredco';
+export type SourceKey = 'osm' | 'ocm' | 'tgredco' | 'overture';
 
 /** Sources that only list where a charger is (a government list, a places dataset): weak evidence, never verified. */
-export const LISTED_SOURCES: ReadonlySet<SourceKey> = new Set<SourceKey>(['tgredco']);
+export const LISTED_SOURCES: ReadonlySet<SourceKey> = new Set<SourceKey>(['tgredco', 'overture']);
 
-export type LicenceId = 'ODbL-1.0' | 'CC-BY-4.0' | 'GODL-India';
+export type LicenceId = 'ODbL-1.0' | 'CC-BY-4.0' | 'GODL-India' | 'CDLA-Permissive-2.0' | 'CC0-1.0' | 'Apache-2.0';
 
 export interface Licence {
   id: LicenceId;
@@ -138,7 +138,11 @@ export interface Rejection {
     /** Outside the state a state-government list covers (a typo in the coordinates). */
     | 'outside-state'
     /** The same charger listed again within LISTED_MERGE_METRES (one row per charge point). */
-    | 'duplicate-listing';
+    | 'duplicate-listing'
+    /** A places listing of a network that runs AC-only or light-EV chargers (Bolt.Earth), or named AC-only. */
+    | 'ac-only'
+    /** A places listing that names no known car charging network, so nothing says a car can charge there. */
+    | 'car-unknown';
   /** Quarantined records are kept out for legal reasons and must never ship, even as ids. */
   quarantine: boolean;
 }

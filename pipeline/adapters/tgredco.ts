@@ -20,7 +20,8 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { CACHE_DIR, USER_AGENT } from '../config.ts';
 import { LICENCES, TGREDCO_DATASET_URL } from '../licences.ts';
-import { distanceMetres, round6 } from '../lib/geo.ts';
+import { round6 } from '../lib/geo.ts';
+import { groupNearby, LISTED_MERGE_METRES } from '../lib/listed.ts';
 import { knownOperator, SWAP_OPERATORS, TWO_WHEELER_OPERATORS } from '../lib/operators.ts';
 import { inferVehicles, NO_VEHICLE_FLAGS } from '../lib/vehicle.ts';
 import type { Adapter, AdapterResult, HealthReport, Rejection, SourceRecord } from '../types.ts';
@@ -33,8 +34,7 @@ export const tgredcoDir = () => join(CACHE_DIR, 'tgredco');
 export const TGREDCO_AS_OF = '2024-04-01T00:00:00Z';
 /** Fewer rows than this means a broken or truncated download (551 in the April 2024 file). */
 export const TGREDCO_MIN_RAW = 400;
-/** Rows of one operator closer than this are one station listed per charge point. */
-export const LISTED_MERGE_METRES = 100;
+export { LISTED_MERGE_METRES };
 /** Telangana's extent with a small margin. Points outside are typos (the state is assigned from shapes later). */
 export const TELANGANA_BBOX = { minLat: 15.75, maxLat: 20.0, minLng: 77.1, maxLng: 81.4 };
 
@@ -231,20 +231,8 @@ export function tgredcoToCanonical(raw: TgredcoRaw): AdapterResult {
 
   // One station per operator within LISTED_MERGE_METRES (rows are charge points). Unknown operators only
   // join other unknown-operator rows: null is not a wildcard.
-  const parent = kept.map((_, i) => i);
-  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
-  for (let i = 0; i < kept.length; i++) {
-    for (let j = i + 1; j < kept.length; j++) {
-      if (kept[i].operator !== kept[j].operator) continue;
-      if (distanceMetres(kept[i], kept[j]) > LISTED_MERGE_METRES) continue;
-      parent[find(j)] = find(i);
-    }
-  }
-  const groups = new Map<number, typeof kept>();
-  kept.forEach((k, i) => (groups.get(find(i)) ?? groups.set(find(i), []).get(find(i))!).push(k));
-
   const records: SourceRecord[] = [];
-  for (const group of groups.values()) {
+  for (const group of groupNearby(kept, LISTED_MERGE_METRES)) {
     const [first, ...rest] = group;
     for (const r of rest) rejected.push({ sourceId: r.id, reason: 'duplicate-listing', quarantine: false });
     const name = group.map((g) => shownName(g.row.name, `${g.row.address} ${g.row.district}`)).find((n) => n !== null) ?? null;

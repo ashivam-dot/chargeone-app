@@ -12,9 +12,9 @@ import { existenceConfidence, fieldConfidence, recordEvidence } from './confiden
 import { LISTED_SOURCES, type Access, type CanonicalConnector, type CanonicalStation, type Claim, type FieldValue, type SourceKey, type SourceRecord, type Tri } from './types.ts';
 
 /** Attribute order of sources: OCM carries power and status; location-only lists come last. */
-const ATTRIBUTE_RANK: Record<SourceKey, number> = { ocm: 0, osm: 1, tgredco: 2 };
+const ATTRIBUTE_RANK: Record<SourceKey, number> = { ocm: 0, osm: 1, tgredco: 2, overture: 3 };
 /** Position order: mappers place OSM pins on the charger; OCM and the lists often geocode an address. */
-const POSITION_RANK: Record<SourceKey, number> = { osm: 0, ocm: 1, tgredco: 2 };
+const POSITION_RANK: Record<SourceKey, number> = { osm: 0, ocm: 1, tgredco: 2, overture: 3 };
 
 /** Attribute priority: verified first, then by source (OCM, OSM, the lists), then newest, then id for a stable order. */
 export function rankRecords(members: SourceRecord[]): SourceRecord[] {

@@ -307,7 +307,7 @@ export function resolve(records: SourceRecord[]): Resolution {
 export const LISTED_DEDUPE_METRES = 100;
 
 /** Source strength for de-duplication: OSM and OCM describe chargers, the lists only place them. */
-const LIST_RANK: Record<SourceRecord['source'], number> = { osm: 0, ocm: 0, tgredco: 1 };
+const LIST_RANK: Record<SourceRecord['source'], number> = { osm: 0, ocm: 0, tgredco: 1, overture: 2 };
 
 /**
  * Clusters made only of location-only listings (a government list, a places dataset) that sit within

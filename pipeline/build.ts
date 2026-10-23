@@ -16,6 +16,7 @@ import { geofabrikAdapter } from './adapters/geofabrik.ts';
 import { ocmApiAdapter, ocmApiKey } from './adapters/ocm-api.ts';
 import { ocmExportAdapter } from './adapters/ocm-export.ts';
 import { osmAdapter } from './adapters/osm.ts';
+import { overtureAdapter } from './adapters/overture.ts';
 import { tgredcoAdapter } from './adapters/tgredco.ts';
 import { CACHE_DIR, OUT_DIR, readJson, REGISTRY_FILE, writeJson } from './config.ts';
 import { baselineFrom, runGates } from './gates.ts';
@@ -49,6 +50,7 @@ function chooseAdapters(): Array<{ adapter: Adapter<unknown>; origin: string }> 
     { adapter: osm as Adapter<unknown>, origin: osm === geofabrikAdapter ? 'geofabrik' : 'overpass' },
     { adapter: ocm as Adapter<unknown>, origin: ocm === ocmApiAdapter ? 'api' : 'github-export' },
     { adapter: tgredcoAdapter as Adapter<unknown>, origin: 'data.telangana.gov.in' },
+    { adapter: overtureAdapter as Adapter<unknown>, origin: 'overturemaps-us-west-2 (anonymous S3)' },
   ];
 }
 

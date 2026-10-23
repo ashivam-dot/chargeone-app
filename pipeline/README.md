@@ -1,7 +1,8 @@
 # ChargeOne data pipeline
 
 Builds `public/data/` from legal open sources only: OpenStreetMap (ODbL 1.0), Open Charge Map
-(CC BY 4.0) and the Telangana TGREDCO list (GODL-India, location-only). No operator apps or sites, no Google Places and no PlugShare. Spec:
+(CC BY 4.0), the Telangana TGREDCO list (GODL-India) and Overture Maps Places (CDLA-Permissive-2.0, with Foursquare
+Apache-2.0 and AllThePlaces CC0 records); the last two are location-only. No operator apps or sites, no Google Places and no PlugShare. Spec:
 `research/product-strategy-2026-10-23.md` sections 4.4, 4.5, 5.2 and 5.3.
 
 ```
@@ -46,6 +47,17 @@ Environment: `PIPELINE_CACHE_DIR` (default `data-cache/`, gitignored, never comm
      like a person's is published as no name. Records carry no plugs, `status: unknown`,
      `verified: false` and the flags `govt-listed` and `location-only`. The data is never uploaded to
      OpenStreetMap.
+   - `overture`: Overture Maps Places, category `ev_charging_station`, India, from the free public release
+     on anonymous S3. `uv run --with duckdb python -I pipeline/overture-extract.py` writes
+     `data-cache/overture/places-ev-<release>.json`; the adapter only reads the newest one. Each record keeps
+     the licence and dataset (`origin`) of its primary source (Microsoft, Uberall, ... CDLA-Permissive-2.0;
+     Foursquare Apache-2.0; AllThePlaces CC0-1.0); a source outside Overture's Places list or an unknown
+     licence refuses the record. Car-capable only: the network (website host, then brand, then name) must be
+     a known one; Bolt.Earth and anything named AC-only go as `ac-only`, Ather/2W/3W as `not-car`, battery
+     swap, closed places, and unknown networks (`car-unknown`). Location-only like TGREDCO. Attribution:
+     CDLA text (`LICENSE-CDLA-Permissive-2.0.txt`), every Places contributor, the Foursquare line and full
+     NOTICE (`NOTICE-Foursquare.txt`, with `LICENSE-Apache-2.0.txt`) and the AllThePlaces CC0 note ship in
+     `LICENSE-data.txt`, the ODbL zip, the manifest, About, the map credits, the SEO pages and the terms.
    - **Location-only sources** (`LISTED_SOURCES`): evidence `[0.45, 0.2]` capped at `LISTED_MAX` 0.5,
      so they always show as unverified and the planner never stops at them. They add nothing to a
      station that OSM or OCM also describe. A location-only cluster within 100 m of an OSM/OCM record

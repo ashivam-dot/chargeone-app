@@ -19,6 +19,7 @@ export const SOURCE_LICENCES: Readonly<Record<string, ReadonlySet<string>>> = {
   osm: new Set(['ODbL-1.0']),
   ocm: new Set(['CC-BY-4.0']),
   tgredco: new Set(['GODL-India']),
+  overture: new Set(['CDLA-Permissive-2.0', 'CC0-1.0', 'Apache-2.0']),
 };
 
 const STATION_FIELDS = ['name', 'operator', 'connectors', 'maxKw', 'points', 'hours', 'price', 'access', 'address', 'website'] as const;
@@ -81,7 +82,7 @@ export interface Baseline {
   stations: Station[];
 }
 
-const SOURCE_KEY: Record<string, SourceKey> = { OpenStreetMap: 'osm', 'Open Charge Map': 'ocm', 'Telangana Open Data (TGREDCO)': 'tgredco' };
+const SOURCE_KEY: Record<string, SourceKey> = { OpenStreetMap: 'osm', 'Open Charge Map': 'ocm', 'Telangana Open Data (TGREDCO)': 'tgredco', 'Overture Maps Places': 'overture' };
 
 /** Baseline from the published files. `manifest` wins for source counts; positions and DC come from stations.json. */
 export function baselineFrom(dataset: Dataset | null, manifest: { sources: Array<{ key: SourceKey; records: number }> } | null): Baseline | null {

@@ -16,11 +16,14 @@ export type Speed = 'dc' | 'ac' | 'unknown';
 
 export type Vehicle = 'car' | '2w' | '3w' | 'bus';
 
-/** The data sources (pipeline/types.ts SourceKey). `tgredco` is a location-only government list. */
-export type DataSourceKey = 'osm' | 'ocm' | 'tgredco';
+/**
+ * The data sources (pipeline/types.ts SourceKey). `tgredco` (a government list) and `overture` (a places
+ * dataset) are location-only.
+ */
+export type DataSourceKey = 'osm' | 'ocm' | 'tgredco' | 'overture';
 
 /** Display names of the sources (pipeline/outputs.ts SOURCE_NAME). */
-export type SourceName = 'OpenStreetMap' | 'Open Charge Map' | 'Telangana Open Data (TGREDCO)';
+export type SourceName = 'OpenStreetMap' | 'Open Charge Map' | 'Telangana Open Data (TGREDCO)' | 'Overture Maps Places';
 
 export interface Connector {
   type: ConnectorType;

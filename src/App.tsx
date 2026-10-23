@@ -65,6 +65,7 @@ const CHARGER_CREDITS = [
   'Chargers © OpenStreetMap contributors (ODbL)',
   'Contains data from Open Charge Map contributors (CC BY 4.0)',
   'Contains data from TGREDCO, Telangana Open Data Portal (GODL-India)',
+  'Overture Maps Foundation Places (CDLA Permissive 2.0), incl. Foursquare (Apache 2.0, © 2024 Foursquare Labs, Inc.) and AllThePlaces (CC0)',
 ];
 const readViewport = () => ({ height: window.innerHeight, desktop: window.innerWidth >= 820 });
 const isVehicle = (v: unknown): v is MyVehicle => isObject(v) && typeof v.modelId === 'string' && typeof v.batteryKwh === 'number';

@@ -53,7 +53,7 @@ export function speedUnknown(s: Pick<Station, 'speed' | 'maxKw'>): boolean {
   return s.speed === 'unknown' && s.maxKw === null;
 }
 
-const SOURCE_NAME: Record<DataSourceKey, SourceName> = { osm: 'OpenStreetMap', ocm: 'Open Charge Map', tgredco: 'Telangana Open Data (TGREDCO)' };
+const SOURCE_NAME: Record<DataSourceKey, SourceName> = { osm: 'OpenStreetMap', ocm: 'Open Charge Map', tgredco: 'Telangana Open Data (TGREDCO)', overture: 'Overture Maps Places' };
 const SOURCE_KEY = Object.fromEntries(Object.entries(SOURCE_NAME).map(([k, v]) => [v, k])) as Record<SourceName, DataSourceKey>;
 
 const monthYear = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
