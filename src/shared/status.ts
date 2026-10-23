@@ -66,8 +66,7 @@ export const LIVE_LABEL: Record<LiveState, string> = {
 };
 
 /**
- * What a charger's map pin shows. A driver report inside its window wins when it is newer than the source
- * data; without one, the source's own status: listed operational (or partly) is "working", temporarily
+ * What a charger's map pin shows. A driver report inside its window wins; without one, the source's own status: listed operational (or partly) is "working", temporarily
  * unavailable is "unavailable", and anything else is "unknown". Never live from the operator.
  */
 export type ChargerState = 'working' | 'in_use' | 'unavailable' | 'unknown';
@@ -80,26 +79,18 @@ export interface ChargerStateInfo {
   from: 'report' | 'data' | 'none';
 }
 
-/** The time of the report that put a station in its live state. */
-function liveAt(s: StationStatus, live: LiveState): string | null {
-  if (live === 'problem') return s.problemAt;
-  if (live === 'in_use') return [s.inUseSince, s.queueAt].filter((t): t is string => Boolean(t)).sort().at(-1) ?? null;
-  return s.lastWorkedAt;
-}
-
+/**
+ * Only the source status and the reports go in, never the source's date: the map's index stations have no
+ * date and the sheet's detailed ones do, so a date rule made the pin and the sheet disagree. A report is at
+ * most 48 hours old inside its window, and a source date is an edit or listing date, not a status check.
+ */
 export function chargerState(
-  station: { status?: 'operational' | 'temporarily_unavailable' | 'partly_operational' | 'unknown'; observedAt?: string | null },
+  station: { status?: 'operational' | 'temporarily_unavailable' | 'partly_operational' | 'unknown' },
   s: StationStatus | undefined,
   now: Date,
 ): ChargerStateInfo {
   const live = liveState(s, now);
-  if (s && live !== 'unknown') {
-    const at = Date.parse(liveAt(s, live) ?? '');
-    const seen = Date.parse(station.observedAt ?? '');
-    if (!Number.isFinite(seen) || !Number.isFinite(at) || at > seen) {
-      return { state: live === 'problem' ? 'unavailable' : live, from: 'report' };
-    }
-  }
+  if (s && live !== 'unknown') return { state: live === 'problem' ? 'unavailable' : live, from: 'report' };
   switch (station.status) {
     case 'operational':
     case 'partly_operational':
@@ -109,6 +100,18 @@ export function chargerState(
     default:
       return { state: 'unknown', from: 'none' };
   }
+}
+
+/** A map pin's feature properties: `st` the state, `rep` when a recent driver report decided it. */
+export function pinProps(station: Parameters<typeof chargerState>[0], s: StationStatus | undefined, now: Date): { st: ChargerState; rep: boolean } {
+  const info = chargerState(station, s, now);
+  return { st: info.state, rep: info.from === 'report' };
+}
+
+/** The "Working" filter: the same rule as the green and amber pins (listed operational, or a driver says so). */
+export function worksNow(station: Parameters<typeof chargerState>[0], s: StationStatus | undefined, now: Date): boolean {
+  const { state } = chargerState(station, s, now);
+  return state === 'working' || state === 'in_use';
 }
 
 /** Pin and badge colours: dark enough for a white glyph on top (3:1 or more) and distinct from each other. */

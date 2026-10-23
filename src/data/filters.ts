@@ -100,6 +100,24 @@ export function showHidden<F extends Filters>(f: F): F {
   return { ...f, mode: 'all', showRestricted: true };
 }
 
+/**
+ * The filters loosened only as far as `s` needs to pass them: a charger picked from search that a filter
+ * hides opens without wiping the rest. The mode and the customers-only setting open together
+ * (showHidden), every other filter is cleared only if this station fails it.
+ */
+export function relaxToShow<F extends Filters>(s: Station, f: F): F {
+  let out: F = f;
+  const fails = (k: Partial<Filters>) => !matchesFilters(s, { ...EMPTY_FILTERS, ...k });
+  if (fails({ mode: f.mode, showRestricted: f.showRestricted })) out = showHidden(out);
+  if (f.dcOnly && fails({ dcOnly: true })) out = { ...out, dcOnly: false };
+  if (f.open24x7 && fails({ open24x7: true })) out = { ...out, open24x7: false };
+  if (f.operator !== null && fails({ operator: f.operator })) out = { ...out, operator: null };
+  if (f.minKw > 0 && fails({ minKw: f.minKw })) out = { ...out, minKw: 0 };
+  if (f.connectors.length > 0 && fails({ connectors: f.connectors })) out = { ...out, connectors: [] };
+  if (f.vehicle !== null && fails({ vehicle: f.vehicle })) out = { ...out, vehicle: null };
+  return out;
+}
+
 export function operatorsByCount(stations: Station[]): Array<{ name: string; count: number }> {
   const counts = new Map<string, number>();
   for (const s of stations) {

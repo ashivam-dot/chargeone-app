@@ -213,8 +213,9 @@ export function StationSheet(props: Props) {
       </p>
 
       <div class="trust" data-testid="trust">
-        <span class={`trust__badge trust__badge--${badge}`} data-testid="trust-badge">
-          {TRUST_LABEL[badge]}
+        {/* Plain text, not a second pill: the state badge in the live block is the sheet's one status badge. */}
+        <span class={`trust__label trust__label--${badge}`} data-testid="trust-badge">
+          Listing: {TRUST_LABEL[badge]}
         </span>
         {speedUnknown(station) && (
           <span class="trust__badge trust__badge--speed" data-testid="speed-unknown">

@@ -33,7 +33,7 @@ export function MapLegend() {
               </span>
             </li>
           ))}
-          <li class="map-legend__note">Bigger pins are DC fast chargers. Numbers are groups of chargers; zoom in to split them.</li>
+          <li class="map-legend__note">Bigger pins are DC fast chargers. Numbers are groups of chargers, and the small green number is how many in the group work; zoom in to split them.</li>
         </ul>
       )}
     </div>

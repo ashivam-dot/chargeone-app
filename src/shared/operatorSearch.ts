@@ -37,6 +37,22 @@ export const BRANDS: Brand[] = [
 /** Words too common in operator names to pick one out by themselves. */
 const COMMON = new Set(['ev', 'e', 'charging', 'charger', 'chargers', 'charge', 'station', 'stations', 'electric', 'vehicle', 'power', 'energy', 'the', 'of', 'and', 'pvt', 'ltd', 'india', 'point', 'grid', 'smart']);
 
+/** Common words long enough that a name starting with one is "generic + more" (chargeZONE, chargeMOD). */
+const COMMON_LONG = [...COMMON].filter((c) => c.length >= 4);
+
+/**
+ * A typed word that names no brand by itself: a common word, or a common word being typed ("charg" on the
+ * way to "charging", "electr"). A half-typed common word still counts as a brand's start when some name
+ * has it at the front of a word that isn't itself common-plus-more: "stati" may be Statiq, but "charg"
+ * only leads to ChargeZone and chargeMOD through "charge", so it stays generic.
+ */
+function isGeneric(t: string, names: Iterable<string>): boolean {
+  if (COMMON.has(t)) return true;
+  if (!COMMON_LONG.some((c) => c.length > t.length && c.startsWith(t))) return false;
+  for (const w of names) if (w.startsWith(t) && !COMMON_LONG.some((c) => w.startsWith(c))) return false;
+  return true;
+}
+
 /** Lower-case words without accents, split at anything that isn't a letter or digit ("Jio-bp" is two words). */
 export function words(text: string): string[] {
   return text
@@ -63,6 +79,7 @@ function phraseIn(phrase: string[], target: string[], min: number): boolean {
 }
 
 const BRAND_WORDS = BRANDS.map((b) => ({ brand: b, phrases: b.aliases.map(words), lower: new Set(b.operators.map((o) => o.toLowerCase())) }));
+const ALIAS_WORDS = [...new Set(BRAND_WORDS.flatMap((b) => b.phrases.flat()))];
 /** Exact aliases only for 1-2 letter typing ("hp", "bp", "ez"); a longer word may be an alias's start ("stati"). */
 const ALIAS_PREFIX_MIN = 3;
 
@@ -70,8 +87,8 @@ const ALIAS_PREFIX_MIN = 3;
 export function brandsFor(query: string): Brand[] {
   const typed = words(query);
   if (!typed.length) return [];
-  // Generic words alone ("charge") only name a brand when they are its whole alias.
-  const generic = typed.every((t) => COMMON.has(t));
+  // Generic words alone ("charge", "charg") only name a brand when they are its whole alias.
+  const generic = typed.every((t) => isGeneric(t, ALIAS_WORDS));
   return BRAND_WORDS.filter((b) => b.phrases.some((p) => (!generic || p.join(' ') === typed.join(' ')) && startsPhrase(typed, p, ALIAS_PREFIX_MIN))).map((b) => b.brand);
 }
 
@@ -80,10 +97,12 @@ export function operatorsNamed(query: string, operators: Iterable<string>): stri
   const typed = words(query);
   if (!typed.length) return [];
   const brands = brandsFor(query);
-  const own = typed.filter((t) => !COMMON.has(t));
+  const list = [...operators];
+  const names = [...ALIAS_WORDS, ...list.flatMap(words)];
+  const own = typed.filter((t) => !isGeneric(t, names));
   const joined = typed.join('');
   const out: string[] = [];
-  for (const op of operators) {
+  for (const op of list) {
     const lower = op.toLowerCase();
     const opWords = words(op);
     const byAlias = brands.some((b) => b.operators.some((o) => o.toLowerCase() === lower));
@@ -121,7 +140,7 @@ export interface OperatorHit {
 }
 
 export interface ChargerSearch {
-  /** The nearest matches when `near` is given, else the best name matches first. */
+  /** The best name matches first; among equal matches, the nearest when `near` is given. */
   stations: Station[];
   /** Operators the query names, most chargers first. */
   operators: OperatorHit[];
@@ -162,7 +181,7 @@ export function searchChargers(stations: Station[], query: string, opts: { limit
     if (score) hits.push({ s, score });
   }
   const near = opts.near;
-  hits.sort((a, b) => (near ? dist2(a.s, near) - dist2(b.s, near) : b.score - a.score));
+  hits.sort((a, b) => b.score - a.score || (near ? dist2(a.s, near) - dist2(b.s, near) : 0));
   return {
     stations: hits.slice(0, opts.limit ?? 3).map((h) => h.s),
     operators: [...named]

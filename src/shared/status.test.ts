@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STATE_COLOUR, chargerState, liveState, stateReason, type StationStatus } from './status.ts';
+import { STATE_COLOUR, chargerState, liveState, pinProps, stateReason, worksNow, type StationStatus } from './status.ts';
 
 const now = new Date('2026-10-23T12:00:00Z');
 const ago = (h: number) => new Date(now.getTime() - h * 3_600_000).toISOString();
@@ -45,17 +45,32 @@ describe('chargerState with driver reports', () => {
     expect(chargerState({ status: 'operational' }, status({ inUseSince: new Date(now.getTime() - 10 * 60_000).toISOString() }), now).state).toBe('in_use');
   });
 
-  it('keeps the source status when the source saw the charger after the report', () => {
+  it('the pin (index station, no date) and the sheet (detailed station, with a date) agree', () => {
     const report = status({ lastWorkedAt: ago(30) });
-    expect(chargerState({ status: 'temporarily_unavailable', observedAt: ago(1) }, report, now)).toEqual({ state: 'unavailable', from: 'data' });
-    expect(chargerState({ status: 'temporarily_unavailable', observedAt: ago(40) }, report, now).state).toBe('working');
-    // A date-only observedAt (start of that day) is older than a report later that day.
-    expect(chargerState({ status: 'temporarily_unavailable', observedAt: '2026-10-23' }, status({ lastWorkedAt: ago(1) }), now).state).toBe('working');
+    const lite = { status: 'temporarily_unavailable' as const };
+    const detail = { ...lite, observedAt: ago(1) };
+    expect(pinProps(lite, report, now)).toEqual({ st: 'working', rep: true });
+    expect(chargerState(detail, report, now)).toEqual({ state: 'working', from: 'report' });
+    expect(pinProps(lite, undefined, now).st).toBe(chargerState(detail, undefined, now).state);
   });
 
   it('a newer problem beats an older "worked" report', () => {
     const s = status({ lastWorkedAt: ago(10), problemAt: ago(2), problemKind: 'blocked' });
     expect(chargerState({ status: 'operational' }, s, now).state).toBe('unavailable');
+  });
+});
+
+describe('the Working filter uses the pin rule', () => {
+  it('keeps chargers listed as operational with no reports at all', () => {
+    expect(worksNow({ status: 'operational' }, undefined, now)).toBe(true);
+    expect(worksNow({ status: 'partly_operational' }, undefined, now)).toBe(true);
+    expect(worksNow({ status: 'unknown' }, undefined, now)).toBe(false);
+    expect(worksNow({ status: 'temporarily_unavailable' }, undefined, now)).toBe(false);
+  });
+
+  it('follows a recent report both ways', () => {
+    expect(worksNow({ status: 'unknown' }, status({ inUseSince: ago(0.2) }), now)).toBe(true);
+    expect(worksNow({ status: 'operational' }, status({ problemAt: ago(2), problemKind: 'broken' }), now)).toBe(false);
   });
 });
 

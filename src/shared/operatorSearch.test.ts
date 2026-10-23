@@ -71,6 +71,17 @@ describe('operator aliases', () => {
     expect(named('charge')).toEqual([]);
   });
 
+  it('a common word half typed names no operator ("charg" is not ChargeZone)', () => {
+    expect(named('charg')).toEqual([]);
+    expect(named('chargi')).toEqual([]);
+    expect(named('electr')).toEqual([]);
+    expect(named('stat')).toEqual(['Statiq']);
+    expect(brandsFor('charg')).toEqual([]);
+    // Typed past the common word, the brand is back.
+    expect(named('chargez')).toEqual(['ChargeZone']);
+    expect(named('chargem')).toEqual(['chargeMOD']);
+  });
+
   it('every brand names at least one alias and operator', () => {
     for (const b of BRANDS) {
       expect(b.operators.length).toBeGreaterThan(0);
@@ -112,6 +123,17 @@ describe('searchChargers', () => {
     const r = searchChargers(all, 'Statiq', { near: { lat: 14.2, lng: 77 } });
     expect(r.operators).toEqual([{ name: 'Statiq', count: 6 }]);
     expect(r.stations.map((s) => s.id)).toEqual(['q4', 'q5', 'q3']);
+  });
+
+  it('a far charger named exactly as typed ranks above near ones that only match by operator', () => {
+    const exact = station('x1', 'Shell Recharge Hosur Road', 'Shell Recharge', 14.5, 77.6);
+    const nearOnes = Array.from({ length: 4 }, (_, i) => station(`n${i}`, `Fuel Point ${i}`, 'Shell Recharge', 12.9 + i * 0.01, 77.6));
+    const r = searchChargers([...nearOnes, exact], 'shell recharge hosur', { near: { lat: 12.9, lng: 77.6 } });
+    expect(r.stations[0].id).toBe('x1');
+    const r2 = searchChargers([...nearOnes, exact], 'shell', { near: { lat: 12.9, lng: 77.6 } });
+    expect(r2.stations[0].id).toBe('x1');
+    // Equal matches still come nearest first.
+    expect(searchChargers(nearOnes, 'shell', { near: { lat: 12.95, lng: 77.6 } }).stations[0].id).toBe('n3');
   });
 
   it('still finds chargers by name, case-insensitive, while typing', () => {

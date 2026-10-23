@@ -681,12 +681,45 @@ html {
   margin: 8px 0 0;
   color: var(--text);
 }
-.map-legend {
+/* The key and the "N hidden · Show" pill, in one row under the filter chips. */
+.map-row {
   position: absolute;
   z-index: 4;
   left: 12px;
+  right: 12px;
   top: calc(122px + var(--safe-top));
-  max-width: min(320px, calc(100% - 24px));
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+.map-row > * {
+  pointer-events: auto;
+}
+.map-hidden {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-solid);
+  box-shadow: var(--overlay-shadow);
+  color: var(--text);
+  font: 600 0.85rem/1 var(--font);
+  cursor: pointer;
+}
+.map-hidden__show {
+  color: var(--accent-strong, var(--accent));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.map-legend {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 320px;
   border-radius: 16px;
   background: var(--panel);
   border: 1px solid var(--line-strong);
@@ -695,7 +728,7 @@ html {
   backdrop-filter: var(--surface-blur);
 }
 /* Under the operator banner when one is showing. */
-.banner--op ~ .map-legend {
+.banner--op ~ .map-row {
   top: calc(176px + var(--safe-top));
 }
 .map-legend__toggle {
@@ -746,17 +779,6 @@ html {
 .legend .state-icon {
   margin-top: 2px;
 }
-.filters__hidden {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  font-weight: 650;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
 .banner--op {
   z-index: 4;
   display: flex;
@@ -787,4 +809,15 @@ html {
 }
 .place__list li.place__all {
   background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+/* Expanded map credits sit above the FAB and the key, on a solid card, so the text stays readable. */
+.maplibregl-ctrl-bottom-left:has(.maplibregl-compact-show),
+.maplibregl-ctrl-bottom-right:has(.maplibregl-compact-show) {
+  z-index: 6;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact-show {
+  background: var(--panel-solid) !important;
+  color: var(--text);
+  box-shadow: var(--overlay-shadow);
 }

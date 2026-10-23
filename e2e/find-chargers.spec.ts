@@ -33,6 +33,44 @@ test.describe('find chargers and read the pins', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   });
 
+  test('a driver who picked dark never sees a light frame while the app loads', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('chargeone:theme', JSON.stringify('dark')));
+    // No app code at all: only the boot script in <head> can set the theme.
+    await page.route(/\/(assets|src)\/.*\.(js|tsx?)(\?.*)?$/, (route) => route.abort());
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#000000');
+  });
+
+  test('picking a 2-wheeler charger from search opens it for now, without changing the saved mode', async ({ page }) => {
+    await openApp(page);
+    await expect(page.getByTestId('mode-car')).toHaveAttribute('aria-pressed', 'true');
+    await search(page).fill('Moto Store & Cafe');
+    await page.getByRole('listbox').first().getByRole('option').filter({ hasText: /Moto Store/ }).first().click();
+    await expect(page.getByTestId('live-status')).toBeVisible();
+    await expect(page.getByTestId('mode-car')).toHaveAttribute('aria-pressed', 'false');
+    await page.reload();
+    await expect(page.getByTestId('app-ready')).toBeAttached({ timeout: 30_000 });
+    await expect(page.getByTestId('mode-car')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('"Working" keeps chargers listed as operational that no driver has reported yet', async ({ page }) => {
+    await openApp(page);
+    await page.getByTestId('working-only').click();
+    await expect(page.getByTestId('working-only')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('filter-count')).toHaveText(/^[1-9]\d* of \d+$/);
+  });
+
+  test('the "N hidden · Show" pill is on screen, not scrolled off with the chips', async ({ page }) => {
+    await openApp(page);
+    const pill = page.getByTestId('show-hidden');
+    await expect(pill).toBeInViewport({ ratio: 1 });
+    await expect(pill).toHaveText(/^\d+ hidden · Show$/);
+    await pill.click();
+    await expect(page.getByTestId('mode-all')).toHaveAttribute('aria-pressed', 'true');
+    await expect(pill).toHaveCount(0);
+  });
+
   test('"HP" finds HPCL chargers, not words that merely contain the letters', async ({ page }) => {
     await openApp(page);
     await search(page).fill('HP');

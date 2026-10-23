@@ -6,7 +6,7 @@ import { clearShardCache, loadDataset, loadStationDetail } from './loader.ts';
 import { aliasBucket, bucketCount, KEYS_PER_BUCKET, resolveThroughBuckets, type AliasBucket } from './lookup.ts';
 import type { Dataset, Station } from './model.ts';
 import { keepIfSame, statusesByStation, unknownStatusIds } from './statusIds.ts';
-import type { StationStatus } from '../shared/status.ts';
+import { chargerState, pinProps, type StationStatus } from '../shared/status.ts';
 
 const DIR = new URL('../../public/data/', import.meta.url);
 const read = (name: string) => JSON.parse(readFileSync(new URL(name, DIR), 'utf8'));
@@ -138,6 +138,25 @@ describe('charger details after a deploy', () => {
     const s = await loadStationDetail(station, index.version, fetchFn);
     expect(s?.id).toBe(station.id);
     expect(s?.sources.length).toBeGreaterThan(0);
+  });
+
+  it('the map pin (index station) and the sheet (shard station) show the same state for every charger', async () => {
+    const { fetchFn } = diskFetch();
+    const now = new Date();
+    const lite = decodeIndex(index);
+    // Reports of every age inside the windows, against every listed status the data has.
+    const reports: Array<StationStatus | undefined> = [undefined, 0.5, 6, 30, 47].map((h) =>
+      h === undefined
+        ? undefined
+        : { stationId: 'x', lastWorkedAt: new Date(now.getTime() - h * 3_600_000).toISOString(), lastWorkedKw: null, lastWorkedVehicle: null, inUseSince: null, queueAt: null, problemAt: null, problemKind: null, problemReports: 0, reports7d: 1 },
+    );
+    const disagree: string[] = [];
+    for (const s of lite) {
+      const full = await loadStationDetail(s, index.version, fetchFn);
+      expect(full).not.toBeNull();
+      for (const r of reports) if (pinProps(s, r, now).st !== chargerState(full!, r, now).state) disagree.push(s.id);
+    }
+    expect(disagree).toEqual([]);
   });
 
   it('a shard that no longer lists the station re-reads index.json once and follows it', async () => {

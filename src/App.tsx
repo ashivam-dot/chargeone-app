@@ -1,6 +1,6 @@
 import { Route } from 'lucide-preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { DEFAULT_FILTERS, EMPTY_FILTERS, filterStations, hiddenBySettings, operatorsByCount, showHidden, type MapMode } from './data/filters.ts';
+import { DEFAULT_FILTERS, EMPTY_FILTERS, filterStations, hiddenBySettings, operatorsByCount, relaxToShow, type MapMode } from './data/filters.ts';
 import { loadDataset, loadStationDetail, type DataManifest } from './data/loader.ts';
 import { keepIfSame, statusesByStation, unknownStatusIds } from './data/statusIds.ts';
 import type { Dataset, Station } from './data/model.ts';
@@ -16,14 +16,14 @@ import { PLATFORM } from './native/bridge.ts';
 import { BACK_EVENT, haptic, initNativeShell, onAppResume } from './native/platform.ts';
 import { PLANS, isPlus, type PlanId } from './shared/plans.ts';
 import { operatorBounds } from './shared/operatorSearch.ts';
-import { liveState, type StationStatus } from './shared/status.ts';
+import { worksNow, type StationStatus } from './shared/status.ts';
 import type { MyVehicle } from './shared/vehicles.ts';
 import { StateCoverage } from './ui/Coverage.tsx';
 import { DEFAULT_PAINTS } from './ui/car/carDesigns.ts';
 import { useCarLink } from './ui/car/carLink.ts';
 import type { VoiceTrip } from './ui/copilot/CopilotScreen.tsx';
 import type { CarPosition } from './ui/drive/DriveMode.tsx';
-import { FilterBar, type MapFilters } from './ui/FilterBar.tsx';
+import { FilterBar, HiddenPill, type MapFilters } from './ui/FilterBar.tsx';
 import { Onboarding } from './ui/onboarding/Onboarding.tsx';
 import { MapLegend } from './ui/MapLegend.tsx';
 import { PlaceInput, type PickedPlace } from './ui/PlaceInput.tsx';
@@ -322,15 +322,17 @@ export function App() {
   }, [stations, rawStatuses, aliasOf]);
   const operators = useMemo(() => operatorsByCount(stations), [stations]);
   const dcCount = useMemo(() => stations.filter((s) => s.speed === 'dc').length, [stations]);
-  const shown = useMemo(() => {
-    const base = filterStations(stations, filters);
-    if (!filters.workingOnly) return base;
-    const now = new Date();
-    return base.filter((s) => {
-      const state = liveState(statuses.get(s.id), now);
-      return state === 'working' || state === 'in_use';
-    });
-  }, [stations, filters, statuses]);
+  /** What the map shows for some filters: the "Working" chip uses the pins' own rule (shared/status.ts). */
+  const visible = useCallback(
+    (f: MapFilters) => {
+      const base = filterStations(stations, f);
+      if (!f.workingOnly) return base;
+      const now = new Date();
+      return base.filter((s) => worksNow(s, statuses.get(s.id), now));
+    },
+    [stations, statuses],
+  );
+  const shown = useMemo(() => visible(filters), [visible, filters]);
   const selectedLite = selectedId ? byId.get(selectedId) ?? null : null;
   const selectedDetail = selectedId ? details.get(selectedId) : undefined;
   const selected = selectedDetail ?? selectedLite;
@@ -357,10 +359,19 @@ export function App() {
     () => (mapView ? { lat: (mapView.bounds.south + mapView.bounds.north) / 2, lng: (mapView.bounds.west + mapView.bounds.east) / 2 } : null),
     [mapView],
   );
-  const changeFilters = (f: MapFilters) => {
-    if (f.mode !== filters.mode) saveJson('map-mode', f.mode);
+  /** `remember: false` for the app's own loosening (opening a hidden charger): only a driver's pick of mode sticks. */
+  const changeFilters = (f: MapFilters, remember = true) => {
+    if (remember && f.mode !== filters.mode) saveJson('map-mode', f.mode);
     setFilters(f);
   };
+  /** The operator banner: that operator's chargers every other filter hides, and showing them all. */
+  const operatorAll = useMemo(
+    () => (filters.operator ? filterStations(stations, { ...EMPTY_FILTERS, operator: filters.operator }).length : 0),
+    [stations, filters.operator],
+  );
+  const operatorHidden = Math.max(0, operatorAll - shown.length);
+  const showOperatorAll = () =>
+    changeFilters({ ...filters, ...EMPTY_FILTERS, operator: filters.operator, workingOnly: false }, false);
   const placeIndexById = useMemo(() => new Map(places?.places.map((p, i) => [p.id, i]) ?? []), [places]);
 
   // Places are a separate, larger file: fetch it only once something needs it.
@@ -607,15 +618,21 @@ export function App() {
               onPick={(p) => {
                 if (!p) return;
                 if (p.stationId) {
-                  // A charger the filters hide still opens: show what's hidden rather than an empty pick.
-                  if (!shown.some((s) => s.id === p.stationId)) changeFilters({ ...filters, ...EMPTY_FILTERS, workingOnly: false });
+                  // A charger the filters hide still opens: loosen only what hides it, for this visit only.
+                  const s = byId.get(p.stationId);
+                  if (s && !shown.some((x) => x.id === s.id)) {
+                    const relaxed = relaxToShow(s, filters);
+                    changeFilters(relaxed.workingOnly && !worksNow(s, statuses.get(s.id), new Date()) ? { ...relaxed, workingOnly: false } : relaxed, false);
+                  }
                   select(p.stationId);
                 } else setFlyTarget(p.bbox ? { kind: 'bbox', bbox: p.bbox } : { kind: 'point', lat: p.lat, lng: p.lng, zoom: 12 });
               }}
               onOperator={(op) => {
                 if (tab !== 'explore') setTab('explore');
-                changeFilters({ ...filters, operator: op });
-                const b = operatorBounds(stations, op);
+                const next = { ...filters, operator: op };
+                changeFilters(next);
+                // Fit to the ones the map will show; if the filters hide them all, to all of them.
+                const b = operatorBounds(visible(next), op) ?? operatorBounds(stations, op);
                 if (b) setFlyTarget({ kind: 'bbox', bbox: b });
               }}
             />
@@ -639,10 +656,10 @@ export function App() {
         <div class="banner banner--op" role="status" data-testid="operator-banner">
           <span>
             <strong>{filters.operator}</strong> · {shown.length} on the map
-            {hiddenCount > 0 && <> · {hiddenCount} more hidden by filters</>}
+            {operatorHidden > 0 && <> · {operatorHidden} more hidden by filters</>}
           </span>
-          {hiddenCount > 0 && (
-            <button type="button" class="link link--inline" data-testid="show-hidden-operator" onClick={() => changeFilters(showHidden(filters))}>
+          {operatorHidden > 0 && (
+            <button type="button" class="link link--inline" data-testid="show-hidden-operator" onClick={showOperatorAll}>
               Show
             </button>
           )}
@@ -651,7 +668,13 @@ export function App() {
           </button>
         </div>
       )}
-      {tab === 'explore' && !drive && !stationOpen && dataset && <MapLegend />}
+      {tab === 'explore' && !drive && !stationOpen && dataset && (
+        <div class="map-row">
+          <MapLegend />
+          {/* With an operator picked, its banner says what's hidden instead. */}
+          {!filters.operator && <HiddenPill filters={filters} hidden={hiddenCount} onChange={changeFilters} />}
+        </div>
+      )}
 
       {!online && <div class="banner" role="status">You're offline. The map and saved chargers still work; status may be out of date.</div>}
       {loadError && (

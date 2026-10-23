@@ -92,7 +92,7 @@ test.describe('charger data you can trust', () => {
   test('with a car saved, 2-wheeler-only chargers are hidden until the driver asks for them', async ({ page }) => {
     await openApp(page);
     await expect(page.getByTestId('mode-car')).toHaveAttribute('aria-pressed', 'true');
-    const hidden = page.getByTestId('filter-count').locator('[title]');
+    const hidden = page.getByTestId('show-hidden');
     await expect(hidden).toHaveAttribute('title', /2-wheelers/);
     const forCar = await count(page);
 
@@ -102,7 +102,7 @@ test.describe('charger data you can trust', () => {
 
     await page.getByTestId('mode-all').click();
     await page.getByTestId('show-restricted').click();
-    await expect(page.getByTestId('filter-count').locator('[title]')).toHaveCount(0);
+    await expect(page.getByTestId('show-hidden')).toHaveCount(0);
     const all = await count(page);
     expect(forCar).toBeGreaterThan(0);
     expect(for2w).toBeGreaterThan(0);
