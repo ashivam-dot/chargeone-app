@@ -6,7 +6,7 @@
 // and a recent problem report overrides everything. The planner only plans stops at PLAN_MIN_CONFIDENCE
 // or above. The 0.6 line is a starting guess until it's calibrated against ground checks.
 import { liveState, type StationStatus } from '../shared/status.ts';
-import type { DetailField, FieldClaim, SourceRecordRef, Station } from './model.ts';
+import type { DataSourceKey, DetailField, FieldClaim, SourceName, SourceRecordRef, Station } from './model.ts';
 
 export const PLAN_MIN_CONFIDENCE = 0.6;
 /** A fresh "charged fine" report on its own. */
@@ -53,7 +53,8 @@ export function speedUnknown(s: Pick<Station, 'speed' | 'maxKw'>): boolean {
   return s.speed === 'unknown' && s.maxKw === null;
 }
 
-const SOURCE_NAME = { osm: 'OpenStreetMap', ocm: 'Open Charge Map' } as const;
+const SOURCE_NAME: Record<DataSourceKey, SourceName> = { osm: 'OpenStreetMap', ocm: 'Open Charge Map', tgredco: 'Telangana Open Data (TGREDCO)', overture: 'Overture Maps Places' };
+const SOURCE_KEY = Object.fromEntries(Object.entries(SOURCE_NAME).map(([k, v]) => [v, k])) as Record<SourceName, DataSourceKey>;
 
 const monthYear = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 
@@ -83,6 +84,10 @@ export function trustReason(station: Station, status: StationStatus | undefined,
   const flags = new Set(station.flags ?? []);
   if (flags.has('ocm-status-30') || station.status === 'temporarily_unavailable') return 'A source lists it as temporarily unavailable.';
   // The flags say more than the score: a bulk import or an edit date is no sign anyone checked the charger.
+  if (flags.has('location-only')) {
+    const seen = lastSeen(station);
+    return `Only in ${sourceNames(station)}${seen ? ` (${monthYear(seen)})` : ''}, which gives the place but no plugs or status. Unverified: confirm before you rely on it.`;
+  }
   if (flags.has('bulk-unverified')) return 'Added in a bulk import and never checked since. It may not exist or work.';
   const seen = lastSeen(station);
   const by = sourceNames(station);
@@ -99,7 +104,7 @@ export function trustReason(station: Station, status: StationStatus | undefined,
   return 'No recent check by the map sources or drivers. Confirm before you rely on it.';
 }
 
-function describe(source: 'osm' | 'ocm', observedAt: string | null, verified: boolean | null, method: FieldClaim['method'] = 'mapped'): string {
+function describe(source: DataSourceKey, observedAt: string | null, verified: boolean | null, method: FieldClaim['method'] = 'mapped'): string {
   const name = SOURCE_NAME[source];
   const valid = observedAt && Number.isFinite(Date.parse(observedAt));
   if (method === 'inferred') return `Guessed from the name on ${name}`;
@@ -110,11 +115,11 @@ function describe(source: 'osm' | 'ocm', observedAt: string | null, verified: bo
   return `${prefix}, listed ${monthYear(observedAt)}`;
 }
 
-function sourceOfLegacyRef(station: Station): { source: 'osm' | 'ocm'; observedAt: string | null } | null {
+function sourceOfLegacyRef(station: Station): { source: DataSourceKey; observedAt: string | null } | null {
   // stations.json only: one source supplies every field unless the station was merged.
   if (station.sources.length !== 1) return null;
   const s = station.sources[0];
-  return { source: s.name === 'OpenStreetMap' ? 'osm' : 'ocm', observedAt: s.updated ?? null };
+  return { source: SOURCE_KEY[s.name] ?? 'ocm', observedAt: s.updated ?? null };
 }
 
 /**

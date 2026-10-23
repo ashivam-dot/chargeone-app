@@ -6,8 +6,8 @@ import { C1_ID } from './ids.ts';
 const CONNECTOR_TYPES: ReadonlySet<ConnectorType> = new Set([
   'CCS2', 'CCS1', 'CHAdeMO', 'Type 2', 'Type 1', 'GB/T DC', 'GB/T AC', 'Bharat AC', 'Bharat DC', 'LECCS', '3-pin socket', 'Other',
 ]);
-/** The worker's check-in id pattern (worker/reports.ts STATION_ID). */
-const LEGACY_ID = /^(osm-[nwr]\d{1,15}|ocm-\d{1,10})$/;
+/** The worker's check-in id pattern (worker/stations.ts STATION_ID): a c1_ id for stations only the location lists know. */
+const LEGACY_ID = /^(osm-[nwr]\d{1,15}|ocm-\d{1,10}|c1_[a-z2-7]{12})$/;
 const SPEEDS = new Set(['dc', 'ac', 'unknown']);
 const VEHICLES = new Set(['car', '2w', '3w', 'bus']);
 const ACCESS = new Set(['public', 'customers', 'unknown']);
@@ -20,7 +20,7 @@ const strOrNull = (v: unknown) => v === null || typeof v === 'string';
 export function validateStation(s: Station): string[] {
   const e: string[] = [];
   const at = (msg: string) => e.push(`${s?.id ?? '?'}: ${msg}`);
-  if (typeof s.id !== 'string' || !LEGACY_ID.test(s.id)) at('id is not an osm-/ocm- id');
+  if (typeof s.id !== 'string' || !LEGACY_ID.test(s.id)) at('id is not an osm-/ocm-/c1_ id');
   if (typeof s.name !== 'string' || !s.name) at('name missing');
   if (!strOrNull(s.operator)) at('operator');
   if (!isNum(s.lat) || s.lat < 6 || s.lat > 37.6 || !isNum(s.lng) || s.lng < 68 || s.lng > 97.5) at('position outside India');
@@ -48,7 +48,7 @@ export function validateStations(stations: Station[]): string[] {
   const errors = stations.flatMap(validateStation);
   const seen = new Set<string>();
   for (const s of stations) {
-    for (const id of [s.id, s.c1Id, ...(s.aliases ?? [])]) {
+    for (const id of new Set([s.id, s.c1Id, ...(s.aliases ?? [])])) {
       if (id === undefined) continue;
       if (seen.has(id)) errors.push(`${id}: used by two stations`);
       seen.add(id);

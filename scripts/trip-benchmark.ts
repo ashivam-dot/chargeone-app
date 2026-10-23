@@ -25,7 +25,7 @@ import { planTrip, findCandidates, DEFAULT_OPTIONS, type Candidate, type PlanInp
 import { planJourney, staysNearDestination, type Journey } from '../src/planner/journey.ts';
 import { RouteIndex } from '../src/planner/geometry.ts';
 import { VEHICLES, myVehicleFromModel } from '../src/shared/vehicles.ts';
-import { parseValhalla } from '../worker/routing.ts';
+import { parseValhalla } from '../worker/valhalla.ts';
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(name);

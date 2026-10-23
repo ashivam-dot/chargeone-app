@@ -1,6 +1,7 @@
 // Everything published in public/data, built in memory first so the gates can check it before any file
 // is written. Pure: the same station layer and run date give the same bytes.
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { encodeCell, encodeIndex } from '../src/data/compact.ts';
 import { aliasBucket, bucketCount, LOOKUP_SCHEMA, type AliasBucket, type LookupFile } from '../src/data/lookup.ts';
 import { hasDc, type Connector, type Dataset, type DatasetSource, type SourceRef, type Station, type Vehicle } from '../src/data/model.ts';
@@ -9,10 +10,28 @@ import { geohash } from './lib/geo.ts';
 import { GOV_COUNTS, STATES } from './lib/states.ts';
 import { zip } from './lib/zip.ts';
 import { positionRecord } from './merge.ts';
-import { BOUNDARIES_ATTRIBUTION, GOVERNMENT_COUNTS_ATTRIBUTION, LICENCES } from './licences.ts';
+import {
+  ALLTHEPLACES_ATTRIBUTION,
+  BOUNDARIES_ATTRIBUTION,
+  CDLA_PERMISSIVE_2_TEXT,
+  FOURSQUARE_ATTRIBUTION,
+  FOURSQUARE_NOTICE,
+  GOVERNMENT_COUNTS_ATTRIBUTION,
+  LICENCES,
+  OVERTURE_ATTRIBUTION_URL,
+  OVERTURE_CDLA_CONTRIBUTORS,
+  TGREDCO_DATASET_URL,
+} from './licences.ts';
+
+/** Licence texts that must travel with the data (CDLA 2.1, Apache 2.0 section 4 and the Foursquare NOTICE). */
+const LICENCE_FILES: Array<{ name: string; data: string }> = [
+  { name: 'LICENSE-CDLA-Permissive-2.0.txt', data: CDLA_PERMISSIVE_2_TEXT },
+  { name: 'LICENSE-Apache-2.0.txt', data: readFileSync(new URL('./licence-texts/Apache-2.0.txt', import.meta.url), 'utf8') },
+  { name: 'NOTICE-Foursquare.txt', data: `${FOURSQUARE_NOTICE}\n\nNotice of changes: ChargeOne selected EV charging places in India from Overture Maps Places, dropped some, and merged them with other sources.\n` },
+];
 import type { Adapter, AdapterResult, CanonicalStation, FieldValue, ReviewItem, Site, SourceKey } from './types.ts';
 
-const SOURCE_NAME: Record<SourceKey, SourceRef['name']> = { osm: 'OpenStreetMap', ocm: 'Open Charge Map' };
+const SOURCE_NAME: Record<SourceKey, SourceRef['name']> = { osm: 'OpenStreetMap', ocm: 'Open Charge Map', tgredco: 'Telangana Open Data (TGREDCO)', overture: 'Overture Maps Places' };
 
 function sourceRef(r: CanonicalStation['members'][number]): SourceRef {
   const id = r.sourceId.replace(/^osm-([nwr])/, (_, t: string) => `${{ n: 'node', w: 'way', r: 'relation' }[t]}/`).replace(/^ocm-/, '');
@@ -280,8 +299,26 @@ It also contains data from Open Charge Map contributors (Data Provider 1 only), 
 CC BY 4.0: https://creativecommons.org/licenses/by/4.0/ and https://openchargemap.org/site/about/terms
 Values from Open Charge Map keep that licence and attribution; every field lists its source and licence.
 
+Location-only listings (source "tgredco") come from Telangana Renewable Energy Development Corporation
+(TGREDCO), "EV charging stations - details of location & ownership" (data as of April 2024), Telangana
+Open Data Portal, under the Government Open Data License - India:
+${TGREDCO_DATASET_URL} and https://data.gov.in/government-open-data-license-india
+They keep that licence and attribution, are not endorsed by the provider, and must not be uploaded to
+OpenStreetMap. Owner names and names of people in that list are not included.
+
+Location-only listings (source "overture") come from Overture Maps Foundation Places
+(${OVERTURE_ATTRIBUTION_URL}), under the Community Data License Agreement - Permissive 2.0
+(full text in LICENSE-CDLA-Permissive-2.0.txt, https://cdla.dev/permissive-2-0/), with data from
+${OVERTURE_CDLA_CONTRIBUTORS.join(', ')}.
+${FOURSQUARE_ATTRIBUTION} The Foursquare NOTICE is in NOTICE-Foursquare.txt and the Apache License 2.0
+in LICENSE-Apache-2.0.txt. Changes: ChargeOne selected EV charging places in India, dropped some, and
+merged them with the other sources.
+${ALLTHEPLACES_ATTRIBUTION}
+Each such record names its upstream dataset ("origin") and licence. They must not be uploaded to
+OpenStreetMap.
+
 Records Open Charge Map marks as copied from Google Maps (Google Place IDs) are excluded.
-If you publish a produced work from this database, credit "© OpenStreetMap contributors, Open Charge Map contributors, ChargeOne".
+If you publish a produced work from this database, credit "© OpenStreetMap contributors, Open Charge Map contributors, TGREDCO via Telangana Open Data Portal (GODL-India), Overture Maps Foundation, ChargeOne".
 If you publicly use an adapted version of this database, you must offer it under the ODbL as well.
 `;
 
@@ -299,7 +336,7 @@ export function buildOutputs(input: BuildInput): Built {
 
   const datasetSources: DatasetSource[] = input.sources.map((r) => ({
     name: r.adapter.name.replace(/ \(.*\)$/, ''),
-    licence: r.adapter.licence.name.replace('Open Database License 1.0', 'ODbL 1.0').replace('Creative Commons Attribution 4.0 International', 'CC BY 4.0'),
+    licence: r.adapter.licence.name.replace('Open Database License 1.0', 'ODbL 1.0').replace('Creative Commons Attribution 4.0 International', 'CC BY 4.0').replace('Community Data License Agreement - Permissive 2.0', 'CDLA Permissive 2.0'),
     attribution: r.adapter.licence.attribution,
     url: r.adapter.licence.url,
     count: input.stations.filter((s) => s.members.some((m) => m.source === r.adapter.key)).length,
@@ -392,6 +429,7 @@ export function buildOutputs(input: BuildInput): Built {
   const whole = zip([
     { name: 'LICENSE.txt', data: ODBL_LICENSE },
     { name: 'chargeone-stations.geojson', data: JSON.stringify(geojson) },
+    ...LICENCE_FILES,
   ]);
   if (whole.length <= THRESHOLDS.assetBytes * 0.9) {
     files.set('chargeone-stations-odbl.zip', whole);
@@ -403,11 +441,15 @@ export function buildOutputs(input: BuildInput): Built {
     names.forEach((name, k) => {
       const part = { ...geojson, part: k + 1, parts, features: geojson.features.slice(k * per, (k + 1) * per), sites: k === 0 ? input.sites : [] };
       const readme = `Part ${k + 1} of ${parts}: ${names.join(', ')}. Sites are in part 1.\n`;
-      files.set(name, zip([{ name: 'LICENSE.txt', data: `${ODBL_LICENSE}\n${readme}` }, { name: `chargeone-stations-${k + 1}.geojson`, data: JSON.stringify(part) }]));
+      files.set(
+        name,
+        zip([{ name: 'LICENSE.txt', data: `${ODBL_LICENSE}\n${readme}` }, { name: `chargeone-stations-${k + 1}.geojson`, data: JSON.stringify(part) }, ...LICENCE_FILES]),
+      );
       odbl.push(name);
     });
   }
   files.set('LICENSE-data.txt', Buffer.from(ODBL_LICENSE));
+  for (const f of LICENCE_FILES) files.set(f.name, Buffer.from(f.data));
 
   const count = (f: (s: Station) => boolean) => appStations.filter(f).length;
   const sources: SourceSummary[] = input.sources.map((r) => {
@@ -454,7 +496,10 @@ export function buildOutputs(input: BuildInput): Built {
     legacyStations,
     odbl,
     thresholds: THRESHOLDS,
-    attribution: [LICENCES['ODbL-1.0'].attribution, LICENCES['CC-BY-4.0'].attribution, GOVERNMENT_COUNTS_ATTRIBUTION],
+    attribution: [
+      ...new Set([LICENCES['ODbL-1.0'].attribution, LICENCES['CC-BY-4.0'].attribution, ...input.sources.map((r) => r.adapter.licence.attribution)]),
+      GOVERNMENT_COUNTS_ATTRIBUTION,
+    ],
   };
   for (const [name, bytes] of [...files].sort(([a], [b]) => a.localeCompare(b))) manifest.files[name] = { bytes: bytes.length, sha256: sha(bytes) };
   files.set('manifest.json', Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`));

@@ -3,9 +3,14 @@
 // came from and how old it is. Unknown stays unknown: no attribute defaults to false or 0.
 import type { ConnectorType } from '../src/data/model.ts';
 
-export type SourceKey = 'osm' | 'ocm';
+export type SourceKey = 'osm' | 'ocm' | 'tgredco' | 'overture';
 
-export type LicenceId = 'ODbL-1.0' | 'CC-BY-4.0';
+/** Sources that only list where a charger is (a government list, a places dataset): weak evidence, never verified. */
+export const LISTED_SOURCES: ReadonlySet<SourceKey> = new Set<SourceKey>(['tgredco', 'overture']);
+/** Sources that are one state's own list: a record the state shapes put in another state is a typo'd point. */
+export const STATE_LIST_SOURCES: ReadonlySet<SourceKey> = new Set<SourceKey>(['tgredco']);
+
+export type LicenceId = 'ODbL-1.0' | 'CC-BY-4.0' | 'GODL-India' | 'CDLA-Permissive-2.0' | 'CC0-1.0' | 'Apache-2.0';
 
 export interface Licence {
   id: LicenceId;
@@ -70,6 +75,11 @@ export interface SourceRecord {
   url: string;
   editUrl?: string;
   licence: LicenceId;
+  /**
+   * The upstream dataset inside an aggregate source (an Overture record's `sources[].dataset`, e.g.
+   * "Foursquare"). Absent for single-origin sources. The licence gate checks it against the denylist.
+   */
+  origin?: string;
   /** Best date for "last seen": OSM check_date or edit time; OCM DateLastVerified. */
   observedAt: string | null;
   /** False when the date is only an edit or bulk-import date, not a survey or verification. */
@@ -119,7 +129,24 @@ export interface Rejection {
     | 'removed'
     | 'not-live'
     | 'google-derived'
-    | 'other-licence';
+    /** Tags or text naming PlugShare or a Google Maps link (e.g. OSM `operator=Plug Share`): possibly copied, kept out. */
+    | 'denylisted-text'
+    | 'other-licence'
+    /** Listed sources: points only two- or three-wheelers can use. */
+    | 'not-car'
+    | 'battery-swap'
+    | 'bus'
+    | 'metro'
+    /** A charger at someone's home, or one listed under a person's name. */
+    | 'private-individual'
+    /** Outside the state a state-government list covers (a typo in the coordinates). */
+    | 'outside-state'
+    /** The same charger listed again within LISTED_MERGE_METRES (one row per charge point). */
+    | 'duplicate-listing'
+    /** A places listing of a network that runs AC-only or light-EV chargers (Bolt.Earth), or named AC-only. */
+    | 'ac-only'
+    /** A places listing that names no known car charging network, so nothing says a car can charge there. */
+    | 'car-unknown';
   /** Quarantined records are kept out for legal reasons and must never ship, even as ids. */
   quarantine: boolean;
 }

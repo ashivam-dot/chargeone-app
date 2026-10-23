@@ -81,7 +81,7 @@ ${ld.map((d) => `<script type="application/ld+json">${jsonLd(d)}</script>`).join
 ${body}
 </main>
 <footer>
-<p>Charger, food and hotel data © OpenStreetMap contributors (ODbL) and Open Charge Map (CC BY 4.0). Live status comes from drivers' reports in the app.</p>
+<p>Charger, food and hotel data © OpenStreetMap contributors (ODbL) and Open Charge Map (CC BY 4.0). Contains data from TGREDCO via the Telangana Open Data Portal (Government Open Data License – India), not endorsed by the provider, and from Overture Maps Foundation Places (CDLA Permissive 2.0; contributors Meta, Microsoft, PinMeTo, Krick, RenderSEO, DAC, BrightQuery, Birdeye, Uberall, OpenTravel Alliance; Foursquare data Copyright 2024 Foursquare Labs, Inc., Apache 2.0; AllThePlaces CC0 1.0). Live status comes from drivers' reports in the app.</p>
 <p><a href="/ev-charging/">All cities</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · <a href="/contact.html">Contact</a></p>
 </footer>
 </body>

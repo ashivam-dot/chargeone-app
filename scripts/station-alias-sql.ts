@@ -18,6 +18,7 @@ import type { AliasBucket } from '../src/data/lookup.ts';
 const ROOT = new URL('../', import.meta.url);
 const CHUNK = 200;
 const ID = /^(c1_[a-z2-7]{12}|osm-[nwr]\d{1,15}|ocm-\d{1,10})$/;
+const LIST_RECORD_ID = /^(tg|ovt)-[\w-]{1,64}$/;
 
 interface AliasFile {
   version: string;
@@ -40,7 +41,11 @@ export function readAliasBuckets(dir: URL): AliasFile {
 }
 
 export function aliasSql(file: AliasFile, withTable: boolean): string {
-  const pairs = Object.entries(file.aliases).sort(([a], [b]) => a.localeCompare(b));
+  // Record ids of the location lists (`tg-…` Telangana, `ovt-…` Overture) never reach check-ins or links:
+  // stations only they know use their c1 id. They resolve in the alias buckets but have no place in D1.
+  const pairs = Object.entries(file.aliases)
+    .filter(([from]) => !LIST_RECORD_ID.test(from))
+    .sort(([a], [b]) => a.localeCompare(b));
   for (const [from, to] of pairs) {
     if (!ID.test(from) || !ID.test(to)) throw new Error(`Bad id in the alias files: ${from} -> ${to}`);
   }

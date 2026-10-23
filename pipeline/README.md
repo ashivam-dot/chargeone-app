@@ -1,7 +1,8 @@
 # ChargeOne data pipeline
 
-Builds `public/data/` from legal open sources only: OpenStreetMap (ODbL 1.0) and Open Charge Map
-(CC BY 4.0). No operator apps or sites, no Google Places and no PlugShare. Spec:
+Builds `public/data/` from legal open sources only: OpenStreetMap (ODbL 1.0), Open Charge Map
+(CC BY 4.0), the Telangana TGREDCO list (GODL-India) and Overture Maps Places (CDLA-Permissive-2.0, with Foursquare
+Apache-2.0 and AllThePlaces CC0 records); the last two are location-only. No operator apps or sites, no Google Places and no PlugShare. Spec:
 `research/product-strategy-2026-10-23.md` sections 4.4, 4.5, 5.2 and 5.3.
 
 ```
@@ -36,6 +37,36 @@ Environment: `PIPELINE_CACHE_DIR` (default `data-cache/`, gitignored, never comm
      marks it `partly_operational`. A title naming another network (`ChargeZone - Forum Mall` under
      Statiq) flags `operator-conflict` and carries `titleOperator` into resolution. `DateLastVerified == DateCreated` counts as an unverified bulk import.
      Duplicate ids are removed.
+   - `tgredco`: TGREDCO's "EV charging stations - details of location & ownership" CSV (April 2024)
+     from the Telangana Open Data Portal, GODL-India (`data-cache/tgredco/`; `--refresh=tgredco` reads
+     the DKAN metastore, checks the licence and adds a new file). Coordinates are repaired (DMS,
+     degrees + decimal minutes, `D.MMSS.s`, stray commas/quotes, swapped pairs) and kept only inside
+     the Telangana box. Rows go for 2W/3W (Ather, ETO…), battery swap, bus depots, metro and
+     domestic/individual owners. One operator's rows within 100 m are one station (the list has a row
+     per charge point). Owners are used only to recognise a known operator; a station name that looks
+     like a person's is published as no name. Records carry no plugs, `status: unknown`,
+     `verified: false` and the flags `govt-listed` and `location-only`. The data is never uploaded to
+     OpenStreetMap.
+   - `overture`: Overture Maps Places, category `ev_charging_station`, India, from the free public release
+     on anonymous S3. `uv run --with duckdb python -I pipeline/overture-extract.py` writes
+     `data-cache/overture/places-ev-<release>.json`; the adapter only reads the newest one. Each record keeps
+     the licence and dataset (`origin`) of its primary source (Microsoft, Uberall, ... CDLA-Permissive-2.0;
+     Foursquare Apache-2.0; AllThePlaces CC0-1.0); a source outside Overture's Places list or an unknown
+     licence refuses the record. Car-capable only: the network (website host, then brand, then name) must be
+     a known one; Bolt.Earth and anything named AC-only go as `ac-only`, Ather/2W/3W as `not-car`, battery
+     swap, closed places, and unknown networks (`car-unknown`). Location-only like TGREDCO. Attribution:
+     CDLA text (`LICENSE-CDLA-Permissive-2.0.txt`), every Places contributor, the Foursquare line and full
+     NOTICE (`NOTICE-Foursquare.txt`, with `LICENSE-Apache-2.0.txt`) and the AllThePlaces CC0 note ship in
+     `LICENSE-data.txt`, the ODbL zip, the manifest, About, the map credits, the SEO pages and the terms.
+   - **Location-only sources** (`LISTED_SOURCES`): evidence `[0.45, 0.2]` capped at `LISTED_MAX` 0.5,
+     so they always show as unverified and the planner never stops at them. They add nothing to a
+     station that OSM or OCM also describe. A location-only cluster within 100 m of an OSM/OCM record
+     (no operator clash, no vehicle conflict) is dropped as a duplicate before ids are issued
+     (`listedDuplicates` in `resolve.ts`); a station from listings alone uses its `c1_` id as the app id.
+     Resolution merges OSM/OCM pairs before any pair with a listing, so a listing never changes how the
+     mapped records cluster.
+   - OSM rule: a node whose tags name PlugShare or carry a Google Maps link (two nodes tagged
+     `operator=Plug Share` in Oct 2026) is quarantined as `denylisted-text`, like OCM's Google records.
 2. **Canonical model** (`types.ts`, OCPI-aligned): Site > Station > EVSE > Connector. It carries
    vehicle flags (car / 2W / 3W / bus, each true, false or null) and battery swap. Rules for
    vehicle class (`lib/vehicle.ts`):
@@ -83,10 +114,16 @@ Environment: `PIPELINE_CACHE_DIR` (default `data-cache/`, gitignored, never comm
    - any shard is over 1 MB;
    - fewer than 25% of DC stations reach the planner's 0.6 line (`minPlannableDcShare`);
    - an operational station lists no connectors;
+   - a location-only station reaches the planner's 0.6 line;
    - an alias is also a live station id (`aliasCollisions`; such aliases are also left out of the
      alias files);
    - any file is over 24 MiB (`assetBytes`, the Workers static-asset limit) or `public/data/` holds
-     more than 3,000 files (`maxDataFiles`).
+     more than 3,000 files (`maxDataFiles`);
+   - **provenance** (`provenanceFailures`): any adapter, source record or field claim has no licence, a
+     licence outside `ALLOWED_LICENCES` (ODbL-1.0, CC-BY-4.0, GODL-India, CDLA-Permissive-2.0, CC0-1.0,
+     Apache-2.0), or a licence that doesn't fit its source (`SOURCE_LICENCES`); a claim points at a
+     record the station doesn't hold; an aggregate record's upstream `origin` is empty or denied; or any
+     published text or URL matches the Google Maps / PlugShare denylist (`lib/denylist.ts`).
 
 ## Outputs (`public/data/`)
 

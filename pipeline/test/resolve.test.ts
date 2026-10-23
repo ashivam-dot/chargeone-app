@@ -118,3 +118,17 @@ describe('entity resolution', () => {
     expect(s.hours.value).toBeNull();
   });
 });
+
+describe('location-only listings', () => {
+  it('never change how mapped records cluster', () => {
+    // A places listing next to one OSM record scored higher than that record's OCM twin 145 m away, merged
+    // first, and its 155 m span then blocked the OSM/OCM merge (ocm-308970 split from ocm-308971, Oct 2026).
+    const a = record({ source: 'osm', operator: 'Statiq', name: 'Statiq Hotel Aroma', connectors: [ccs2(60)] });
+    const b = record({ source: 'ocm', operator: 'Statiq', name: 'Statiq Hotel Aroma', lat: a.lat + metresNorth(145), connectors: [ccs2(60)] });
+    const listing = record({ source: 'overture', sourceId: 'ovt-1', licence: 'CDLA-Permissive-2.0', operator: 'Statiq', name: 'Statiq Hotel Aroma', lat: a.lat - metresNorth(10), verified: false });
+    expect(scorePair(a, listing).score).toBeGreaterThan(scorePair(a, b).score);
+    const clusters = resolve([a, b, listing]).clusters.map((c) => [...c].sort());
+    expect(clusters).toContainEqual([0, 1]);
+    expect(clusters).toContainEqual([2]);
+  });
+});

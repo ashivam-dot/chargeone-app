@@ -13,13 +13,21 @@
 // planning line: a specific listing verified within a year, or bulk-imported within about 90 days, is
 // plannable; older single-source listings are not; OSM and OCM agreeing usually are.
 import { THRESHOLDS } from './config.ts';
-import type { Claim, SourceRecord } from './types.ts';
+import { LISTED_SOURCES, type Claim, type SourceRecord } from './types.ts';
 
 /** [base, floor] by kind of observation. */
 const VERIFIED: [number, number] = [0.8, 0.3];
 const UNVERIFIED_OSM: [number, number] = [0.65, 0.35];
 const BULK: [number, number] = [0.5, 0.25];
 const FLOOR = BULK[1];
+/**
+ * A location-only listing (LISTED_SOURCES: a government list, a places dataset) says a charger was
+ * there once, nothing about its plugs or whether it works. It never reaches the planner on its own
+ * (LISTED_MAX stays under PLAN_MIN_CONFIDENCE 0.6), and it adds nothing to a station OSM or OCM
+ * describes: those sources already say more, and the listing may well be copied from them.
+ */
+const LISTED: [number, number] = [0.45, 0.2];
+export const LISTED_MAX = 0.5;
 /** A specific listing: mapped operator, typed connector with kW, stated operational (or mapped on OSM). */
 export const SPECIFICITY = 0.35;
 const DAY = 86_400_000;
@@ -62,6 +70,10 @@ export function isSpecific(r: EvidenceInput): boolean {
 
 /** How much one record on its own says the charger exists (0-1). */
 export function recordEvidence(r: EvidenceInput, now: Date): number {
+  if (LISTED_SOURCES.has(r.source)) {
+    const listed = decay(LISTED[0], ageDays(r.observedAt, referenceDate(r.snapshotAt, now)), LISTED[1]);
+    return Math.min(LISTED_MAX, listed) * STATUS_FACTOR[r.status];
+  }
   const [base, floor] = r.verified ? VERIFIED : r.source === 'osm' ? UNVERIFIED_OSM : BULK;
   const aged = decay(base, ageDays(r.observedAt, referenceDate(r.snapshotAt, now)), floor);
   const evidence = isSpecific(r) ? noisyOr([aged, SPECIFICITY]) : aged;
@@ -79,9 +91,11 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * (one OCM bulk import duplicated twice proves little), so each source counts once, by its best record.
  */
 export function existenceConfidence(members: SourceRecord[], now: Date): number {
+  const mapped = members.filter((r) => !LISTED_SOURCES.has(r.source));
   const best = new Map<string, number>();
-  for (const r of members) best.set(r.source, Math.max(best.get(r.source) ?? 0, recordEvidence(r, now)));
-  return round2(Math.min(0.99, noisyOr([...best.values()])));
+  for (const r of mapped.length ? mapped : members) best.set(r.source, Math.max(best.get(r.source) ?? 0, recordEvidence(r, now)));
+  const cap = mapped.length ? 0.99 : LISTED_MAX;
+  return round2(Math.min(cap, noisyOr([...best.values()])));
 }
 
 /**

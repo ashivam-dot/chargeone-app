@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-23T00:00:00.000Z",
+  "generatedAt": "2026-10-23T14:10:00.763Z",
   "denominator": {
     "title": "State / UT wise installed EV charging stations (EVCS) as on 29.07.2026",
     "asOf": "2026-07-29",
@@ -10,8 +10,8 @@
     "note": "Government counts are \"at least\" figures of installed stations of every kind (cars, 2W, 3W, buses, captive). They are a ceiling for what open data can show, not a target."
   },
   "national": {
-    "stations": 2000,
-    "dc": 1381,
+    "stations": 2560,
+    "dc": 1383,
     "government": [
       {
         "label": "Installed EV charging stations, pan India",
@@ -28,128 +28,138 @@
         "url": "https://www.hindustantimes.com/car-bike/india-has-over-52-700-public-ev-charging-stations-including-16-561-fast-chargers-for-cars-govt-101784783674297.html"
       }
     ],
-    "wording": "ChargeOne lists 2000 of at least 52718 installed charging stations in India (government count as of 2026-07-29)."
+    "wording": "ChargeOne lists 2560 of at least 52718 installed charging stations in India (government count as of 2026-07-29)."
   },
   "states": [
     {
       "state": "Kerala",
-      "stations": 668,
+      "stations": 669,
       "dc": 563,
       "withKw": 583,
-      "withKwShare": 0.873,
+      "withKwShare": 0.871,
       "government": 3399,
       "share": 0.197,
-      "wording": "ChargeOne lists 668 of at least 3399 installed charging stations (government count as of 2026-07-29)."
+      "wording": "ChargeOne lists 669 of at least 3399 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Karnataka",
-      "stations": 429,
+      "stations": 447,
       "dc": 342,
       "withKw": 375,
-      "withKwShare": 0.874,
+      "withKwShare": 0.839,
       "government": 6805,
-      "share": 0.063,
-      "wording": "ChargeOne lists 429 of at least 6805 installed charging stations (government count as of 2026-07-29)."
+      "share": 0.066,
+      "wording": "ChargeOne lists 447 of at least 6805 installed charging stations (government count as of 2026-07-29)."
+    },
+    {
+      "state": "Telangana",
+      "stations": 420,
+      "dc": 8,
+      "withKw": 10,
+      "withKwShare": 0.024,
+      "government": 3739,
+      "share": 0.112,
+      "wording": "ChargeOne lists 420 of at least 3739 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Tamil Nadu",
-      "stations": 273,
+      "stations": 287,
       "dc": 204,
       "withKw": 229,
-      "withKwShare": 0.839,
+      "withKwShare": 0.798,
       "government": 3839,
-      "share": 0.071,
-      "wording": "ChargeOne lists 273 of at least 3839 installed charging stations (government count as of 2026-07-29)."
-    },
-    {
-      "state": "Delhi",
-      "stations": 172,
-      "dc": 17,
-      "withKw": 30,
-      "withKwShare": 0.174,
-      "government": 2370,
-      "share": 0.073,
-      "wording": "ChargeOne lists 172 of at least 2370 installed charging stations (government count as of 2026-07-29)."
+      "share": 0.075,
+      "wording": "ChargeOne lists 287 of at least 3839 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Maharashtra",
-      "stations": 139,
+      "stations": 190,
       "dc": 75,
       "withKw": 70,
-      "withKwShare": 0.504,
+      "withKwShare": 0.368,
       "government": 6985,
-      "share": 0.02,
-      "wording": "ChargeOne lists 139 of at least 6985 installed charging stations (government count as of 2026-07-29)."
+      "share": 0.027,
+      "wording": "ChargeOne lists 190 of at least 6985 installed charging stations (government count as of 2026-07-29)."
+    },
+    {
+      "state": "Delhi",
+      "stations": 179,
+      "dc": 17,
+      "withKw": 30,
+      "withKwShare": 0.168,
+      "government": 2370,
+      "share": 0.076,
+      "wording": "ChargeOne lists 179 of at least 2370 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Uttar Pradesh",
-      "stations": 53,
+      "stations": 60,
       "dc": 26,
       "withKw": 29,
-      "withKwShare": 0.547,
+      "withKwShare": 0.483,
       "government": 4493,
-      "share": 0.012,
-      "wording": "ChargeOne lists 53 of at least 4493 installed charging stations (government count as of 2026-07-29)."
-    },
-    {
-      "state": "Rajasthan",
-      "stations": 50,
-      "dc": 45,
-      "withKw": 46,
-      "withKwShare": 0.92,
-      "government": 2827,
-      "share": 0.018,
-      "wording": "ChargeOne lists 50 of at least 2827 installed charging stations (government count as of 2026-07-29)."
-    },
-    {
-      "state": "Haryana",
-      "stations": 38,
-      "dc": 27,
-      "withKw": 28,
-      "withKwShare": 0.737,
-      "government": 2291,
-      "share": 0.017,
-      "wording": "ChargeOne lists 38 of at least 2291 installed charging stations (government count as of 2026-07-29)."
+      "share": 0.013,
+      "wording": "ChargeOne lists 60 of at least 4493 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Gujarat",
-      "stations": 36,
+      "stations": 58,
       "dc": 28,
       "withKw": 29,
-      "withKwShare": 0.806,
+      "withKwShare": 0.5,
       "government": 2789,
-      "share": 0.013,
-      "wording": "ChargeOne lists 36 of at least 2789 installed charging stations (government count as of 2026-07-29)."
+      "share": 0.021,
+      "wording": "ChargeOne lists 58 of at least 2789 installed charging stations (government count as of 2026-07-29)."
+    },
+    {
+      "state": "Rajasthan",
+      "stations": 57,
+      "dc": 45,
+      "withKw": 46,
+      "withKwShare": 0.807,
+      "government": 2827,
+      "share": 0.02,
+      "wording": "ChargeOne lists 57 of at least 2827 installed charging stations (government count as of 2026-07-29)."
+    },
+    {
+      "state": "Haryana",
+      "stations": 54,
+      "dc": 27,
+      "withKw": 28,
+      "withKwShare": 0.519,
+      "government": 2291,
+      "share": 0.024,
+      "wording": "ChargeOne lists 54 of at least 2291 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Andhra Pradesh",
-      "stations": 33,
+      "stations": 35,
       "dc": 4,
       "withKw": 4,
-      "withKwShare": 0.121,
+      "withKwShare": 0.114,
       "government": 1976,
-      "share": 0.017,
-      "wording": "ChargeOne lists 33 of at least 1976 installed charging stations (government count as of 2026-07-29)."
+      "share": 0.018,
+      "wording": "ChargeOne lists 35 of at least 1976 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "West Bengal",
-      "stations": 32,
+      "stations": 33,
       "dc": 6,
       "withKw": 6,
-      "withKwShare": 0.188,
+      "withKwShare": 0.182,
       "government": 1766,
-      "share": 0.018,
-      "wording": "ChargeOne lists 32 of at least 1766 installed charging stations (government count as of 2026-07-29)."
+      "share": 0.019,
+      "wording": "ChargeOne lists 33 of at least 1766 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Madhya Pradesh",
-      "stations": 17,
+      "stations": 19,
       "dc": 11,
       "withKw": 12,
-      "withKwShare": 0.706,
+      "withKwShare": 0.632,
       "government": 1959,
-      "share": 0.009,
-      "wording": "ChargeOne lists 17 of at least 1959 installed charging stations (government count as of 2026-07-29)."
+      "share": 0.01,
+      "wording": "ChargeOne lists 19 of at least 1959 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Uttarakhand",
@@ -162,16 +172,6 @@
       "wording": "ChargeOne lists 15 of at least 410 installed charging stations (government count as of 2026-07-29)."
     },
     {
-      "state": "Telangana",
-      "stations": 14,
-      "dc": 6,
-      "withKw": 8,
-      "withKwShare": 0.571,
-      "government": 3739,
-      "share": 0.004,
-      "wording": "ChargeOne lists 14 of at least 3739 installed charging stations (government count as of 2026-07-29)."
-    },
-    {
       "state": "Goa",
       "stations": 10,
       "dc": 6,
@@ -182,24 +182,34 @@
       "wording": "ChargeOne lists 10 of at least 314 installed charging stations (government count as of 2026-07-29)."
     },
     {
-      "state": "Jharkhand",
-      "stations": 5,
+      "state": "Punjab",
+      "stations": 8,
       "dc": 2,
       "withKw": 2,
-      "withKwShare": 0.4,
-      "government": 525,
-      "share": 0.01,
-      "wording": "ChargeOne lists 5 of at least 525 installed charging stations (government count as of 2026-07-29)."
+      "withKwShare": 0.25,
+      "government": 1548,
+      "share": 0.005,
+      "wording": "ChargeOne lists 8 of at least 1548 installed charging stations (government count as of 2026-07-29)."
     },
     {
-      "state": "Punjab",
+      "state": "Jharkhand",
       "stations": 3,
       "dc": 2,
       "withKw": 2,
       "withKwShare": 0.667,
-      "government": 1548,
-      "share": 0.002,
-      "wording": "ChargeOne lists 3 of at least 1548 installed charging stations (government count as of 2026-07-29)."
+      "government": 525,
+      "share": 0.006,
+      "wording": "ChargeOne lists 3 of at least 525 installed charging stations (government count as of 2026-07-29)."
+    },
+    {
+      "state": "Odisha",
+      "stations": 3,
+      "dc": 0,
+      "withKw": 2,
+      "withKwShare": 0.667,
+      "government": 1055,
+      "share": 0.003,
+      "wording": "ChargeOne lists 3 of at least 1055 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Assam",
@@ -222,14 +232,24 @@
       "wording": "ChargeOne lists 2 of at least 1044 installed charging stations (government count as of 2026-07-29)."
     },
     {
-      "state": "Odisha",
+      "state": "Chandigarh",
       "stations": 2,
-      "dc": 0,
-      "withKw": 2,
-      "withKwShare": 1,
-      "government": 1055,
-      "share": 0.002,
-      "wording": "ChargeOne lists 2 of at least 1055 installed charging stations (government count as of 2026-07-29)."
+      "dc": 1,
+      "withKw": 1,
+      "withKwShare": 0.5,
+      "government": 76,
+      "share": 0.026,
+      "wording": "ChargeOne lists 2 of at least 76 installed charging stations (government count as of 2026-07-29)."
+    },
+    {
+      "state": "Himachal Pradesh",
+      "stations": 2,
+      "dc": 1,
+      "withKw": 1,
+      "withKwShare": 0.5,
+      "government": 256,
+      "share": 0.008,
+      "wording": "ChargeOne lists 2 of at least 256 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Puducherry",
@@ -250,26 +270,6 @@
       "government": 9,
       "share": 0.111,
       "wording": "ChargeOne lists 1 of at least 9 installed charging stations (government count as of 2026-07-29)."
-    },
-    {
-      "state": "Chandigarh",
-      "stations": 1,
-      "dc": 1,
-      "withKw": 1,
-      "withKwShare": 1,
-      "government": 76,
-      "share": 0.013,
-      "wording": "ChargeOne lists 1 of at least 76 installed charging stations (government count as of 2026-07-29)."
-    },
-    {
-      "state": "Himachal Pradesh",
-      "stations": 1,
-      "dc": 1,
-      "withKw": 1,
-      "withKwShare": 1,
-      "government": 256,
-      "share": 0.004,
-      "wording": "ChargeOne lists 1 of at least 256 installed charging stations (government count as of 2026-07-29)."
     },
     {
       "state": "Jammu and Kashmir",

@@ -25,12 +25,14 @@ import { geohashBounds, type Bounds } from '../src/shared/geohash.ts';
 import { overpass, OVERPASS_PAUSE_MS, sleep } from './overpass.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+/** The same cache directory as the data pipeline (PIPELINE_CACHE_DIR, default data-cache/). */
+const CACHE_DIR = process.env.PIPELINE_CACHE_DIR || join(ROOT, 'data-cache');
 /** The first import (2026-10-20): places around OSM charging stations, plus every city and town node. */
-const LEGACY_CACHE = join(ROOT, 'data-cache', 'osm-places.json');
+const LEGACY_CACHE = join(CACHE_DIR, 'osm-places.json');
 /** Places around each charger point, filled a batch of cells at a time. */
-const AROUND_CACHE = join(ROOT, 'data-cache', 'osm-places-around.json');
+const AROUND_CACHE = join(CACHE_DIR, 'osm-places-around.json');
 /** Places around each charger point, read from a local extract by --from-pbf. Same shape as AROUND_CACHE. */
-const PBF_CACHE = join(ROOT, 'data-cache', 'osm-places-pbf.json');
+const PBF_CACHE = join(CACHE_DIR, 'osm-places-pbf.json');
 const STATIONS_FILE = join(ROOT, 'public', 'data', 'stations.json');
 const OUT_FILE = join(ROOT, 'public', 'data', 'places.json');
 /** Geohash precision for grouping chargers: 5 is about 4.9 x 4.9 km. */

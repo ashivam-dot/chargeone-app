@@ -9,14 +9,19 @@ import { unnamedStation } from '../src/data/normalize.ts';
 import { connectorsOf, maxKwOf, maxOrNull, mergeSourceConnectors, sourceConnectors, speedOf } from './lib/connectors.ts';
 import { mergeVehicleFlags, vehicleClass } from './lib/vehicle.ts';
 import { existenceConfidence, fieldConfidence, recordEvidence } from './confidence.ts';
-import type { Access, CanonicalConnector, CanonicalStation, Claim, FieldValue, SourceRecord, Tri } from './types.ts';
+import { LISTED_SOURCES, type Access, type CanonicalConnector, type CanonicalStation, type Claim, type FieldValue, type SourceKey, type SourceRecord, type Tri } from './types.ts';
 
-/** Attribute priority: verified first, then OCM over OSM, then newest, then id for a stable order. */
+/** Attribute order of sources: OCM carries power and status; location-only lists come last. */
+const ATTRIBUTE_RANK: Record<SourceKey, number> = { ocm: 0, osm: 1, tgredco: 2, overture: 3 };
+/** Position order: mappers place OSM pins on the charger; OCM and the lists often geocode an address. */
+const POSITION_RANK: Record<SourceKey, number> = { osm: 0, ocm: 1, tgredco: 2, overture: 3 };
+
+/** Attribute priority: verified first, then by source (OCM, OSM, the lists), then newest, then id for a stable order. */
 export function rankRecords(members: SourceRecord[]): SourceRecord[] {
   return [...members].sort(
     (a, b) =>
       Number(b.verified) - Number(a.verified) ||
-      (a.source === 'ocm' ? 0 : 1) - (b.source === 'ocm' ? 0 : 1) ||
+      ATTRIBUTE_RANK[a.source] - ATTRIBUTE_RANK[b.source] ||
       (b.observedAt ?? '').localeCompare(a.observedAt ?? '') ||
       a.sourceId.localeCompare(b.sourceId),
   );
@@ -26,7 +31,7 @@ export function rankRecords(members: SourceRecord[]): SourceRecord[] {
 export function positionRecord(members: SourceRecord[]): SourceRecord {
   return [...members].sort(
     (a, b) =>
-      (a.source === 'osm' ? 0 : 1) - (b.source === 'osm' ? 0 : 1) ||
+      POSITION_RANK[a.source] - POSITION_RANK[b.source] ||
       Number(b.verified) - Number(a.verified) ||
       (b.observedAt ?? '').localeCompare(a.observedAt ?? '') ||
       a.sourceId.localeCompare(b.sourceId),
@@ -113,7 +118,9 @@ export function mergeCluster(members: SourceRecord[], now: Date): Omit<Canonical
   const status = ranked.find((r) => r.status !== 'unknown')?.status ?? 'unknown';
   const vehicles = mergeVehicleFlags(members.map((r) => r.vehicles));
   const sources = new Set(members.map((r) => r.source));
-  const flags = [...new Set(members.flatMap((r) => r.flags))].sort();
+  // "location-only" describes a station only the lists know; OSM or OCM in the cluster say more.
+  const mapped = members.some((r) => !LISTED_SOURCES.has(r.source));
+  const flags = [...new Set(members.flatMap((r) => r.flags))].filter((f) => !(mapped && f === 'location-only')).sort();
   if (sources.size > 1) flags.push('multi-source');
 
   return {
