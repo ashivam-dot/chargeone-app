@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 
 interface Props {
   title: string;
@@ -15,7 +15,9 @@ export function Sheet({ title, onClose, children, modal = false }: Props) {
   close.current = onClose;
   const [collapsed, setCollapsed] = useState(false);
 
-  useEffect(() => {
+  // A layout effect runs as the sheet is committed, before the first paint: Escape and focus work from
+  // the moment the sheet can be seen. useEffect ran after paint, so an early Escape could go unheard.
+  useLayoutEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     ref.current?.focus();
     const onKey = (e: KeyboardEvent) => {
