@@ -66,88 +66,124 @@ function projector(s: number, y: number, r: number, hw: number, h: number): Face
   ];
 }
 
-/** Nexon EV (2023 facelift): thin full-width DRL bar on the bonnet edge, closed body-colour panel, split
- * headlamps in black bumper-corner pods, wide lower dam with silver strakes, silver skid. */
+/** Nexon EV (2023 facelift). Front: a thin full-width DRL bar on the bonnet lip whose ends turn down round
+ * the corners; tall, inverted-triangle headlamp clusters low in the bumper corners, each split from the
+ * lower bumper by a black blade; a closed body-colour face between them; a wide, angular black lower
+ * bumper with a field of small arrowheads; a broad silver skid plate. */
 function nexonFront(n: number): FaceItem[] {
+  const hw = 0.901;
+  const h = 1.625;
   return [
-    { kind: 'gloss', rect: [-0.9, 0.9, n - 0.03, n - 0.004] },
-    { kind: 'drl', pts: [[0, n - 0.016], [0.9, n - 0.016], [0.99, n - 0.03]], w: 8, mirror: true },
-    { kind: 'gloss', poly: [[0.6, n - 0.27], [0.97, n - 0.2], [0.99, n - 0.07], [0.9, n - 0.06], [0.64, n - 0.15]], mirror: true },
-    { kind: 'drl', pts: [[0.97, n - 0.04], [0.93, n - 0.1], [0.72, n - 0.2]], w: 7, mirror: true },
-    ...projector(0.8, n - 0.185, 0.036, 0.901, 1.625),
-    ...projector(0.9, n - 0.145, 0.032, 0.901, 1.625),
-    { kind: 'intake', poly: [[-0.7, 0.155], [0.7, 0.155], [0.8, 0.3], [0.6, 0.33], [-0.6, 0.33], [-0.8, 0.3]] },
-    { kind: 'satin', pattern: 'slats-h', rect: [-0.62, 0.62, 0.19, 0.31], pitch: 30, fill: 0.25, lift: 1 },
-    { kind: 'satin', poly: [[-0.42, 0.12], [0.42, 0.12], [0.46, 0.15], [-0.46, 0.15]], lift: 1 },
+    { kind: 'gloss', rect: [-0.9, 0.9, n - 0.03, n - 0.006] },
+    { kind: 'drl', pts: [[0, n - 0.017], [0.86, n - 0.017], [0.96, n - 0.03], [1.04, n - 0.08]], w: 8, mirror: true },
+    // Headlamp cluster: a tall shield pointing down and in, with two projectors stacked on a diagonal and
+    // an LED light guide down its outer edge.
+    { kind: 'housing', poly: [[0.6, n - 0.085], [0.95, n - 0.065], [1.04, n - 0.11], [0.99, n - 0.2], [0.86, n - 0.315], [0.76, n - 0.3]], mirror: true },
+    ...projector(0.81, n - 0.135, 0.042, hw, h),
+    ...projector(0.885, n - 0.225, 0.038, hw, h),
+    { kind: 'drl', pts: [[1.0, n - 0.1], [0.96, n - 0.19], [0.88, n - 0.29]], w: 6, mirror: true },
+    // The black blade that splits the cluster from the lower bumper corner.
+    { kind: 'trim', poly: [[0.8, n - 0.3], [0.88, n - 0.315], [1.02, n - 0.2], [1.06, n - 0.2], [1.02, 0.235], [0.88, 0.235]], mirror: true },
+    // Lower bumper: wide at the bottom, tapering up towards the centre, with an arrowhead field.
+    { kind: 'trim', poly: [[-0.6, 0.33], [0.6, 0.33], [0.82, 0.29], [0.95, 0.2], [-0.95, 0.2], [-0.82, 0.29]] },
+    { kind: 'satin', pattern: 'triangles', rect: [-0.56, 0.56, 0.235, 0.31], pitch: 30, fill: 0.55, lift: 1 },
+    // Silver skid plate with angled ends.
+    { kind: 'satin', poly: [[-0.56, 0.2], [0.56, 0.2], [0.66, 0.235], [-0.66, 0.235]], lift: 2 },
   ];
 }
-/** Connected thin red bar ending in angled X blades, black lower bumper, silver skid. */
+/** Connected red bar under the rear glass; at each corner it fans into three angled blades that wrap onto
+ * the quarter; black band under the lamps; black lower bumper with corner reflectors; silver skid. */
 function nexonRear(t: number): FaceItem[] {
-  const top = t - 0.035;
+  const top = t - 0.03;
   return [
-    { kind: 'housing', rect: [-1.04, 1.04, top - 0.075, top] },
-    { kind: 'tail', pts: [[0, top - 0.035], [1.04, top - 0.035]], w: 7, mirror: true },
-    { kind: 'tail', pts: [[0.64, top - 0.07], [0.84, top - 0.012], [1.04, top - 0.012]], w: 9, mirror: true },
-    { kind: 'tail', pts: [[0.64, top], [0.84, top - 0.06], [1.04, top - 0.062]], w: 9, mirror: true },
-    { kind: 'gloss', rect: [-1.0, 1.0, 0.14, 0.27] },
-    { kind: 'satin', rect: [-0.45, 0.45, 0.15, 0.17], lift: 1 },
-    { kind: 'tail', rect: [0.8, 0.94, 0.225, 0.24], mirror: true },
+    { kind: 'housing', rect: [-0.72, 0.72, top - 0.03, top] },
+    { kind: 'tail', pts: [[0, top - 0.013], [0.74, top - 0.013]], w: 6, mirror: true },
+    { kind: 'housing', poly: [[0.7, top - 0.03], [0.72, top], [1.13, top - 0.005], [1.13, top - 0.065], [0.93, top - 0.08]], mirror: true },
+    { kind: 'lens', poly: [[0.74, top - 0.026], [0.76, top - 0.006], [1.11, top - 0.011], [1.11, top - 0.058], [0.94, top - 0.07]], mirror: true, lift: 2 },
+    { kind: 'tail', pts: [[0.72, top - 0.013], [1.11, top - 0.016]], w: 7, mirror: true },
+    { kind: 'tail', pts: [[0.86, top - 0.04], [1.11, top - 0.036]], w: 6, mirror: true },
+    { kind: 'tail', pts: [[0.96, top - 0.062], [1.11, top - 0.052]], w: 5, mirror: true },
+    // Black band under the lamps across the tailgate.
+    { kind: 'gloss', rect: [-0.66, 0.66, top - 0.06, top - 0.045] },
+    { kind: 'gloss', poly: [[-1.0, 0.31], [1.0, 0.31], [1.02, 0.192], [-1.02, 0.192]] },
+    { kind: 'trim', poly: [[0.78, 0.3], [0.98, 0.33], [1.0, 0.2], [0.86, 0.2]], mirror: true, lift: 1 },
+    { kind: 'tail', rect: [0.88, 0.94, 0.215, 0.29], mirror: true, lift: 1 },
+    { kind: 'satin', poly: [[-0.62, 0.198], [0.62, 0.198], [0.56, 0.232], [-0.56, 0.232]], lift: 2 },
   ];
 }
-/** Punch EV (2026 facelift): piano-black strip across the nose with small corner DRLs, vertical headlamp
- * pods low in the bumper, closed black upper panel, trapezoid lower intake, faux silver skid. */
+/** Punch EV. Front: a thin LED line along the bonnet lip over a piano-black strip, a smooth closed upper
+ * face, vertically stacked headlamps in tapering corner pods, a black band
+ * between the pods, a black lower bumper with vertical slats and a silver skid plate. */
 function punchFront(n: number): FaceItem[] {
+  const hw = 0.871;
+  const h = 1.622;
   return [
-    { kind: 'gloss', rect: [-0.92, 0.92, n - 0.075, n - 0.008] },
-    { kind: 'drl', pts: [[0.7, n - 0.025], [0.95, n - 0.025], [1.0, n - 0.05]], w: 11, mirror: true },
-    { kind: 'gloss', rect: [-0.55, 0.55, n - 0.17, n - 0.09] },
-    { kind: 'housing', poly: [[0.66, n - 0.33], [0.9, n - 0.31], [0.93, n - 0.12], [0.7, n - 0.12]], mirror: true },
-    ...projector(0.795, n - 0.17, 0.038, 0.871, 1.622),
-    ...projector(0.795, n - 0.26, 0.038, 0.871, 1.622),
-    { kind: 'drl', pts: [[0.9, n - 0.14], [0.9, n - 0.3]], w: 5, mirror: true },
-    { kind: 'intake', poly: [[-0.42, 0.16], [0.42, 0.16], [0.55, 0.29], [-0.55, 0.29]] },
-    { kind: 'trim', pattern: 'slats-h', rect: [-0.4, 0.4, 0.18, 0.27], pitch: 24, fill: 0.4, lift: 1 },
-    { kind: 'satin', poly: [[-0.34, 0.13], [0.34, 0.13], [0.4, 0.16], [-0.4, 0.16]], lift: 1 },
+    { kind: 'gloss', poly: [[-0.95, n - 0.006], [0.95, n - 0.006], [0.99, n - 0.03], [0.6, n - 0.045], [0, n - 0.05], [-0.6, n - 0.045], [-0.99, n - 0.03]] },
+    { kind: 'drl', pts: [[0, n - 0.03], [0.6, n - 0.027], [0.93, n - 0.016], [0.99, n - 0.022]], w: 6, mirror: true },
+    // Corner pods: wide at the top, tapering down, with the two lamps stacked and a light guide inboard.
+    { kind: 'housing', poly: [[0.66, n - 0.085], [0.96, n - 0.07], [1.03, n - 0.12], [0.97, n - 0.31], [0.76, n - 0.31]], mirror: true },
+    ...projector(0.86, n - 0.135, 0.036, hw, h),
+    ...projector(0.88, n - 0.235, 0.036, hw, h),
+    { kind: 'drl', pts: [[0.7, n - 0.1], [0.77, n - 0.29]], w: 5, mirror: true },
+    // Black band joining the pods across the face.
+    { kind: 'gloss', rect: [-0.72, 0.72, n - 0.29, n - 0.255] },
+    { kind: 'trim', pattern: 'slats-h', rect: [-0.68, 0.68, n - 0.284, n - 0.261], pitch: 8, fill: 0.4, lift: 1 },
+    // Lower bumper: black, angled up at the corners, with vertical slats; silver skid plate.
+    { kind: 'trim', poly: [[-0.62, 0.31], [0.62, 0.31], [0.86, 0.28], [0.98, 0.2], [-0.98, 0.2], [-0.86, 0.28]] },
+    { kind: 'satin', pattern: 'slats-v', rect: [-0.56, 0.56, 0.245, 0.295], pitch: 26, fill: 0.3, lift: 1 },
+    { kind: 'satin', poly: [[-0.62, 0.2], [0.62, 0.2], [0.7, 0.238], [-0.7, 0.238]], lift: 2 },
   ];
 }
 function punchRear(t: number): FaceItem[] {
-  const top = t - 0.035;
+  const top = t - 0.032;
   return [
-    { kind: 'housing', rect: [0.66, 1.05, top - 0.08, top], mirror: true },
-    { kind: 'tail', pts: [[0, top - 0.025], [1.04, top - 0.025]], w: 6, mirror: true },
-    { kind: 'tail', rect: [0.72, 1.03, top - 0.07, top - 0.045], mirror: true },
-    { kind: 'clad', rect: [-1.0, 1.0, 0.13, 0.26] },
-    { kind: 'satin', rect: [-0.4, 0.4, 0.145, 0.17], lift: 1 },
+    { kind: 'housing', rect: [0.64, 1.07, top - 0.08, top], mirror: true },
+    { kind: 'lens', rect: [0.67, 1.05, top - 0.07, top - 0.008], mirror: true, lift: 2 },
+    { kind: 'tail', pts: [[0, top - 0.02], [1.05, top - 0.02]], w: 6, mirror: true },
+    { kind: 'tail', pts: [[0.7, top - 0.05], [1.05, top - 0.05], [1.05, top - 0.07]], w: 7, mirror: true },
+    { kind: 'clad', poly: [[-1.0, 0.31], [1.0, 0.31], [1.02, 0.192], [-1.02, 0.192]] },
+    { kind: 'tail', rect: [0.84, 0.95, 0.24, 0.255], mirror: true, lift: 1 },
+    { kind: 'satin', poly: [[-0.5, 0.19], [0.5, 0.19], [0.44, 0.225], [-0.44, 0.225]], lift: 2 },
   ];
 }
-/** XEV 9S: thick full-width LED bar that turns down at the corners to frame the face, headlamps flanking a
- * blanked black panel, gloss-black lower bumper with two slots. */
+/** XEV 9S. Front: a thick LED bar across the nose whose ends drop straight down the corners (an inverted
+ * L); headlamp clusters tucked inside each L; a blanked gloss-black panel in the middle that narrows
+ * downward, framed by body colour; a gloss-black lower bumper that sweeps up the corners, with two slots. */
 function xev9sFront(n: number): FaceItem[] {
+  const hw = 0.95;
+  const h = 1.747;
   return [
-    { kind: 'drl', pts: [[0, n - 0.02], [0.86, n - 0.02], [0.95, n - 0.05], [0.98, n - 0.21]], w: 15, mirror: true },
-    { kind: 'gloss', rect: [-0.88, 0.88, n - 0.2, n - 0.045] },
-    { kind: 'housing', poly: [[0.66, n - 0.19], [0.92, n - 0.18], [0.93, n - 0.06], [0.68, n - 0.06]], mirror: true, lift: 1 },
-    ...projector(0.735, n - 0.12, 0.04, 0.95, 1.747),
-    ...projector(0.84, n - 0.115, 0.04, 0.95, 1.747),
-    { kind: 'gloss', rect: [-0.86, 0.86, 0.15, 0.31] },
-    { kind: 'intake', poly: [[0.08, 0.19], [0.55, 0.19], [0.62, 0.27], [0.1, 0.27]], mirror: true, lift: 1 },
-    { kind: 'satin', rect: [-0.4, 0.4, 0.125, 0.145], lift: 1 },
+    { kind: 'drl', pts: [[0, n - 0.022], [0.9, n - 0.022], [0.97, n - 0.04], [0.99, n - 0.08], [0.985, n - 0.25]], w: 14, mirror: true },
+    { kind: 'gloss', rect: [-0.9, 0.9, n - 0.045, n - 0.005] },
+    // Headlamps: a dark triangle inside the L, deepest at the outer edge, with three projectors on a slant.
+    { kind: 'housing', poly: [[0.56, n - 0.055], [0.955, n - 0.055], [0.955, n - 0.235], [0.86, n - 0.2]], mirror: true },
+    ...projector(0.67, n - 0.085, 0.03, hw, h),
+    ...projector(0.77, n - 0.105, 0.03, hw, h),
+    ...projector(0.87, n - 0.13, 0.03, hw, h),
+    { kind: 'drl', pts: [[0.6, n - 0.062], [0.94, n - 0.062]], w: 5, mirror: true },
+    // Blanked panel, framed by body colour.
+    { kind: 'gloss', poly: [[-0.46, n - 0.06], [0.46, n - 0.06], [0.36, n - 0.21], [-0.36, n - 0.21]] },
+    { kind: 'grille', pattern: 'diamonds', rect: [-0.38, 0.38, n - 0.19, n - 0.08], pitch: 30, fill: 0.5, lift: 1 },
+    // Lower bumper: gloss black, rising up the corners to meet the vertical DRL legs.
+    { kind: 'gloss', poly: [[-0.55, 0.3], [0.55, 0.3], [0.8, 0.31], [0.94, n - 0.27], [1.04, n - 0.25], [1.04, 0.19], [-1.04, 0.19], [-1.04, n - 0.25], [-0.94, n - 0.27], [-0.8, 0.31]] },
+    { kind: 'intake', poly: [[0.08, 0.215], [0.5, 0.215], [0.56, 0.265], [0.1, 0.265]], mirror: true, lift: 1 },
+    { kind: 'satin', poly: [[-0.38, 0.188], [0.38, 0.188], [0.42, 0.203], [-0.42, 0.203]], lift: 2 },
   ];
 }
-/** XUV700-style tail lamps joined by a black trim panel with a hex pattern; no light bar. */
+/** XUV700-style tail lamps: tall, angled clusters that run forward onto the quarters and point down at
+ * their inner end, joined by a black trim panel with a hex-like pattern; no light bar. */
 function xev9sRear(t: number): FaceItem[] {
-  const top = t - 0.03;
+  const top = t - 0.025;
   return [
-    // Tall lamps that run forward onto the rear quarters, as on the XUV700 body it shares.
-    { kind: 'housing', poly: [[0.6, top - 0.13], [1.1, top - 0.07], [1.1, top + 0.015], [0.6, top + 0.015]], mirror: true },
-    { kind: 'lens', poly: [[0.63, top - 0.11], [1.08, top - 0.06], [1.08, top + 0.003], [0.63, top + 0.003]], mirror: true, lift: 1 },
-    { kind: 'tail', pts: [[0.64, top - 0.008], [1.07, top - 0.008]], w: 10, mirror: true },
-    { kind: 'tail', pts: [[0.66, top - 0.1], [1.07, top - 0.055]], w: 8, mirror: true },
-    { kind: 'gloss', rect: [-0.59, 0.59, top - 0.08, top - 0.015] },
-    { kind: 'grille', pattern: 'diamonds', rect: [-0.58, 0.58, top - 0.07, top - 0.025], pitch: 24, fill: 0.6, lift: 1 },
-    { kind: 'gloss', rect: [-1.0, 1.0, 0.13, 0.27] },
-    { kind: 'satin', rect: [-0.42, 0.42, 0.14, 0.16], lift: 1 },
-    { kind: 'tail', rect: [0.82, 0.95, 0.22, 0.235], mirror: true },
+    { kind: 'housing', poly: [[0.56, top - 0.035], [0.62, top + 0.012], [1.13, top + 0.012], [1.13, top - 0.06], [0.72, top - 0.14]], mirror: true },
+    { kind: 'lens', poly: [[0.6, top - 0.033], [0.645, top + 0.002], [1.11, top + 0.002], [1.11, top - 0.052], [0.73, top - 0.125]], mirror: true, lift: 3 },
+    { kind: 'tail', pts: [[0.63, top - 0.006], [1.11, top - 0.006]], w: 9, mirror: true },
+    { kind: 'tail', pts: [[0.64, top - 0.035], [0.74, top - 0.11], [0.8, top - 0.1]], w: 7, mirror: true },
+    { kind: 'gloss', rect: [-0.57, 0.57, top - 0.065, top - 0.01] },
+    { kind: 'grille', pattern: 'diamonds', rect: [-0.54, 0.54, top - 0.055, top - 0.02], pitch: 26, fill: 0.55, lift: 1 },
+    { kind: 'gloss', poly: [[-1.02, 0.3], [1.02, 0.3], [1.02, 0.19], [-1.02, 0.19]] },
+    { kind: 'satin', poly: [[-0.45, 0.188], [0.45, 0.188], [0.4, 0.215], [-0.4, 0.215]], lift: 2 },
+    { kind: 'tail', rect: [0.8, 0.95, 0.245, 0.262], mirror: true, lift: 1 },
   ];
 }
 
@@ -330,35 +366,37 @@ const SPECS: Record<string, Spec> = {
     name: 'Tata Nexon EV',
     body: 'suv',
     size: [3995, 1802, 1625, 2498, 190, 16],
-    profile: [0.31, 0.46, 0.87, 0.95, 0.57, 0.635, 0.62, 0.98, 0.68],
+    profile: [0.31, 0.46, 0.87, 0.955, 0.57, 0.635, 0.62, 0.98, 0.68],
     dloX: 0.875,
-    faceRake: 0.1,
+    faceRake: 0.13,
     front: 'bar-split',
     rear: 'x-bar',
     floatingRoof: true,
     blackRoof: true,
     cladding: true,
-    wheel: 'aero',
+    // Five twin spokes, machined faces over dark pockets.
+    wheel: 'twin',
     finish: 'two-tone',
     tyre: [215, 60],
     frontOverhang: 0.538,
-    noseRound: 0.25,
+    noseRound: 0.35,
     frontItems: nexonFront,
     rearItems: nexonRear,
     curves: {
       // Rounded bonnet lip that the DRL bar sits on.
-      hood: [[0, 0.535], [0.008, 0.56], [0.022, 0.576], [0.06, 0.588], [0.3, 0.635]],
+      hood: [[0, 0.535], [0.008, 0.56], [0.022, 0.576], [0.06, 0.59], [0.3, 0.635]],
       // The window line climbs all the way back and kicks up hard into the thick rear quarter, while the
-      // roof falls away behind the B-pillar: the side glass tapers to a point at the rear.
-      belt: [[0.31, 0.62], [0.5, 0.632], [0.7, 0.657], [0.8, 0.7], [0.885, 0.77], [0.95, 0.685]],
-      roof: [[0.48, 0.985], [0.6, 0.98], [0.75, 0.96], [0.87, 0.915]],
+      // roof falls away from the B-pillar: the coupe-SUV stance, with side glass tapering to a point.
+      belt: [[0.31, 0.62], [0.5, 0.634], [0.7, 0.66], [0.8, 0.705], [0.885, 0.775], [0.955, 0.685]],
+      roof: [[0.48, 0.985], [0.58, 0.982], [0.7, 0.965], [0.8, 0.935], [0.87, 0.895]],
     },
-    plan: { noseDepth: 0.44, noseSquare: 2.5, tailDepth: 0.32, tailSquare: 2.6 },
+    plan: { noseDepth: 0.46, noseSquare: 2.4, tailDepth: 0.34, tailSquare: 2.5 },
     hoodCrown: 0.045,
-    shoulder: { drop: [0.19, 0.1], tumble: 0.09, sharp: true, crease: { y: [0.34, 0.42], depth: 0.007 } },
-    glass: { rearPillar: 'black', trim: 'black', rearSlant: 0.12 },
-    arch: { shape: 'round', gap: 0.02 },
-    clad: { archWidth: 0.075, sillH: 0.11 },
+    shoulder: { drop: [0.19, 0.1], tumble: 0.09, sharp: true, crease: { y: [0.34, 0.42], depth: 0.008 } },
+    // Silver accent along the rising window line, as on the dual-tone cars.
+    glass: { rearPillar: 'black', trim: 'chrome', rearSlant: 0.12 },
+    arch: { shape: 'round', gap: 0.018 },
+    clad: { archWidth: 0.09, sillH: 0.125, proud: 0.014 },
     lampGlow: 1.2,
     paints: [['Empowered Oxide', '#8A8F86'], ['Pristine White', '#F2F2EF'], ['Daytona Grey', '#5E6266'], ['Ocean Blue', '#1F4E79'], ['Pure Grey', '#9B9EA0']],
   },
@@ -373,9 +411,10 @@ const SPECS: Record<string, Spec> = {
     blackRoof: true,
     cladding: true,
     roofRails: true,
-    noseRound: 0.1,
-    faceRake: 0.04,
-    wheel: 'spoke',
+    noseRound: 0.15,
+    faceRake: 0.06,
+    wheel: 'aero',
+    spokes: 6,
     finish: 'two-tone',
     tyre: [195, 60],
     frontItems: punchFront,
@@ -387,7 +426,7 @@ const SPECS: Record<string, Spec> = {
     shoulder: { drop: [0.12, 0.1], tumble: 0.055, sharp: true },
     glass: { rearPillar: 'black', trim: 'black', rearSlant: 0.04 },
     arch: { shape: 'squared', gap: 0.022 },
-    clad: { colour: '#4a4d52', archWidth: 0.085, sillH: 0.13, proud: 0.016 },
+    clad: { colour: '#4a4d52', archWidth: 0.1, sillH: 0.14, proud: 0.018 },
     handles: 'pillar-rear',
     lampGlow: 1.2,
     paints: [['Fearless Yellow', '#E9B824'], ['Supernova Copper', '#B36A45'], ['Bengal Rouge', '#8E2430'], ['Empowered Oxide', '#8A8F86'], ['Pristine White', '#F2F2EF']],
@@ -532,24 +571,27 @@ const SPECS: Record<string, Spec> = {
     name: 'Mahindra XEV 9S',
     body: 'suv',
     size: [4737, 1900, 1747, 2762, 205, 18],
-    profile: [0.31, 0.45, 0.9, 0.96, 0.58, 0.62, 0.6, 0.97, 0.63],
+    // Tall, upright three-row body: the bonnet and beltline sit a little above the photo estimates, which
+    // read as a low estate car in the renders.
+    profile: [0.31, 0.45, 0.9, 0.96, 0.6, 0.64, 0.62, 0.975, 0.645],
     front: 'bar-down',
     rear: 'wrap',
     cladding: true,
     roofRails: true,
     flushHandles: true,
-    wheel: 'aero',
+    // Five wide, swirling aero blades, two-tone.
+    wheel: 'blade',
     finish: 'two-tone',
     tyre: [235, 60],
-    noseRound: 0.15,
-    faceRake: 0.05,
+    noseRound: 0.2,
+    faceRake: 0.07,
     frontItems: xev9sFront,
     rearItems: xev9sRear,
     // Upright XUV700 body: the window line kicks up at the C-pillar into a body-colour D-pillar.
     curves: {
       // Big rounded bonnet lip over the full-width light bar.
-      hood: [[0, 0.545], [0.008, 0.574], [0.022, 0.592], [0.06, 0.6], [0.3, 0.625]],
-      belt: [[0.31, 0.6], [0.7, 0.61], [0.8, 0.62], [0.85, 0.665], [0.96, 0.63]],
+      hood: [[0, 0.565], [0.008, 0.594], [0.022, 0.611], [0.06, 0.62], [0.3, 0.645]],
+      belt: [[0.31, 0.62], [0.7, 0.632], [0.8, 0.642], [0.85, 0.69], [0.96, 0.645]],
     },
     plan: { noseDepth: 0.36, noseSquare: 2.9, tailDepth: 0.3, tailSquare: 2.8 },
     arch: { shape: 'round', gap: 0.022 },

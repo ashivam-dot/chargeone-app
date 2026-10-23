@@ -72,7 +72,8 @@ export type FaceItem = FaceLine | FacePanel | FacePoly | FacePattern;
 /** Control points `[t, h]` of a side-view line; the generator runs a smooth, non-overshooting curve through them. */
 export type Curve = Array<[t: number, h: number]>;
 
-export type WheelStyle = 'spoke' | 'twin' | 'multi' | 'aero' | 'turbine' | 'disc';
+/** `blade`: a few wide aero blades with a strong swirl (Mahindra XEV-style). */
+export type WheelStyle = 'spoke' | 'twin' | 'multi' | 'aero' | 'turbine' | 'blade' | 'disc';
 export type WheelFinish = 'silver' | 'two-tone' | 'black' | 'gunmetal';
 
 export interface CarPaint {

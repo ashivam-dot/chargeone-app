@@ -32,9 +32,9 @@ const views: Record<string, [number, number, number]> = {
   side: [0, 0.8, L * 4.4],
   front34: [L * 1.32, 1.5, L * 1.32],
   rear34: [-L * 1.32, 1.5, L * 1.32],
-  front: [L * 1.7, 0.95, 0],
+  front: [L * 1.45, 0.95, 0],
   close: [L * 0.95, 1.1, L * 0.7],
-  rear: [-L * 2.6, 0.9, 0],
+  rear: [-L * 1.45, 0.95, 0],
   top: [0, 26, 0.01],
 };
 const v = views[q.get('view') ?? 'front34'] ?? views.front34;

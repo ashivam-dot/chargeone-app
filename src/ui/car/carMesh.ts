@@ -23,7 +23,7 @@ import {
   type Material,
   type Object3D,
 } from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { CarDesign, Curve, FaceItem, FaceKind, FaceLine, FacePanel, FacePattern, FacePoly, FacePt } from './carDesign.ts';
 
 // Builds a car from its CarDesign numbers: a lofted body with a top-down plan shape, shoulder and door creases
@@ -272,9 +272,13 @@ function strip(points: Array<[Vector3, Vector3]>, mat: Material): Mesh {
   return new Mesh(geo, mat);
 }
 
+/** A triangle soup (face decals) with smooth normals: shared corners are welded first, so a lens or panel
+ * draped over a curved corner shades as one surface instead of showing every facet in the reflections. */
 function triangles(pos: number[], mat: Material): Mesh {
-  const geo = new BufferGeometry();
-  geo.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
+  const raw = new BufferGeometry();
+  raw.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
+  const geo = mergeVertices(raw, 1e-5);
+  raw.dispose();
   geo.computeVertexNormals();
   return new Mesh(geo, mat);
 }
@@ -293,6 +297,8 @@ interface WheelLayout {
   twist: number;
   /** Half width of the slot that splits each spoke into two, metres (twin spokes). */
   slot: number;
+  /** Extra half width per metre of radius: spokes that widen toward the rim (blades). */
+  grow?: number;
 }
 
 function wheelLayout(d: CarDesign, rimR: number): WheelLayout {
@@ -307,6 +313,8 @@ function wheelLayout(d: CarDesign, rimR: number): WheelLayout {
       return { n, rin: 0.5, rout: 0.86, half: ((Math.PI * rimR * 0.68) / n) * 0.5, twist: 0.12, slot: 0 };
     case 'turbine':
       return { n, rin: 0.33, rout: 0.89, half: 0.016, twist: 0.8, slot: 0 };
+    case 'blade':
+      return { n, rin: 0.3, rout: 0.9, half: 0.012, grow: 0.4, twist: 1.0, slot: 0 };
     case 'disc':
       return { n, rin: 0.72, rout: 0.84, half: ((Math.PI * rimR * 0.78) / n) * 0.78, twist: 0.3, slot: 0 };
     default:
@@ -328,8 +336,8 @@ function wheelShape(lay: WheelLayout, rimR: number): Shape {
     let ok = true;
     for (let i = 0; i <= M; i++) {
       const r = lerp(rin, rout, i / M);
-      const a0 = ang(k, r) + Math.asin(Math.min(0.95, lay.half / r));
-      const a1 = ang(k + 1, r) - Math.asin(Math.min(0.95, lay.half / r));
+      const a0 = ang(k, r) + Math.asin(Math.min(0.95, (lay.half + (lay.grow ?? 0) * r) / r));
+      const a1 = ang(k + 1, r) - Math.asin(Math.min(0.95, (lay.half + (lay.grow ?? 0) * r) / r));
       if (a1 - a0 < 0.02) ok = false;
       left.push(new Vector2(Math.cos(a0) * r, Math.sin(a0) * r));
       right.push(new Vector2(Math.cos(a1) * r, Math.sin(a1) * r));
@@ -385,10 +393,10 @@ function wheel(m: Mats, d: CarDesign, R: number, width: number, rimR: number): G
   const sw = R - rimR;
   const side = (s: number): Vector2[] => {
     const pts = [
-      [rimR * 0.985, 0.84],
-      [rimR + sw * 0.1, 0.9],
-      [rimR + sw * 0.16, 0.97],
-      [rimR + sw * 0.24, 0.95],
+      [rimR * 0.985, 0.9],
+      [rimR + sw * 0.1, 0.94],
+      [rimR + sw * 0.16, 0.98],
+      [rimR + sw * 0.24, 0.96],
       [rimR + sw * 0.45, 1.0],
       [rimR + sw * 0.68, 0.99],
       [R - 0.03, 0.93],
@@ -413,7 +421,9 @@ function wheel(m: Mats, d: CarDesign, R: number, width: number, rimR: number): G
   tyre.rotation.x = Math.PI / 2;
   g.add(tyre);
 
-  const face = hw * 0.8;
+  // The rim face sits almost flush with the sidewall, so the wheel reads at its real size from three-quarter
+  // views instead of hiding behind the tyre bulge.
+  const face = hw * 0.9;
   const barrel = new Mesh(new CylinderGeometry(rimR * 0.985, rimR * 0.985, width * 0.85, 40, 1, true), m.rimDark);
   barrel.rotation.x = Math.PI / 2;
   g.add(barrel);
@@ -514,12 +524,14 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     }
     return y;
   };
-  const bottom = (t: number): number => {
+  /** The body's bottom edge ignoring the wheel arches. */
+  const bottomBase = (t: number): number => {
     let y = GC;
     if (t < 0.07) y += 0.11 * (1 - t / 0.07) ** 2;
     if (t > 0.93) y += 0.09 * ((t - 0.93) / 0.07) ** 2;
-    return Math.max(y, archAt(xOf(t)));
+    return y;
   };
+  const bottom = (t: number): number => Math.max(bottomBase(t), archAt(xOf(t)));
   /** Top-down half width: superellipse corners at the nose and tail. */
   const se = (u: number, q: number) => (1 - (1 - clamp01(u)) ** q) ** (1 / q);
   const planHalf = (t: number): number => {
@@ -571,8 +583,12 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     const key = Math.round(t * 1e5);
     const hit = sections.get(key);
     if (hit) return hit;
-    const yb = bottom(t);
-    const yt = Math.max(top(t), yb + 0.04);
+    // The section is laid out on the arch-free bottom, so every shoulder, crease and sill vertex keeps its
+    // height from ring to ring; points below an arch are then collapsed onto the arch edge. Laying it out on
+    // the arch itself squeezed the creases upward over each wheel and made the reflections wobble there.
+    const yb = bottomBase(t);
+    const yArch = archAt(xOf(t));
+    const yt = Math.max(top(t), yb + 0.04, yArch + 0.04);
     const h = yt - yb;
     const x = xOf(t);
     // Haunches: full width over the wheels, a little in between.
@@ -582,7 +598,7 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     const tail = t > 0.9 ? ((t - 0.9) / 0.1) ** 1.5 : 0;
     const u = clamp01((t - 0.1) / 0.8);
     const drop = lerp(d.shoulder.drop[0], d.shoulder.drop[1], u);
-    const rb = Math.min(0.08, h * 0.2);
+    const rb = Math.min(0.08, h * 0.2, w * 0.4);
     const rty = Math.min(0.04 + 0.1 * nose * (0.4 + d.noseRound) + 0.05 * tail, h * 0.3, drop * 0.9);
     const rtz = Math.min(rty * 1.2, w * 0.4);
     const y0 = yb + rb;
@@ -596,10 +612,12 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
     ys = Math.min(Math.max(ys, y0 + span * 0.45), yA - span * 0.08);
     yc = Math.min(Math.max(yc, y0 + span * 0.18), ys - cw - span * 0.08);
     ySill = Math.min(Math.max(ySill, y0 + span * 0.04), yc - cw - span * 0.05);
-    const tuck = 0.032;
-    const tumble = d.shoulder.tumble;
-    const creaseDepth = d.shoulder.crease?.depth ?? 0;
-    const zAt = (y: number): number => (y <= ys ? w - tuck * ((ys - y) / Math.max(1e-3, ys - yb)) ** 2 : w - tumble * ((y - ys) / Math.max(1e-3, yt - ys)) ** 1.25);
+    // Tuck and tumble shrink with the section at the very nose and tail, so a narrow ring never folds
+    // across the centre line (that fold showed as an X-shaped notch down the middle of the face).
+    const tuck = Math.min(0.032, w * 0.2);
+    const tumble = Math.min(d.shoulder.tumble, w * 0.3);
+    const creaseDepth = Math.min(d.shoulder.crease?.depth ?? 0, w * 0.05);
+    const zAt = (y: number): number => Math.max(0, y <= ys ? w - tuck * ((ys - y) / Math.max(1e-3, ys - yb)) ** 2 : w - tumble * ((y - ys) / Math.max(1e-3, yt - ys)) ** 1.25);
     const zA = zAt(yA);
     const pts: Array<[number, number]> = [];
     const zb = zAt(y0);
@@ -635,7 +653,15 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
       const z = zc * (1 - i / 5);
       pts.push([z, yt + crown * (1 - (z / Math.max(1e-6, zc)) ** 2)]);
     }
-    const s: Section = { pts, yb, yt, zA, yA, rtz, rty, zLow: zb };
+    if (yArch > yb) {
+      // Over a wheel: the floor rises to the arch and the side points below it collapse onto its edge.
+      const zEdge = zAt(yArch);
+      pts.forEach((pt, k) => {
+        if (pt[1] >= yArch) return;
+        pts[k] = [k <= N_FLAT ? Math.min(pt[0], zEdge) : zEdge, yArch];
+      });
+    }
+    const s: Section = { pts, yb: Math.max(yb, yArch), yt, zA, yA, rtz, rty, zLow: zb };
     sections.set(key, s);
     return s;
   };
@@ -1196,7 +1222,7 @@ export function buildCar(d: CarDesign, paintHex: string): CarModel {
   for (const ax of axles) {
     for (const zSign of [1, -1]) {
       const w = wheel(m, d, R, tyreW, rimR);
-      w.position.set(ax, R, zSign * (W / 2 - tyreW / 2 - 0.025));
+      w.position.set(ax, R, zSign * (W / 2 - tyreW / 2 - 0.015));
       if (zSign < 0) w.scale.z = -1;
       const pivot = new Group();
       pivot.add(w);
