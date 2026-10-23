@@ -24,14 +24,12 @@ const BUTTON_WAIT_MS = 6000;
 
 interface Props {
   clientId: string;
-  dark: boolean;
   disabled: boolean;
   onCredential: (credential: string) => void;
 }
 
 export function GoogleButton({
   clientId,
-  dark,
   disabled,
   onCredential,
 }: Props) {
@@ -59,7 +57,9 @@ export function GoogleButton({
         });
         el.replaceChildren();
         window.google.accounts.id.renderButton(el, {
-          theme: dark ? "filled_black" : "outline",
+          // The white "outline" button in both themes: "filled_black" is a near-black pill that
+          // vanishes on the dark sheet, and white matches the sheet's own primary button there.
+          theme: "outline",
           size: "large",
           shape: "pill",
           text: "continue_with",
@@ -78,7 +78,7 @@ export function GoogleButton({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [clientId, dark]);
+  }, [clientId]);
 
   return (
     <div class="auth-google">

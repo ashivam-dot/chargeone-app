@@ -733,7 +733,6 @@ export function App() {
       {(overlay === 'signin' || overlay === 'username' || overlay === 'methods') && (
         <SignIn
           config={config}
-          dark={dark}
           start={overlay === 'signin' ? undefined : overlay}
           me={me}
           onClose={() => {

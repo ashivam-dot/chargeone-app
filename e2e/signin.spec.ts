@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { FakeFirebase, OTP } from "./firebase-mock.ts";
 import { expect, test } from "./fixtures.ts";
-import { openApp, watchErrors } from "./helpers.ts";
+import { animationsSettled, openApp, watchErrors } from "./helpers.ts";
 
 // Sign-in with Google, email or username and password, and a phone number with a one-time code.
 // Firebase and Google are faked (e2e/firebase-mock.ts): nothing leaves the machine.
@@ -382,6 +382,24 @@ test.describe("sign-in sheet", () => {
     await expect(page.getByTestId("signin-username")).toHaveCount(0);
     expect(fb.leaks).toEqual([]);
     expect(errors).toEqual([]);
+  });
+
+  test("Google's button stands out on the dark sheet and the text links are big enough to tap", async ({
+    page,
+  }) => {
+    await setup(page);
+    await openSignIn(page);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    // "filled_black" is a near-black pill on a near-black sheet; the white outline button reads.
+    await expect(
+      page.getByTestId("signin-google").locator("iframe"),
+    ).toHaveAttribute("data-theme", "outline");
+    // Measure once the sheet has finished its entrance: mid-animation its boxes are still transformed.
+    await animationsSettled(page);
+    for (const id of ["signin-forgot", "signin-register"]) {
+      const box = (await page.getByTestId(id).boundingBox())!;
+      expect(box.height, id).toBeGreaterThanOrEqual(24);
+    }
   });
 
   test("a guest can close the sheet and keep using Basic", async ({ page }) => {

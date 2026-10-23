@@ -17,12 +17,11 @@ const LABEL: Record<AuthProvider, string> = {
 interface Props {
   me: Me;
   clientId: string | null;
-  dark: boolean;
   onUpdated: (me: Me) => void;
   onDone: () => void;
 }
 
-export function MethodsView({ me, clientId, dark, onUpdated, onDone }: Props) {
+export function MethodsView({ me, clientId, onUpdated, onDone }: Props) {
   const [busy, setBusy] = useState<AuthProvider | null>(null);
   const [confirm, setConfirm] = useState<AuthProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +113,6 @@ export function MethodsView({ me, clientId, dark, onUpdated, onDone }: Props) {
           </p>
           <GoogleButton
             clientId={clientId}
-            dark={dark}
             disabled={busy !== null}
             onCredential={(c) =>
               void run("google", () => api.linkGoogle(c), "Google added.")

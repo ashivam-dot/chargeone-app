@@ -484,6 +484,16 @@ div.auth-alert:has(> svg) {
 .auth-foot .link--inline {
   font-weight: 650;
 }
+/* Text links in the sheet are buttons too: at least 24 px tall to tap (WCAG 2.5.8), without moving the
+   text. inline-flex keeps the text's baseline, so they still sit in their sentence. */
+.auth .link--inline,
+.auth .auth-field__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding-block: 3px;
+  margin-block: -3px;
+}
 .auth-back {
   display: inline-flex;
   align-items: center;

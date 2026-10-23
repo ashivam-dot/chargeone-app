@@ -31,7 +31,6 @@ import "./signin.css";
 
 export interface SignInSheetProps {
   config: Config | null;
-  dark: boolean;
   /** Open straight at "choose a username" or "sign-in methods" for a signed-in driver (from the You screen). */
   start?: "username" | "methods";
   me?: Me | null;
@@ -108,7 +107,6 @@ const unverified = (e: unknown): e is ApiError =>
 
 export function SignInSheet({
   config,
-  dark,
   start,
   me: initialMe,
   onClose,
@@ -450,7 +448,6 @@ export function SignInSheet({
           <MethodsView
           me={signedIn.current}
           clientId={clientId}
-          dark={dark}
           onUpdated={(m) => {
             signedIn.current = m;
             setMethodsMe(m);
@@ -479,7 +476,6 @@ export function SignInSheet({
             {clientId && (
               <GoogleButton
                 clientId={clientId}
-                dark={dark}
                 disabled={busy !== null}
                 onCredential={(c) => void google(c)}
               />
